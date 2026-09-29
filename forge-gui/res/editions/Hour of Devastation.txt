@@ -2,17 +2,17 @@
 Code=HOU
 Date=2017-07-14
 Name=Hour of Devastation
-Code2=HOU
 Type=Expansion
 BoosterCovers=5
-Booster=10 Common:!fromSheet("HOU Planeswalker Decks and Toolkit"), 3 Uncommon:!fromSheet("HOU Planeswalker Decks and Toolkit"), 1 RareMythic:!fromSheet("HOU Planeswalker Decks and Toolkit"), 1 BasicLand
-AdditionalSheetForFoils=fromSheet("MPS Hour of Devastation Invocations")
+Booster=10 Common:fromSheet("HOU cards"), 3 Uncommon:fromSheet("HOU cards"), 1 RareMythic:fromSheet("HOU cards"), 1 BasicLand
+AdditionalSheetForFoils=fromSheet("MPS_AKH special slot")
 FatPack=10
 FatPackExtraSlots=80 BasicLands
 AdditionalSetUnlockedInQuest=MPS_AKH
 TreatAsSmallSet=true
 ChaosDraftThemes=GRAVEYARD_MATTERS
 ScryfallCode=HOU
+TokenFallbackCode=AKH
 
 [cards]
 1 C Act of Heroism @Magali Villeneuve
@@ -96,7 +96,7 @@ ScryfallCode=HOU
 79 C Torment of Venom @Johann Bodin
 80 U Vile Manifestation @Jason Felix
 81 C Without Weakness @Alex Konstad
-82 C Wretched Camel @Dan Scott
+82 C Wretched Camel @Dan Murayama Scott
 83 U Abrade @Jonas De Ro
 84 C Blur of Blades @Anna Steinbauer
 85 U Burning-Fist Minotaur @Matt Stewart
@@ -167,7 +167,7 @@ ScryfallCode=HOU
 150 U Claim // Fame @Jason Rainville
 151 U Struggle // Survive @Eric Deschamps
 152 U Appeal // Authority @Jason Rainville
-153 R Leave // Chance @Dan Scott
+153 R Leave // Chance @Dan Murayama Scott
 154 R Reason // Believe @Daarken
 155 R Grind // Dust @Josh Hass
 156 R Refuse // Cooperate @Yongjae Choi
@@ -214,6 +214,8 @@ ScryfallCode=HOU
 197 L Mountain @Kev Walker
 198 L Forest @Titus Lunter
 199 L Forest @Mark Poole
+
+[precon product]
 200 M Nissa, Genesis Mage @Chris Rallis
 201 U Avid Reclaimer @Josu Hernaiz
 202 C Brambleweft Behemoth @Florian de Gesincourt
@@ -226,20 +228,17 @@ ScryfallCode=HOU
 209 C Cinder Barrens @Titus Lunter
 
 [tokens]
-w_1_1_cat_lifelink
-w_5_5_horse
-w_1_1_warrior_vigilance
-b_2_2_zombie
-g_5_4_snake
-ur_1_1_insect_flying_haste
+10 w_5_5_horse @Lucas Graciano
+11 g_5_4_snake @Winona Nelson
+12 ur_1_1_insect_flying_haste @Lius Lasahido
 
 [other]
-eternalize_adorned_pouncer
-eternalize_champion_of_wits
-eternalize_dreamstealer
-eternalize_earthshaker_khenra
-eternalize_proven_combatant
-eternalize_resilient_khenra
-eternalize_sinuous_striker
-eternalize_steadfast_sentinel
-eternalize_sunscourge_champion
+1 eternalize_adorned_pouncer @Slawomir Maniak
+2 eternalize_champion_of_wits @Even Amundsen
+3 eternalize_dreamstealer @Yongjae Choi
+4 eternalize_earthshaker_khenra @Jason A. Engle
+5 eternalize_proven_combatant @Clint Cearley
+6 eternalize_resilient_khenra @Svetlin Velinov
+7 eternalize_sinuous_striker @Svetlin Velinov
+8 eternalize_steadfast_sentinel @ Karl Kopinski
+9 eternalize_sunscourge_champion @Josu Hernaiz

@@ -1,7 +1,7 @@
 [metadata]
 Code=THB
 Date=2020-01-24
-Name=Theros: Beyond Death
+Name=Theros Beyond Death
 Type=Expansion
 BoosterCovers=3
 Booster=10 Common:fromSheet("THB Commons"), 3 Uncommon:fromSheet("THB Uncommons"), 1 RareMythic:fromSheet("THB RareMythics"), 1 BasicLand
@@ -66,7 +66,7 @@ ScryfallCode=THB
 52 M Kiora Bests the Sea God @Victor Adame Minguez
 53 U Medomai's Prophecy @Seb McKinnon
 54 C Memory Drain @PINDURSKI
-55 R Nadir Kraken @Dan Scott
+55 R Nadir Kraken @Dan Murayama Scott
 56 C Naiad of Hidden Coves @Kieran Yanner
 57 C Nyxborn Seaguard @Simon Dominic
 58 C Omen of the Sea @Piotr Dura
@@ -195,7 +195,7 @@ ScryfallCode=THB
 181 R Nessian Boar @Zoltan Boros
 182 U Nessian Hornbeetle @Jason Felix
 183 U Nessian Wanderer @Matt Stewart
-184 C Nexus Wardens @Dan Scott
+184 C Nexus Wardens @Dan Murayama Scott
 185 M Nylea, Keen-Eyed @Chris Rahn
 186 C Nylea's Forerunner @Christopher Burdett
 187 C Nylea's Huntmaster @Winona Nelson
@@ -245,7 +245,7 @@ ScryfallCode=THB
 231 C Altar of the Pantheon @Jonas De Ro
 232 C Bronze Sword @Kev Walker
 233 U Entrancing Lyre @Yeong-Hao Han
-234 U Mirror Shield @Dan Scott
+234 U Mirror Shield @Dan Murayama Scott
 235 R Nyx Lotus @Raoul Vitale
 236 R Shadowspear @Yeong-Hao Han
 237 U Soul-Guide Lantern @Cliff Childs
@@ -326,7 +326,7 @@ ScryfallCode=THB
 302 R Shatter the Sky @Bayard Wu
 303 R Taranika, Akroan Veteran @Eric Deschamps
 304 R Ashiok's Erasure @Zezhou Chen
-305 R Nadir Kraken @Dan Scott
+305 R Nadir Kraken @Dan Murayama Scott
 306 R Protean Thaumaturge @Izzy
 307 R Thassa's Intervention @Zack Stella
 308 R Thassa's Oracle @Jesper Ejsing
@@ -368,7 +368,7 @@ ScryfallCode=THB
 344 R Nyx Lotus @Raoul Vitale
 345 R Shadowspear @Yeong-Hao Han
 346 R Labyrinth of Skophos @Jonas De Ro
-347 R Temple of Abandon @Adam Paquette
+347★ R Temple of Abandon @Adam Paquette
 348 R Temple of Deceit @Jonas De Ro
 349 R Temple of Enlightenment @Piotr Dura
 350 R Temple of Malice @Jonas De Ro
@@ -652,17 +652,17 @@ Unknown Shores|THB|1
 3 Uro, Titan of Nature's Wrath|THB|1
 
 [tokens]
-b_2_2_zombie
-c_0_4_a_wall_defender
-c_a_gold_sac
-g_1_2_spider_reach
-g_2_2_wolf
-r_1_1_satyr_noblock
-r_x_1_elemental_trample_haste
-u_1_1_tentacle
-u_3_2_reflection
-u_8_8_kraken_hexproof
-ub_2_3_nightmare_mill
-w_0_1_goat
-w_1_1_human_soldier
-w_2_2_pegasus_flying
+1 w_0_1_goat @John Thacker
+2 w_1_1_human_soldier @Kimonas Theodossiou
+3 w_2_2_pegasus_flying @Lars Grant-West
+4 u_8_8_kraken_hexproof @Victor Adame Minguez
+5 u_3_2_reflection @Kieran Yanner
+6 u_1_1_tentacle @Dan Murayama Scott
+7 b_2_2_zombie @Emrah Elmasli
+8 r_x_1_elemental_trample_haste @Svetlin Velinov
+9 r_1_1_satyr_noblock @Eric Deschamps
+10 g_1_2_spider_reach @Sam Rowan
+11 g_2_2_wolf @Jakub Kasper
+12 ub_2_3_nightmare_mill @Yeong-Hao Han
+13 c_a_gold_sac @Yeong-Hao Han
+14 c_0_4_a_wall_defender @Adam Paquette

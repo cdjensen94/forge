@@ -17,22 +17,21 @@
  */
 package forge.screens.deckeditor.controllers;
 
-import java.awt.event.ActionEvent;
-import java.awt.event.ActionListener;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map.Entry;
 import java.util.Set;
-
-import com.google.common.base.Supplier;
+import java.util.function.Supplier;
 
 import forge.card.CardEdition;
 import forge.deck.CardPool;
 import forge.deck.Deck;
-import forge.deck.DeckGroup;
+import forge.deck.DeckBase;
+import forge.deck.DeckProxy;
 import forge.deck.DeckSection;
 import forge.game.GameType;
+import forge.gamemodes.net.EventFormat;
 import forge.gui.UiCommand;
 import forge.gui.framework.DragCell;
 import forge.gui.framework.FScreen;
@@ -63,9 +62,9 @@ import forge.util.storage.IStorage;
  * @author Forge
  * @version $Id: DeckEditorCommon.java 12850 2011-12-26 14:55:09Z slapshot5 $
  */
-public final class CEditorLimited extends CDeckEditor<DeckGroup> {
+public final class CEditorLimited<T extends DeckBase> extends CDeckEditor<T> {
 
-    private final DeckController<DeckGroup> controller;
+    private final DeckController<T> controller;
     private DragCell constructedDecksParent = null;
     private DragCell commanderDecksParent = null;
     private DragCell oathbreakerDecksParent = null;
@@ -73,6 +72,12 @@ public final class CEditorLimited extends CDeckEditor<DeckGroup> {
     private DragCell tinyLeadersDecksParent = null;
     private DragCell deckGenParent = null;
     private final List<DeckSection> allSections = new ArrayList<>();
+
+    /** Picks the editor screen for a network event deck from its eventFormat tag. */
+    public static FScreen networkEventEditorScreen(Deck deck) {
+        return deck != null && EventFormat.BOOSTER_DRAFT.name().equals(DeckProxy.getEventTag(deck, "eventFormat"))
+                ? FScreen.DECK_EDITOR_DRAFT : FScreen.DECK_EDITOR_SEALED;
+    }
 
     //========== Constructor
 
@@ -82,7 +87,7 @@ public final class CEditorLimited extends CDeckEditor<DeckGroup> {
      * @param deckMap0 &emsp; {@link forge.deck.DeckGroup}<{@link forge.util.storage.IStorage}>
      */
     @SuppressWarnings("serial")
-    public CEditorLimited(final IStorage<DeckGroup> deckMap0, final FScreen screen0, final CDetailPicture cDetailPicture0) {
+    public CEditorLimited(final IStorage<T> deckMap0, final Supplier<T> newCreator, final FScreen screen0, final CDetailPicture cDetailPicture0) {
         super(screen0, cDetailPicture0, GameType.Sealed);
 
         final CardManager catalogManager = new CardManager(cDetailPicture0, false, false, FScreen.DECK_EDITOR_DRAFT.equals(screen0));
@@ -96,36 +101,25 @@ public final class CEditorLimited extends CDeckEditor<DeckGroup> {
         this.setCatalogManager(catalogManager);
         this.setDeckManager(deckManager);
 
-        final Supplier<DeckGroup> newCreator = new Supplier<DeckGroup>() {
-            @Override
-            public DeckGroup get() {
-                return new DeckGroup("");
-            }
-        };
         this.controller = new DeckController<>(deckMap0, this, newCreator);
 
-        getBtnAddBasicLands().setCommand(new UiCommand() {
-            @Override
-            public void run() {
-                CEditorLimited.addBasicLands(CEditorLimited.this);
-            }
-        });
+        getBtnAddBasicLands().setCommand((UiCommand) () -> CEditorLimited.addBasicLands(CEditorLimited.this));
 
         allSections.add(DeckSection.Main);
+
+        //TODO: Ideally these should only show when the draft pool includes cards that could go in them.
         allSections.add(DeckSection.Conspiracy);
         allSections.add(DeckSection.Attractions);
+        allSections.add(DeckSection.Contraptions);
 
         this.getCbxSection().removeAllItems();
         for (DeckSection section : allSections) {
             this.getCbxSection().addItem(section);
         }
-        this.getCbxSection().addActionListener(new ActionListener() {
-            @Override
-            public void actionPerformed(ActionEvent actionEvent) {
-                FComboBox cb = (FComboBox)actionEvent.getSource();
-                DeckSection ds = (DeckSection)cb.getSelectedItem();
-                setEditorMode(ds);
-            }
+        this.getCbxSection().addActionListener(actionEvent -> {
+            FComboBox cb = (FComboBox)actionEvent.getSource();
+            DeckSection ds = (DeckSection)cb.getSelectedItem();
+            setEditorMode(ds);
         });
     }
 
@@ -194,11 +188,11 @@ public final class CEditorLimited extends CDeckEditor<DeckGroup> {
      * @see forge.gui.deckeditor.ACEditorBase#getController()
      */
     @Override
-    public DeckController<DeckGroup> getDeckController() {
+    public DeckController<T> getDeckController() {
         return this.controller;
     }
 
-    public static void addBasicLands(ACEditorBase<PaperCard, DeckGroup> editor) {
+    public static void addBasicLands(ACEditorBase<PaperCard, ? extends DeckBase> editor) {
         Deck deck = editor.getHumanDeck();
         if (deck == null) { return; }
 
@@ -225,6 +219,10 @@ public final class CEditorLimited extends CDeckEditor<DeckGroup> {
             case Attractions:
                 this.getCatalogManager().setup(ItemManagerConfig.ATTRACTION_POOL);
                 this.getDeckManager().setPool(getHumanDeck().getOrCreate(DeckSection.Attractions));
+                break;
+            case Contraptions:
+                this.getCatalogManager().setup(ItemManagerConfig.CONTRAPTION_POOL);
+                this.getDeckManager().setPool(getHumanDeck().getOrCreate(DeckSection.Contraptions));
                 break;
             case Main:
                 this.getCatalogManager().setup(getScreen() == FScreen.DECK_EDITOR_DRAFT ? ItemManagerConfig.DRAFT_POOL : ItemManagerConfig.SEALED_POOL);

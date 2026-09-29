@@ -67,7 +67,7 @@ ScryfallCode=DDU
 59 C Neurok Replica @Zoltan Boros & Gabor Szikszai
 60 C Pyrite Spellbomb @Jim Nelson
 61 R Scuttling Doom Engine @Filip Burburan
-62 R Solemn Simulacrum @Dan Scott
+62 R Solemn Simulacrum @Dan Murayama Scott
 63 R Thopter Assembly @Svetlin Velinov
 64 U Voyager Staff @Tsutomu Kawade
 65 U Darksteel Citadel @John Avon
@@ -84,8 +84,7 @@ ScryfallCode=DDU
 76 L Mountain @Eytan Zana
 
 [tokens]
-g_1_1_elf_warrior
-c_1_1_a_myr
-c_1_1_a_phyrexian_myr
-c_1_1_a_thopter_flying
-c_1_1_a_thopter_flying
+1 g_1_1_elf_warrior @William O'Connor
+2 c_1_1_a_myr @Ryan Pancoast
+3 c_1_1_a_thopter_flying @Svetlin Velinov
+4 c_1_1_a_thopter_flying @Richard Wright

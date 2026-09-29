@@ -1,7 +1,5 @@
 package forge.ai;
 
-import com.google.common.base.Function;
-
 import forge.game.GameEntity;
 import forge.game.ability.AbilityUtils;
 import forge.game.ability.ApiType;
@@ -10,11 +8,19 @@ import forge.game.card.CounterEnumType;
 import forge.game.cost.CostPayEnergy;
 import forge.game.keyword.Keyword;
 import forge.game.spellability.SpellAbility;
+import forge.game.staticability.StaticAbility;
 import forge.game.staticability.StaticAbilityAssignCombatDamageAsUnblocked;
 import forge.game.staticability.StaticAbilityCantAttackBlock;
+import forge.game.staticability.StaticAbilityMode;
 import forge.game.staticability.StaticAbilityMustAttack;
+import forge.game.trigger.Trigger;
+import forge.game.trigger.TriggerType;
 
 import java.util.List;
+import java.util.function.Function;
+
+// the evaluator focuses on common abilities that can have impact on their own (or only need very likely conditions)
+// a negative example would be the "CountersRemain" static since it's just not worth the overhead in such a heavily used engine part
 
 public class CreatureEvaluator implements Function<Card, Integer> {
     @Override
@@ -26,12 +32,17 @@ public class CreatureEvaluator implements Function<Card, Integer> {
         return evaluateCreature(c, true, true);
     }
     public int evaluateCreature(final Card c, final boolean considerPT, final boolean considerCMC) {
+        //Card shouldn't be null and AI shouldn't crash since this is just score
+        if (c == null)
+            return 0;
         int value = 80;
         if (!c.isToken()) {
             value += addValue(20, "non-token"); // tokens should be worth less than actual cards
         }
         int power = c.getNetCombatDamage();
         final int toughness = c.getNetToughness();
+
+        // TODO getKeyCards
 
         // TODO replace with ReplacementEffect checks
         if (c.hasKeyword("Prevent all combat damage that would be dealt by CARDNAME.")
@@ -43,6 +54,7 @@ public class CreatureEvaluator implements Function<Card, Integer> {
 
         if (considerPT) {
             value += addValue(power * 15, "power");
+            // TODO factor in marked damage - but probably not always?
             value += addValue(toughness * 10, "toughness: " + toughness);
 
             // because backside is always stronger the potential makes it better than a single faced card
@@ -130,8 +142,11 @@ public class CreatureEvaluator implements Function<Card, Integer> {
         if (c.hasKeyword(Keyword.REACH) && !c.hasKeyword(Keyword.FLYING)) {
             value += addValue(5, "reach");
         }
-        if (c.hasKeyword("CARDNAME can block creatures with shadow as though they didn't have shadow.")) {
-            value += addValue(3, "shadow-block");
+        for (final StaticAbility stAb : c.getStaticAbilities()) {
+            if (stAb.checkConditions(StaticAbilityMode.CanBlockIfShadow)) {
+                value += addValue(3, "shadow-block");
+                break;
+            }
         }
 
         // Protection
@@ -156,12 +171,6 @@ public class CreatureEvaluator implements Function<Card, Integer> {
             value += addValue(20, "protection");
         }
 
-        for (final SpellAbility sa : c.getSpellAbilities()) {
-            if (sa.isAbility()) {
-                value += addValue(evaluateSpellAbility(sa), "sa: " + sa);
-            }
-        }
-
         // paired creatures are more valuable because they grant a bonus to the other creature
         if (c.isPaired()) {
             value += addValue(14, "paired");
@@ -181,13 +190,16 @@ public class CreatureEvaluator implements Function<Card, Integer> {
         } else if (c.getSVar("SacrificeEndCombat").equals("True")) {
             value -= subValue(40, "sac-end");
         }
-        if (c.hasKeyword("CARDNAME can't attack or block.")) {
+        if (c.isDetained()) {
+            value = addValue(50 + (c.getCMC() * 5), "detained"); // reset everything - useless
+        } else if (c.hasKeyword("CARDNAME can't attack or block.")) {
             value = addValue(50 + (c.getCMC() * 5), "useless"); // reset everything - useless
         } else if (c.hasKeyword("CARDNAME can't block.")) {
             value -= subValue(10, "cant-block");
         } else if (c.isGoaded()) {
             value -= subValue(5, "goaded");
         } else {
+            // TODO lower the values slightly if they're only temporary
             List<GameEntity> mAEnt = StaticAbilityMustAttack.entitiesMustAttack(c);
             if (mAEnt.contains(c)) {
                 value -= subValue(10, "must-attack");
@@ -209,11 +221,7 @@ public class CreatureEvaluator implements Function<Card, Integer> {
             value += addValue(1, "untapped");
         }
 
-        if (!c.getManaAbilities().isEmpty()) {
-            value += addValue(10, "manadork");
-        }
-
-        if (c.hasKeyword("CARDNAME doesn't untap during your untap step.")) {
+        if (!c.canUntap(c.getController(), true)) {
             if (c.isTapped()) {
                 value = addValue(50 + (c.getCMC() * 5), "tapped-useless"); // reset everything - useless
             } else {
@@ -222,30 +230,68 @@ public class CreatureEvaluator implements Function<Card, Integer> {
         } else {
             value -= subValue(10 * c.getCounters(CounterEnumType.STUN), "stunned");
         }
-        if (c.hasSVar("EndOfTurnLeavePlay")) {
-            value -= subValue(50, "eot-leaves");
-        } else if (c.hasKeyword(Keyword.CUMULATIVE_UPKEEP)) {
-            value -= subValue(30, "cupkeep");
-        } else if (c.hasStartOfKeyword("UpkeepCost")) {
-            value -= subValue(20, "sac-unless");
-        } else if (c.hasKeyword(Keyword.ECHO) && c.cameUnderControlSinceLastUpkeep()) {
-            value -= subValue(10, "echo-unpaid");
+
+        for (final SpellAbility sa : c.getSpellAbilities()) {
+            if (sa.isAbility()) {
+                value += addValue(evaluateSpellAbility(sa), "sa: " + sa);
+            }
         }
-        if (c.hasKeyword(Keyword.FADING)) {
-            value -= subValue(20 / (Math.max(1, c.getCounters(CounterEnumType.FADE))), "fading");
+
+        if (!c.getManaAbilities().isEmpty()) {
+            value += addValue(10, "manadork");
         }
-        if (c.hasKeyword(Keyword.VANISHING)) {
-            value -= subValue(20 / (Math.max(1, c.getCounters(CounterEnumType.TIME))), "vanishing");
-        }
+
         // use scaling because the creature is only available halfway
         if (c.hasKeyword(Keyword.PHASING)) {
             value -= subValue(Math.max(20, value / 2), "phasing");
         }
 
-        // TODO no longer a KW
-        if (c.hasStartOfKeyword("At the beginning of your upkeep, CARDNAME deals")) {
-            value -= subValue(20, "upkeep-dmg");
-        } 
+        if (c.hasSVar("EndOfTurnLeavePlay")) {
+            value -= subValue(50, "eot-leaves");
+        } else {
+            for (Trigger t : c.getTriggers()) {
+                if (t.getParamOrDefault("TriggerDescription", "").startsWith("Landfall")) {
+                    value += addValue(10, "landfall");
+                }
+
+                if (!TriggerType.Phase.equals(t.getMode())) {
+                    continue;
+                }
+                if (!"Upkeep".equals(t.getParam("Phase"))) {
+                    continue;
+                }
+
+                if (t.isKeyword(Keyword.CUMULATIVE_UPKEEP)) {
+                    value -= subValue(30, "cupkeep");
+                } else if (t.isKeyword(Keyword.ECHO) && c.cameUnderControlSinceLastUpkeep()) {
+                    value -= subValue(10, "echo-unpaid");
+                }
+                if (t.isKeyword(Keyword.FADING)) {
+                    value -= subValue(20 / (Math.max(1, c.isInPlay() ? c.getCounters(CounterEnumType.FADE) : c.getKeywordMagnitude(Keyword.FADING))), "fading");
+                }
+                if (t.isKeyword(Keyword.VANISHING)) {
+                    value -= subValue(20 / (Math.max(1, c.isInPlay() ? c.getCounters(CounterEnumType.TIME) : c.getKeywordMagnitude(Keyword.VANISHING))), "vanishing");
+                }
+
+                SpellAbility ab = t.ensureAbility();
+                if (ab == null) {
+                    continue;
+                }
+                if (ApiType.DealDamage.equals(ab.getApi())) {
+                    if (!"You".equals(ab.getParamOrDefault("Defined", "You"))) {
+                        continue;
+                    }
+                    if (c.getController().canLoseLife()) {
+                        value -= subValue(20, "upkeep-dmg");
+                    }
+                } else if (ApiType.Sacrifice.equals(ab.getApi())) {
+                    if (!ab.hasParam("UnlessCost")) {
+                        continue;
+                    }
+                    value -= subValue(20, "sac-unless");
+                }
+            }
+        }
 
         // card-specific evaluation modifier
         if (c.hasSVar("AIEvaluationModifier")) {
@@ -256,7 +302,6 @@ public class CreatureEvaluator implements Function<Card, Integer> {
     }
 
     private int evaluateSpellAbility(SpellAbility sa) {
-        // Pump abilities
         if (sa.getApi() == ApiType.Pump) {
             // Pump abilities that grant +X/+X to the card
             if ("+X".equals(sa.getParam("NumAtt"))
@@ -277,8 +322,9 @@ public class CreatureEvaluator implements Function<Card, Integer> {
                     }
                 }
             }
+        } else if (ComputerUtilCost.isSacrificeSelfCost(sa.getPayCosts())) {
+            return -10; // can be sacrificed in response to ability or spell, thus, less prioritable
         }
-
         // default value
         return 10;
     }

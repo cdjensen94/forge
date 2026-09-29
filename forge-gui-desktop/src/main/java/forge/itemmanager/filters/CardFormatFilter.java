@@ -1,8 +1,7 @@
 package forge.itemmanager.filters;
 
 import java.util.List;
-
-import com.google.common.base.Predicate;
+import java.util.function.Predicate;
 
 import forge.game.GameFormat;
 import forge.item.PaperCard;
@@ -42,14 +41,11 @@ public class CardFormatFilter extends FormatFilter<PaperCard> {
         final CardFormatFilter itemFilter = this;
         dialog.setWantReprintsCB(allowReprints);
 
-        dialog.setOkCallback(new Runnable() {
-            @Override
-            public void run() {
-                formats.clear();
-                formats.addAll(dialog.getSelectedFormats());
-                allowReprints = dialog.getWantReprints();
-                itemManager.addFilter(itemFilter); // this adds/updates the current filter...
-            }
+        dialog.setOkCallback(() -> {
+            formats.clear();
+            formats.addAll(dialog.getSelectedFormats());
+            allowReprints = dialog.getWantReprints();
+            itemManager.addFilter(itemFilter); // this adds/updates the current filter...
         });
     }
 }

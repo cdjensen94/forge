@@ -21,13 +21,12 @@ package forge.toolbox;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
+import java.util.function.Consumer;
+import java.util.function.Function;
+import java.util.function.Predicate;
 
-import com.badlogic.gdx.Input;
-import com.google.common.base.Function;
-import com.google.common.base.Predicate;
-import com.google.common.base.Predicates;
+import com.badlogic.gdx.Input.Keys;
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.Iterables;
 
 import forge.Forge;
 import forge.Graphics;
@@ -40,8 +39,8 @@ import forge.itemmanager.filters.ItemFilter;
 import forge.itemmanager.filters.ListLabelFilter;
 import forge.menu.FMenuItem;
 import forge.menu.FPopupMenu;
-import forge.util.Callback;
-import forge.util.Utils;
+import forge.util.*;
+import org.apache.commons.lang3.StringUtils;
 
 /**
  * A simple class that shows a list of choices in a dialog. Two properties
@@ -80,10 +79,10 @@ public class ListChooser<T> extends FContainer {
     private FOptionPane optionPane;
     private final Collection<T> list;
     private final Function<T, String> display;
-    private final Callback<List<T>> callback;
+    private final Consumer<List<T>> callback;
     private AdvancedSearchFilter<? extends InventoryItem> advancedSearchFilter;
 
-    public ListChooser(final String title, final int minChoices, final int maxChoices, final Collection<T> list0, final Function<T, String> display0, final Callback<List<T>> callback0) {
+    public ListChooser(final String title, final int minChoices, final int maxChoices, final Collection<T> list0, final Function<T, String> display0, final Consumer<List<T>> callback0) {
         FThreads.assertExecutedByEdt(true);
         list = list0;
         lstChoices = add(new ChoiceList(list, minChoices, maxChoices));
@@ -95,6 +94,7 @@ public class ListChooser<T> extends FContainer {
             txtSearch = add(new FTextField());
             txtSearch.setFont(FSkinFont.get(12));
             txtSearch.setGhostText(Forge.getLocalizer().getMessage("lblSearch"));
+            txtSearch.setLiveChangeEvents(true); //filter as characters are typed
             txtSearch.setChangedHandler(e -> applyFilters());
 
             advancedSearchFilter = lstChoices.getListItemRenderer().getAdvancedSearchFilter(this);
@@ -123,19 +123,16 @@ public class ListChooser<T> extends FContainer {
 
         updateHeight();
 
-        optionPane = new FOptionPane(null, null, title, null, this, options, 0, new Callback<Integer>() {
-            @Override
-            public void run(Integer result) {
-                called = false;
-                if (result == 0) {
-                    callback.run(lstChoices.getSelectedItems());
-                }
-                else if (minChoices > 0) {
-                    show(); //show if user tries to cancel when input is mandatory
-                }
-                else {
-                    callback.run(new ArrayList<>());
-                }
+        optionPane = new FOptionPane(null, null, title, null, this, options, 0, result -> {
+            called = false;
+            if (result == 0) {
+                callback.accept(lstChoices.getSelectedItems());
+            }
+            else if (minChoices > 0) {
+                show(); //show if user tries to cancel when input is mandatory
+            }
+            else {
+                callback.accept(new ArrayList<>());
             }
         }) {
             @Override
@@ -164,9 +161,9 @@ public class ListChooser<T> extends FContainer {
 
         List<Predicate<? super T>> predicates = new ArrayList<>();
 
-        final String pattern = txtSearch.getText().toLowerCase();
+        final String pattern = normalize(txtSearch.getText());
         if (!pattern.isEmpty()) {
-            predicates.add(input -> lstChoices.getChoiceText(input).toLowerCase().contains(pattern));
+            predicates.add(input -> normalize(lstChoices.getChoiceText(input)).contains(pattern));
         }
         if (advancedSearchFilter != null && !advancedSearchFilter.isEmpty()) {
             predicates.add((Predicate<? super T>)advancedSearchFilter.getPredicate());
@@ -176,13 +173,17 @@ public class ListChooser<T> extends FContainer {
             lstChoices.setListData(list);
         }
         else {
-            lstChoices.setListData(Iterables.filter(list, Predicates.and(predicates)));
+            lstChoices.setListData(IterableUtil.filter(list, IterableUtil.<T>and(predicates)));
         }
 
         if (!lstChoices.isEmpty() && lstChoices.getMaxChoices() > 0) {
             lstChoices.addSelectedIndex(0);
         }
         lstChoices.setScrollTop(0);
+    }
+
+    private static String normalize(final String s) {
+        return StringUtils.stripAccents(s.toLowerCase()).replaceAll("[^a-z0-9 ]", "");
     }
 
     private void updateHeight() {
@@ -204,11 +205,8 @@ public class ListChooser<T> extends FContainer {
 
     /**
      * Shows the dialog and returns after the dialog was closed.
-     *
-     * @param index0 index to select when shown
-     * @return a boolean.
      */
-    public void show(final T item, final boolean selectMax) {
+    public void show(final Collection<T> item, final boolean selectMax) {
         if (called) {
             throw new IllegalStateException("Already shown");
         }
@@ -229,7 +227,7 @@ public class ListChooser<T> extends FContainer {
             }
         }
         else {
-            lstChoices.setSelectedItem(item);
+            lstChoices.setSelectedItems(item);
         }
         optionPane.show();
     }
@@ -299,23 +297,28 @@ public class ListChooser<T> extends FContainer {
 
     @Override
     public boolean keyDown(int keyCode) {
-        if (Forge.hasGamepad()) {
-            if (keyCode == Input.Keys.DPAD_DOWN) {
-                setNextSelected();
-            } else if (keyCode == Input.Keys.DPAD_UP) {
-                setPreviousSelected();
-            }
-            return true;
+        boolean horizontal = lstChoices.getListItemRenderer().layoutHorizontal();
+        switch (keyCode) {
+            case Keys.DPAD_DOWN:
+                moveSelection(horizontal ? 10 : 1);
+                break;
+            case Keys.DPAD_UP:
+                moveSelection(horizontal ? -10 : -1);
+                break;
+            case Keys.DPAD_RIGHT:
+                moveSelection(horizontal ? 1 : 10);
+                break;
+            case Keys.DPAD_LEFT:
+                moveSelection(horizontal ? -1 : -10);
+                break;
+            default:
+                return super.keyDown(keyCode);
         }
-        return super.keyDown(keyCode);
+        return true;
     }
-    public void setNextSelected() {
-        if ((lstChoices.getSelectedIndex()+1) < lstChoices.getCount())
-            lstChoices.setSelectedIndex(lstChoices.getSelectedIndex()+1);
-    }
-    public void setPreviousSelected() {
-        if ((lstChoices.getSelectedIndex()-1) > -1) {
-            lstChoices.setSelectedIndex(lstChoices.getSelectedIndex() - 1);
-        }
+
+    public void moveSelection(int offset) {
+        int target = Math.min(lstChoices.getCount(), Math.max(lstChoices.getSelectedIndex() + offset, 0));
+        lstChoices.setSelectedIndex(target);
     }
 }

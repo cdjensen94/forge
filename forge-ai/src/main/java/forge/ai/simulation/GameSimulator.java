@@ -1,23 +1,19 @@
 package forge.ai.simulation;
 
-import forge.game.spellability.LandAbility;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
 
+import forge.ai.AIOption;
 import forge.ai.ComputerUtil;
 import forge.ai.PlayerControllerAi;
 import forge.ai.simulation.GameStateEvaluator.Score;
 import forge.game.Game;
-import forge.game.GameObject;
 import forge.game.card.Card;
 import forge.game.phase.PhaseType;
 import forge.game.player.Player;
 import forge.game.spellability.SpellAbility;
 import forge.game.spellability.TargetChoices;
 import forge.util.collect.FCollectionView;
+
+import java.util.*;
 
 public class GameSimulator {
     public static boolean COPY_STACK = false;
@@ -30,12 +26,26 @@ public class GameSimulator {
     private Score origScore;
     private SpellAbilityChoicesIterator interceptor;
 
+    // Verifying that the copied game scores identically to the original costs a second full
+    // evaluation (with debug string building enabled) for every simulator that gets constructed.
+    // That's worth paying for in development and in the test suite, where a game copy bug should
+    // fail loudly, but not in a shipped game where it only slows the AI down. Assertions are
+    // enabled by Maven Surefire, so the check still runs for every test.
+    private static final boolean CHECK_GAME_COPY_SCORE = areAssertionsEnabled();
+
+    @SuppressWarnings("AssertWithSideEffects")
+    private static boolean areAssertionsEnabled() {
+        boolean enabled = false;
+        assert enabled = true;
+        return enabled;
+    }
+
     public GameSimulator(SimulationController controller, Game origGame, Player origAiPlayer, PhaseType advanceToPhase) {
         this.controller = controller;
         copier = new GameCopier(origGame);
         simGame = copier.makeCopy(advanceToPhase, origAiPlayer);
 
-        aiPlayer = (Player) copier.find(origAiPlayer);
+        aiPlayer = copier.find(origAiPlayer);
         eval = new GameStateEvaluator();
 
         origLines = new ArrayList<>();
@@ -44,7 +54,7 @@ public class GameSimulator {
         debugPrint = false;
         origScore = eval.getScoreForGameState(origGame, origAiPlayer);
 
-        if (advanceToPhase == null) {
+        if (advanceToPhase == null && CHECK_GAME_COPY_SCORE) {
             ensureGameCopyScoreMatches(origGame, origAiPlayer);
         }
 
@@ -132,9 +142,25 @@ public class GameSimulator {
             return sa;
         }
         Card origHostCard = sa.getHostCard();
-        Card hostCard = (Card) copier.find(origHostCard);
+        Card hostCard = copier.find(origHostCard);
         String desc = sa.getDescription();
+        // TODO tests fail if this isn't checked first
         FCollectionView<SpellAbility> candidates = hostCard.getSpellAbilities();
+
+        SpellAbility result = saMatcher(candidates, desc);
+        if (result == null) {
+            // could try and reimplement this so a quick match doesn't require building the rest first
+            result = saMatcher(hostCard.getAllPossibleAbilities(aiPlayer, true), desc);
+        }
+
+        if (result != null) {
+            result = SpellAbilityChoiceCopier.copyCastChoices(sa, result, aiPlayer);
+        }
+
+        return result;
+    }
+
+    private SpellAbility saMatcher(Iterable<SpellAbility> candidates, String desc) {
         // first pass for accuracy (spells with alternative costs)
         for (SpellAbility cSa : candidates) {
             if (desc.equals(cSa.getDescription())) {
@@ -158,9 +184,11 @@ public class GameSimulator {
     }
     public Score simulateSpellAbility(SpellAbility origSa, GameStateEvaluator eval, boolean resolve) {
         SpellAbility sa;
-        if (origSa instanceof LandAbility) {
+        if (origSa.isLandAbility()) {
             Card hostCard = (Card) copier.find(origSa.getHostCard());
-            if (!aiPlayer.playLand(hostCard, false)) {
+            if (origSa.canPlay()) {
+                aiPlayer.playLand(hostCard, origSa);
+            } else {
                 System.err.println("Simulation: Couldn't play land! " + origSa);
             }
             sa = origSa;
@@ -173,38 +201,22 @@ public class GameSimulator {
             }
 
             debugPrint("Found SA " + sa + " on host card " + sa.getHostCard() + " with owner:"+ sa.getHostCard().getOwner());
-            sa.setActivatingPlayer(aiPlayer, true);
-            SpellAbility origSaOrSubSa = origSa;
-            SpellAbility saOrSubSa = sa;
-            do {
-                if (origSaOrSubSa.usesTargeting()) {
-                    final boolean divided = origSaOrSubSa.isDividedAsYouChoose();
-                    for (final GameObject o : origSaOrSubSa.getTargets()) {
-                        final GameObject target = copier.find(o);
-                        saOrSubSa.getTargets().add(target);
-                        if (divided) {
-                            saOrSubSa.addDividedAllocation(target, origSaOrSubSa.getDividedValue(o));
-                        }
-                    }
-                }
-                origSaOrSubSa = origSaOrSubSa.getSubAbility();
-                saOrSubSa = saOrSubSa.getSubAbility();
-            } while (saOrSubSa != null);
+            sa.setActivatingPlayer(aiPlayer);
 
-            if (debugPrint && !sa.getAllTargetChoices().isEmpty()) {
-                debugPrint("Targets: ");
-                for (TargetChoices target : sa.getAllTargetChoices()) {
-                    System.out.print(target);
-                }
-                System.out.println();
-            }
-            final SpellAbility playingSa = sa;
-            // Is this right?
             simGame.copyLastState();
-            boolean success = ComputerUtil.handlePlayingSpellAbility(aiPlayer, sa, simGame, () -> {
+            boolean success = ComputerUtil.handlePlayingSpellAbility(aiPlayer, sa, playingSa -> {
                 if (interceptor != null) {
                     interceptor.announceX(playingSa);
                     interceptor.chooseTargets(playingSa, GameSimulator.this);
+                } else {
+                    SpellAbilityChoiceCopier.copyTargets(origSa, playingSa, copier::find);
+                }
+                if (debugPrint && !playingSa.getAllTargetChoices().isEmpty()) {
+                    debugPrint("Targets: ");
+                    for (TargetChoices target : playingSa.getAllTargetChoices()) {
+                        System.out.print(target);
+                    }
+                    System.out.println();
                 }
             });
             if (!success) {
@@ -237,7 +249,7 @@ public class GameSimulator {
         controller.possiblyCacheResult(score, origSa);
         if (controller.shouldRecurse() && !simGame.isGameOver()) {
             controller.push(sa, score, this);
-            SpellAbilityPicker sim = new SpellAbilityPicker(simGame, aiPlayer);
+            SpellAbilityPicker sim = new SpellAbilityPicker(aiPlayer);
             SpellAbility nextSa = sim.chooseSpellAbilityToPlay(controller);
             if (nextSa != null) {
                 score = sim.getScoreForChosenAbility();
@@ -251,33 +263,30 @@ public class GameSimulator {
     public static void resolveStack(final Game game, final Player opponent) {
         // TODO: This needs to set an AI controller for all opponents, in case of multiplayer.
         PlayerControllerAi sim = new PlayerControllerAi(game, opponent, opponent.getLobbyPlayer());
-        sim.setUseSimulation(true);
-        opponent.runWithController(new Runnable() {
-            @Override
-            public void run() {
-                final Set<Card> allAffectedCards = new HashSet<>();
+        sim.getAi().setUseSimulation(AIOption.USE_FULL_SIMULATION);
+        opponent.runWithController(() -> {
+            final Set<Card> allAffectedCards = new HashSet<>();
+            game.getAction().checkStateEffects(false, allAffectedCards);
+            game.getStack().addAllTriggeredAbilitiesToStack();
+            while (!game.getStack().isEmpty() && !game.isGameOver()) {
+                debugPrint("Resolving:" + game.getStack().peekAbility());
+
+                // Resolve the top effect on the stack.
+                game.getStack().resolveStack();
+
+                // Evaluate state based effects as a result of resolving stack.
+                // Note: Needs to happen after resolve stack rather than at the
+                // top of the loop to ensure state effects are evaluated after the
+                // last resolved effect
                 game.getAction().checkStateEffects(false, allAffectedCards);
+
+                // Add any triggers additional triggers as a result of the above.
+                // Must be below state effects, since legendary rule is evaluated
+                // as part of state effects and trigger come afterward. (e.g. to
+                // correctly handle two Dark Depths - one having no counters).
                 game.getStack().addAllTriggeredAbilitiesToStack();
-                while (!game.getStack().isEmpty() && !game.isGameOver()) {
-                    debugPrint("Resolving:" + game.getStack().peekAbility());
 
-                    // Resolve the top effect on the stack.
-                    game.getStack().resolveStack();
- 
-                    // Evaluate state based effects as a result of resolving stack.
-                    // Note: Needs to happen after resolve stack rather than at the
-                    // top of the loop to ensure state effects are evaluated after the
-                    // last resolved effect
-                    game.getAction().checkStateEffects(false, allAffectedCards);
-
-                    // Add any triggers additional triggers as a result of the above.
-                    // Must be below state effects, since legendary rule is evaluated
-                    // as part of state effects and trigger come afterward. (e.g. to
-                    // correctly handle two Dark Depths - one having no counters).
-                    game.getStack().addAllTriggeredAbilitiesToStack();
-
-                    // Continue until stack is empty.
-                }
+                // Continue until stack is empty.
             }
         }, sim);
     }

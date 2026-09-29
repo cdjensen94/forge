@@ -102,6 +102,9 @@ OrzhovShop
 IzzetShop
   xy: 336, 752
   size: 16, 16
+FunnyShop
+  xy: 320, 960
+  size: 16, 16
 GolgariShop
   xy: 352, 752
   size: 16, 16    
@@ -140,7 +143,10 @@ UBShop
   size: 16, 16
 NobleShop
   xy: 320, 944
-  size: 16, 16   
+  size: 16, 16
+BoosterShop
+  xy: 384,944
+  size:16, 16
 MerfolkShop
   xy: 368, 768
   size: 16, 16
@@ -205,7 +211,7 @@ ChaosShop
   xy: 352, 816
   size: 16, 16
 InsectShop
-  xy: 368, 912
+  xy: 288, 960
   size: 16, 16
 CatShop
   xy: 288, 928
@@ -348,7 +354,7 @@ LegendShop
 ShardTrader  
   xy: 288, 896
   size: 16, 16
-Waypoint  
+Waypoint
   xy: 288, 912
   size: 16, 16
 Overlay8Black

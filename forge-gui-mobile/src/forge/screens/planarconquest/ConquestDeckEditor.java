@@ -3,6 +3,7 @@ package forge.screens.planarconquest;
 import java.util.Map;
 
 import forge.Forge;
+import forge.deck.CardPool;
 import forge.deck.DeckProxy;
 import forge.deck.FDeckEditor;
 import forge.game.GameType;
@@ -12,19 +13,15 @@ import forge.itemmanager.ColumnDef;
 import forge.itemmanager.ItemColumn;
 import forge.itemmanager.ItemManagerConfig;
 import forge.model.FModel;
-import forge.toolbox.FEvent;
-import forge.toolbox.FEvent.FEventHandler;
 
 public class ConquestDeckEditor extends FDeckEditor {
     public ConquestDeckEditor(final ConquestCommander commander) {
-        super(EditorType.PlanarConquest, new DeckProxy(commander.getDeck(), Forge.getLocalizer().getMessage("lblConquestCommander"),
-                GameType.PlanarConquest, FModel.getConquest().getDecks()), true);
+        super(FDeckEditor.EditorConfigPlanarConquest,
+                new DeckProxy(commander.getDeck(), Forge.getLocalizer().getMessage("lblConquestCommander"), GameType.PlanarConquest, FModel.getConquest().getDecks())
+        );
 
-        setSaveHandler(new FEventHandler() {
-            @Override
-            public void handleEvent(FEvent e) {
-                commander.reloadDeck(); //ensure commander receives deck changes
-            }
+        setSaveHandler(e -> {
+            commander.reloadDeck(); //ensure commander receives deck changes
         });
     }
 
@@ -40,5 +37,11 @@ public class ConquestDeckEditor extends FDeckEditor {
     @Override
     protected Map<ColumnDef, ItemColumn> getColOverrides(ItemManagerConfig config) {
         return ConquestData.getColOverrides(config);
+    }
+
+    @Override
+    protected void devAddCards(CardPool cards) {
+        FModel.getConquest().getModel().unlockCards(cards.toFlatList());
+        getCatalogPage().scheduleRefresh();
     }
 }

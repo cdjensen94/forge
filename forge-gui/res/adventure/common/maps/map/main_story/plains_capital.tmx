@@ -37,7 +37,7 @@
  <objectgroup id="4" name="Objects">
   <object id="41" template="../../obj/shop.tx" x="465" y="260">
    <properties>
-    <property name="commonShopList" value="Enchantment6White,Creature6White,Instant6White,Angel,Human4White,Soldier4White,SmallCats,"/>
+    <property name="commonShopList" value="Enchantment6White,Creature6White,WhiteBoosterPackShop,Instant6White,Angel,Human4White,Soldier4White,SmallCats,"/>
     <property name="mythicShopList" value="Planeswalker4White,WUBRG,RWG,RWU,RWB,UWG,UWB,GWB,Legend4White,PhyrexianWhite,Eldrazi"/>
     <property name="rareShopList" value="Artifact4White,Land4White,Dimir,Rakdos,Orzhov,Golgari,Vehicle2White,Wand4White"/>
     <property name="signYOffset" type="float" value="-8"/>
@@ -46,7 +46,7 @@
   </object>
   <object id="56" template="../../obj/shop.tx" x="416" y="260">
    <properties>
-    <property name="commonShopList" value="Enchantment6White,Creature6White,Instant6White,Angel,Human4White,Soldier4White,SmallCats,"/>
+    <property name="commonShopList" value="Enchantment6White,Creature6White,WhiteBoosterPackShop,Instant6White,Angel,Human4White,Soldier4White,SmallCats,"/>
     <property name="mythicShopList" value="Planeswalker4White,WUBRG,RWG,RWU,RWB,UWG,UWB,GWB,Legend4White,PhyrexianWhite,Eldrazi"/>
     <property name="rareShopList" value="Artifact4White,Land4White,Dimir,Rakdos,Orzhov,Golgari,Vehicle2White,Wand4White"/>
     <property name="signYOffset" type="float" value="-8"/>
@@ -55,7 +55,7 @@
   </object>
   <object id="57" template="../../obj/shop.tx" x="545" y="259">
    <properties>
-    <property name="commonShopList" value="Enchantment6White,Creature6White,Instant6White,Angel,Human4White,Soldier4White"/>
+    <property name="commonShopList" value="Enchantment6White,Creature6White,WhiteBoosterPackShop,Instant6White,Angel,Human4White,Soldier4White"/>
     <property name="mythicShopList" value="Planeswalker4White,WUBRG,RWG,RWU,RWB,UWG,UWB,GWB,Legend4White,PhyrexianWhite"/>
     <property name="rareShopList" value="Artifact4White,Land4White,Dimir,Rakdos,Orzhov,Golgari,Vehicle2White,Wand4White"/>
     <property name="signYOffset" type="float" value="-8"/>
@@ -64,7 +64,7 @@
   </object>
   <object id="43" template="../../obj/shop.tx" x="370" y="325">
    <properties>
-    <property name="commonShopList" value="Enchantment6White,Creature6White,Instant6White,Angel,Human4White,Soldier4White,SmallCats,"/>
+    <property name="commonShopList" value="Enchantment6White,Creature6White,WhiteBoosterPackShop,Instant6White,Angel,Human4White,Soldier4White,SmallCats,"/>
     <property name="mythicShopList" value="Planeswalker4White,WUBRG,RWG,RWU,RWB,UWG,UWB,GWB,Legend4White,PhyrexianWhite,Eldrazi"/>
     <property name="rareShopList" value="Artifact4White,Land4White,Dimir,Rakdos,Orzhov,Golgari,Vehicle2White,Wand4White"/>
     <property name="signYOffset" type="float" value="-8"/>
@@ -74,7 +74,7 @@
   <object id="47" template="../../obj/inn.tx" x="536" y="144"/>
   <object id="49" template="../../obj/shop.tx" x="417" y="324">
    <properties>
-    <property name="commonShopList" value="Enchantment6White,Creature6White,Instant6White,Angel,Human4White,Soldier4White,SmallCats,"/>
+    <property name="commonShopList" value="Enchantment6White,Creature6White,WhiteBoosterPackShop,Instant6White,Angel,Human4White,Soldier4White,SmallCats,"/>
     <property name="mythicShopList" value="Planeswalker4White,WUBRG,RWG,RWU,RWB,UWG,UWB,GWB,Legend4White,PhyrexianWhite,Eldrazi"/>
     <property name="rareShopList" value="Artifact4White,Land4White,Dimir,Rakdos,Orzhov,Golgari,Vehicle2White,Wand4White"/>
     <property name="signYOffset" type="float" value="-8"/>
@@ -83,7 +83,7 @@
   </object>
   <object id="50" template="../../obj/shop.tx" x="465" y="323">
    <properties>
-    <property name="commonShopList" value="Enchantment6White,Creature6White,Instant6White,Angel,Human4White,Soldier4White,SmallCats,"/>
+    <property name="commonShopList" value="Enchantment6White,Creature6White,WhiteBoosterPackShop,Instant6White,Angel,Human4White,Soldier4White,SmallCats,"/>
     <property name="mythicShopList" value="Planeswalker4White,WUBRG,RWG,RWU,RWB,UWG,UWB,GWB,Legend4White,PhyrexianWhite,Eldrazi"/>
     <property name="rareShopList" value="Artifact4White,Land4White,Dimir,Rakdos,Orzhov,Golgari,Vehicle2White,Wand4White"/>
     <property name="signYOffset" type="float" value="-8"/>
@@ -92,7 +92,7 @@
   </object>
   <object id="51" template="../../obj/shop.tx" x="545" y="325">
    <properties>
-    <property name="commonShopList" value="Enchantment6White,Creature6White,Instant6White,Angel,Human4White,Soldier4White"/>
+    <property name="commonShopList" value="Enchantment6White,Creature6White,WhiteBoosterPackShop,Instant6White,Angel,Human4White,Soldier4White"/>
     <property name="mythicShopList" value="Planeswalker4White,WUBRG,RWG,RWU,RWB,UWG,UWB,GWB,Legend4White,PhyrexianWhite"/>
     <property name="rareShopList" value="Artifact4White,Land4White,Dimir,Rakdos,Orzhov,Golgari,Vehicle2White,Wand4White"/>
     <property name="signYOffset" type="float" value="-8"/>
@@ -101,7 +101,7 @@
   </object>
   <object id="52" template="../../obj/shop.tx" x="369" y="261">
    <properties>
-    <property name="commonShopList" value="Enchantment6White,Creature6White,Instant6White,Angel,Human4White,Soldier4White,SmallCats,"/>
+    <property name="commonShopList" value="Enchantment6White,Creature6White,WhiteBoosterPackShop,Instant6White,Angel,Human4White,Soldier4White,SmallCats,"/>
     <property name="mythicShopList" value="Planeswalker4White,WUBRG,RWG,RWU,RWB,UWG,UWB,GWB,Legend4White,PhyrexianWhite,Eldrazi"/>
     <property name="rareShopList" value="Artifact4White,Land4White,Dimir,Rakdos,Orzhov,Golgari,Vehicle2White,Wand4White"/>
     <property name="signYOffset" type="float" value="-8"/>
@@ -134,7 +134,7 @@
 	&quot;Archer&quot;,
 	&quot;Archer Elite&quot;,
 	&quot;Archaeologist&quot;,
-	&quot;Armored Knight&quot;
+	&quot;Armored Knight&quot;,
 	&quot;Cathar&quot;,
 	&quot;Challenger 20&quot;,
 	&quot;Challenger 21&quot;,
@@ -162,31 +162,49 @@
     &quot;rounds&quot;:3,
     &quot;entryFee&quot;:100,
      &quot;rewards&quot;: [[
-		{
-			&quot;type&quot;: &quot;gold&quot;,
-			&quot;probability&quot;: 1,
-			&quot;count&quot;: 500,
-			&quot;itemNames&quot;: [&quot;Gold Armor&quot;,&quot;Gold Shield&quot;,&quot;Gold Boots&quot;,&quot;Bronze Sword&quot;]
-		}
-		],[{
-			&quot;type&quot;: &quot;item&quot;,
-			&quot;probability&quot;: 1,
-			&quot;count&quot;: 1,
-			&quot;itemNames&quot;: [&quot;Gold Armor&quot;,&quot;Gold Shield&quot;,&quot;Gold Boots&quot;,&quot;Bronze Sword&quot;]
-		}
-		],
-[
-		{
-			&quot;type&quot;: &quot;card&quot;,
-			&quot;probability&quot;: 1, 
-      			&quot;count&quot;:2,
-			&quot;rarity&quot;: [
-				&quot;Rare&quot;,&quot;Mythic Rare&quot;
-			],
-      			&quot;colors&quot;: [&quot;white&quot;] 
-		}
-		]
-		] 
+        {
+            &quot;type&quot;: &quot;gold&quot;,
+            &quot;probability&quot;: 1,
+            &quot;count&quot;: 100
+        }
+    ],[
+        {
+            &quot;type&quot;: &quot;gold&quot;,
+            &quot;probability&quot;: 1,
+            &quot;count&quot;: 200
+        },
+        {
+            &quot;type&quot;: &quot;card&quot;,
+            &quot;probability&quot;: 1,
+            &quot;count&quot;: 1,
+            &quot;rarity&quot;: [
+                &quot;Rare&quot;
+            ],
+            &quot;colors&quot;: [&quot;white&quot;]
+        }
+    ],[
+        {
+            &quot;type&quot;: &quot;gold&quot;,
+            &quot;probability&quot;: 1,
+            &quot;count&quot;: 200
+        },
+        {
+            &quot;type&quot;: &quot;item&quot;,
+            &quot;probability&quot;: 1,
+            &quot;count&quot;: 1,
+            &quot;itemNames&quot;: [&quot;Gold Armor&quot;,&quot;Gold Shield&quot;,&quot;Gold Boots&quot;,&quot;Bronze Sword&quot;]
+        },
+        {
+            &quot;type&quot;: &quot;card&quot;,
+            &quot;probability&quot;: 1,
+            &quot;count&quot;: 2,
+            &quot;rarity&quot;: [
+                &quot;Mythic Rare&quot;
+            ],
+            &quot;colors&quot;: [&quot;white&quot;]
+        }
+    ]
+    ]
 }</property>
    </properties>
   </object>
@@ -207,9 +225,10 @@
   <object id="64" name="IntroChar" type="dialog" gid="7627" x="159.75" y="114.667" width="16" height="16">
    <properties>
     <property name="dialog">[{
-  &quot;text&quot;:&quot;Hello there is nothing to do for you...\nFor now.&quot;,
+  &quot;text&quot;:&quot;Hello. There is nothing for you to do here...\nFor now.&quot;,
+  &quot;loctext&quot;: &quot;adv.main_story_plains_capital.64.d.n0.text&quot;,
   &quot;options&quot;:[ 
-    { &quot;name&quot;:&quot;Bye&quot; }
+    { &quot;name&quot;:&quot;Leave&quot;, &quot;locname&quot;: &quot;adv.shared.leave&quot; }
   ]
 }]</property>
     <property name="sprite" value=""/>
@@ -222,7 +241,7 @@
   </object>
   <object id="67" template="../../obj/shop.tx" x="208" y="338">
    <properties>
-    <property name="commonShopList" value="Enchantment6White,Creature6White,Instant6White,Angel,Human4White,Soldier4White"/>
+    <property name="commonShopList" value="Enchantment6White,Creature6White,WhiteBoosterPackShop,Instant6White,Angel,Human4White,Soldier4White"/>
     <property name="mythicShopList" value="Planeswalker4White,WUBRG,RWG,RWU,RWB,UWG,UWB,GWB,Legend4White,PhyrexianWhite"/>
     <property name="rareShopList" value="Artifact4White,Land4White,Dimir,Rakdos,Orzhov,Golgari,Vehicle2White,Wand4White"/>
     <property name="signYOffset" type="float" value="-2"/>
@@ -231,7 +250,7 @@
   </object>
   <object id="68" template="../../obj/shop.tx" x="128" y="338">
    <properties>
-    <property name="commonShopList" value="Enchantment6White,Creature6White,Instant6White,Angel,Human4White,Soldier4White"/>
+    <property name="commonShopList" value="Enchantment6White,Creature6White,WhiteBoosterPackShop,Instant6White,Angel,Human4White,Soldier4White"/>
     <property name="mythicShopList" value="Planeswalker4White,WUBRG,RWG,RWU,RWB,UWG,UWB,GWB,Legend4White,PhyrexianWhite"/>
     <property name="rareShopList" value="Artifact4White,Land4White,Dimir,Rakdos,Orzhov,Golgari,Vehicle2White,Wand4White"/>
     <property name="signYOffset" type="float" value="-2"/>

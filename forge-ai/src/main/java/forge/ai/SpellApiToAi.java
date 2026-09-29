@@ -1,13 +1,14 @@
 package forge.ai;
 
-import java.util.Map;
-
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
-
 import forge.ai.ability.*;
 import forge.game.ability.ApiType;
+import forge.game.spellability.SpellAbility;
 import forge.util.ReflectionUtil;
+
+import java.security.InvalidParameterException;
+import java.util.Map;
 
 public enum SpellApiToAi {
     Converter;
@@ -22,22 +23,26 @@ public enum SpellApiToAi {
             .put(ApiType.AddOrRemoveCounter, CountersPutOrRemoveAi.class)
             .put(ApiType.AddPhase, AddPhaseAi.class)
             .put(ApiType.AddTurn, AddTurnAi.class)
+            .put(ApiType.AdvanceCrank, AdvanceCrankAi.class)
+            .put(ApiType.Airbend, AirbendAi.class)
             .put(ApiType.AlterAttribute, AlterAttributeAi.class)
             .put(ApiType.Amass, AmassAi.class)
             .put(ApiType.Animate, AnimateAi.class)
             .put(ApiType.AnimateAll, AnimateAllAi.class)
             .put(ApiType.Attach, AttachAi.class)
-            .put(ApiType.Ascend, AlwaysPlayAi.class)
+            .put(ApiType.AssembleContraption, AssembleContraptionAi.class)
             .put(ApiType.AssignGroup, AssignGroupAi.class)
             .put(ApiType.Balance, BalanceAi.class)
-            .put(ApiType.BecomeMonarch, AlwaysPlayAi.class)
+            .put(ApiType.BecomeMonarch, BecomeMonarchAi.class)
             .put(ApiType.BecomesBlocked, BecomesBlockedAi.class)
             .put(ApiType.BidLife, BidLifeAi.class)
             .put(ApiType.BlankLine, AlwaysPlayAi.class)
+            .put(ApiType.Blight, BlightAi.class)
             .put(ApiType.Bond, BondAi.class)
             .put(ApiType.Branch, BranchAi.class)
             .put(ApiType.Camouflage, ChooseCardAi.class)
             .put(ApiType.ChangeCombatants, ChangeCombatantsAi.class)
+            .put(ApiType.ChangeSpeed, AlwaysPlayAi.class)
             .put(ApiType.ChangeTargets, ChangeTargetsAi.class)
             .put(ApiType.ChangeX, AlwaysPlayAi.class)
             .put(ApiType.ChangeZone, ChangeZoneAi.class)
@@ -53,8 +58,9 @@ public enum SpellApiToAi {
             .put(ApiType.ChooseSector, AlwaysPlayAi.class)
             .put(ApiType.ChooseSource, ChooseSourceAi.class)
             .put(ApiType.ChooseType, ChooseTypeAi.class)
+            .put(ApiType.ClaimThePrize, AlwaysPlayAi.class)
             .put(ApiType.Clash, ClashAi.class)
-            .put(ApiType.ClassLevelUp, AlwaysPlayAi.class)
+            .put(ApiType.ClassLevelUp, ClassLevelUpAi.class)
             .put(ApiType.Cleanup, AlwaysPlayAi.class)
             .put(ApiType.Cloak, CloakAi.class)
             .put(ApiType.Clone, CloneAi.class)
@@ -72,6 +78,7 @@ public enum SpellApiToAi {
             .put(ApiType.DelayedTrigger, DelayedTriggerAi.class)
             .put(ApiType.Destroy, DestroyAi.class)
             .put(ApiType.DestroyAll, DestroyAllAi.class)
+            .put(ApiType.Detain, DetainAi.class)
             .put(ApiType.Dig, DigAi.class)
             .put(ApiType.DigMultiple, DigMultipleAi.class)
             .put(ApiType.DigUntil, DigUntilAi.class)
@@ -81,8 +88,10 @@ public enum SpellApiToAi {
             .put(ApiType.DrainMana, DrainManaAi.class)
             .put(ApiType.Draw, DrawAi.class)
             .put(ApiType.EachDamage, DamageEachAi.class)
+            .put(ApiType.Earthbend, EarthbendAi.class)
             .put(ApiType.Effect, EffectAi.class)
             .put(ApiType.Encode, EncodeAi.class)
+            .put(ApiType.Endure, EndureAi.class)
             .put(ApiType.EndCombatPhase, EndTurnAi.class)
             .put(ApiType.EndTurn, EndTurnAi.class)
             .put(ApiType.ExchangeLife, LifeExchangeAi.class)
@@ -93,7 +102,7 @@ public enum SpellApiToAi {
             .put(ApiType.ExchangeZone, ZoneExchangeAi.class)
             .put(ApiType.Explore, ExploreAi.class)
             .put(ApiType.Fight, FightAi.class)
-            .put(ApiType.FlipACoin, FlipACoinAi.class)
+            .put(ApiType.FlipCoin, FlipCoinAi.class)
             .put(ApiType.FlipOntoBattlefield, FlipOntoBattlefieldAi.class)
             .put(ApiType.Fog, FogAi.class)
             .put(ApiType.GainControl, ControlGainAi.class)
@@ -103,8 +112,9 @@ public enum SpellApiToAi {
             .put(ApiType.GameDrawn, CannotPlayAi.class)
             .put(ApiType.GenericChoice, ChooseGenericAi.class)
             .put(ApiType.Goad, GoadAi.class)
-            .put(ApiType.Heist, AlwaysPlayAi.class)
             .put(ApiType.Haunt, HauntAi.class)
+            .put(ApiType.HealDamage, AlwaysPlayAi.class)
+            .put(ApiType.Heist, AlwaysPlayAi.class)
             .put(ApiType.ImmediateTrigger, ImmediateTriggerAi.class)
             .put(ApiType.Investigate, InvestigateAi.class)
             .put(ApiType.Learn, LearnAi.class)
@@ -115,6 +125,7 @@ public enum SpellApiToAi {
             .put(ApiType.Mana, ManaAi.class)
             .put(ApiType.ManaReflected, CannotPlayAi.class)
             .put(ApiType.Manifest, ManifestAi.class)
+            .put(ApiType.ManifestDread, ManifestAi.class)
             .put(ApiType.Meld, MeldAi.class)
             .put(ApiType.Mill, MillAi.class)
             .put(ApiType.MoveCounter, CountersMoveAi.class)
@@ -123,7 +134,8 @@ public enum SpellApiToAi {
             .put(ApiType.MustBlock, MustBlockAi.class)
             .put(ApiType.Mutate, MutateAi.class)
             .put(ApiType.NameCard, ChooseCardNameAi.class)
-            .put(ApiType.NoteCounters, AlwaysPlayAi.class)
+            //.put(ApiType.NoteCounters, AlwaysPlayAi.class)
+            .put(ApiType.OpenAttraction, AssembleContraptionAi.class)
             .put(ApiType.PeekAndReveal, PeekAndRevealAi.class)
             .put(ApiType.PermanentCreature, PermanentCreatureAi.class)
             .put(ApiType.PermanentNoncreature, PermanentNoncreatureAi.class)
@@ -187,8 +199,8 @@ public enum SpellApiToAi {
             .put(ApiType.TimeTravel, TimeTravelAi.class)
             .put(ApiType.Token, TokenAi.class)
             .put(ApiType.TwoPiles, TwoPilesAi.class)
-            .put(ApiType.Unattach, CannotPlayAi.class)
-            .put(ApiType.UnattachAll, UnattachAllAi.class)
+            .put(ApiType.Unattach, UnattachAi.class)
+            .put(ApiType.UnlockDoor, UnlockDoorAi.class)
             .put(ApiType.Untap, UntapAi.class)
             .put(ApiType.UntapAll, UntapAllAi.class)
             .put(ApiType.Venture, VentureAi.class)
@@ -201,6 +213,14 @@ public enum SpellApiToAi {
             .put(ApiType.InternalIgnoreEffect, CannotPlayAi.class)
             .put(ApiType.InternalRadiation, AlwaysPlayAi.class)
             .build());
+
+    public SpellAbilityAi get(final SpellAbility sa) {
+        ApiType api = sa.getApi();
+        if (null == api) {
+            throw new InvalidParameterException("SA is not api-based, this is not supported yet");
+        }
+        return get(api);
+    }
 
     public SpellAbilityAi get(final ApiType api) {
         SpellAbilityAi result = apiToInstance.get(api);

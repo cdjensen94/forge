@@ -12,6 +12,8 @@ import com.badlogic.gdx.utils.Align;
 import com.badlogic.gdx.utils.Scaling;
 import com.github.tommyettinger.textra.TextraButton;
 import com.github.tommyettinger.textra.TextraLabel;
+import com.github.tommyettinger.textra.TypingLabel;
+import forge.Adventure;
 import forge.Forge;
 import forge.adventure.character.EnemySprite;
 import forge.adventure.data.EnemyData;
@@ -44,7 +46,8 @@ public class PlayerStatisticScene extends UIScene {
     TextraLabel wins, totalWins, eventWins, eventMatchWins;
     TextraLabel loss, totalLoss, eventLosses, eventMatchLosses;
     TextraLabel winloss, lossWinRatio, eventLossWinRatio, eventMatchLossWinRatio;
-    TextraLabel playerName, headerAchievements, headerAvatar, headerName, headerWinLoss;
+    TextraLabel headerAchievements, headerAvatar, headerName, headerWinLoss;
+    TypingLabel playerName;
     TextraButton back, toggleAward;
     private final Table scrollContainer, achievementContainer;
     TextraLabel blessingScroll;
@@ -187,8 +190,9 @@ public class PlayerStatisticScene extends UIScene {
 
     @Override
     public void enter() {
+        Adventure.getInstance().renderTransitionScreen = false;
         super.enter();
-        GameHUD.getInstance().switchAudio();
+        GameHUD.getInstance().updateBGM();
         achievementContainer.clear();
         updateAchievements(cardActivation, true);
         updateAchievements(planeswalkers, true);
@@ -196,7 +200,9 @@ public class PlayerStatisticScene extends UIScene {
         scrollContainer.clear();
 
         if (playerName != null) {
-            playerName.setText(GamePlayerUtil.getGuiPlayer().getName());
+            String gender = Current.player().isFemale() ? "{GRADIENT=MAGENTA;MAUVE;1;1}\u2640{ENDGRADIENT}[BLACK] " : "{GRADIENT=CYAN;BLUE;1;1}\u2642{ENDGRADIENT}[BLACK] ";
+            playerName.setText(gender + GamePlayerUtil.getGuiPlayer().getName());
+            playerName.skipToTheEnd();
         }
         if (avatar != null) {
             avatar.setDrawable(new TextureRegionDrawable(Current.player().avatar()));
@@ -274,12 +280,14 @@ public class PlayerStatisticScene extends UIScene {
                     continue;
             }
             a.updateTrophyImage();
-            TextureRegion textureRegion = new TextureRegion(((FBufferedImage) a.getImage()).getTexture());
-            textureRegion.flip(false, true);
-            Image image = new Image(textureRegion);
             float alpha = a.isActive() ? 1f : 0.25f;
-            image.getColor().a = alpha;
-            achievementContainer.add(image).height(50).width(40).center().pad(5);
+            if (((FBufferedImage) a.getImage()).getTexture() != null) {
+                TextureRegion textureRegion = new TextureRegion(((FBufferedImage) a.getImage()).getTexture());
+                textureRegion.flip(false, true);
+                Image image = new Image(textureRegion);
+                image.getColor().a = alpha;
+                achievementContainer.add(image).height(50).width(40).center().pad(5);
+            }
             String value = "[%105]" + a.getDisplayName() + "[%98]";
             String subTitle = a.getSubTitle(true);
             if (subTitle != null)
@@ -298,6 +306,7 @@ public class PlayerStatisticScene extends UIScene {
 
     @Override
     public boolean back(){
+        Adventure.getInstance().renderTransitionScreen = true;
         Forge.switchScene(lastGameScene==null?GameScene.instance():lastGameScene);
         return true;
     }

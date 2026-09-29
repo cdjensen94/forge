@@ -31,13 +31,13 @@
 
 package forge.util;
 
-import java.nio.charset.StandardCharsets;
-
 import javax.crypto.Cipher;
 import javax.crypto.SecretKey;
 import javax.crypto.SecretKeyFactory;
 import javax.crypto.spec.PBEKeySpec;
 import javax.crypto.spec.PBEParameterSpec;
+import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
 
 /**
  * A Base64 encoder/decoder.
@@ -63,7 +63,7 @@ public final class Base64Coder {
      * Constant.
      * <code>systemLineSeparator="System.getProperty(line.separator)"</code>
      */
-    private static final String SYSTEM_LINE_SEPARATOR = System.getProperty("line.separator");
+    private static final String SYSTEM_LINE_SEPARATOR = System.lineSeparator();
 
     // Mapping table from 6-bit nibbles to Base64 characters.
     /** Constant <code>map1=new char[64]</code>. */
@@ -89,9 +89,7 @@ public final class Base64Coder {
     private static byte[] map2 = new byte[128];
 
     static {
-        for (int i = 0; i < Base64Coder.map2.length; i++) {
-            Base64Coder.map2[i] = -1;
-        }
+        Arrays.fill(Base64Coder.map2, (byte) -1);
         for (int i = 0; i < 64; i++) {
             Base64Coder.map2[Base64Coder.map1[i]] = (byte) i;
         }

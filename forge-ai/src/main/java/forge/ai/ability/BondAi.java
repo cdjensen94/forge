@@ -17,13 +17,18 @@
  */
 package forge.ai.ability;
 
-import java.util.Map;
-
+import forge.ai.AiAbilityDecision;
+import forge.ai.AiPlayDecision;
 import forge.ai.ComputerUtilCard;
 import forge.ai.SpellAbilityAi;
 import forge.game.card.Card;
 import forge.game.player.Player;
 import forge.game.spellability.SpellAbility;
+import forge.util.StreamUtil;
+import org.apache.commons.lang3.StringUtils;
+
+import java.util.Map;
+import java.util.stream.Collectors;
 
 /**
  * <p>
@@ -46,17 +51,31 @@ public final class BondAi extends SpellAbilityAi {
      * @return a boolean.
      */
     @Override
-    protected boolean canPlayAI(Player aiPlayer, SpellAbility sa) {
-        return true;
-    } // end bondCanPlayAI()
-
-    @Override
-    protected Card chooseSingleCard(Player ai, SpellAbility sa, Iterable<Card> options, boolean isOptional, Player targetedPlayer, Map<String, Object> params) {
-        return ComputerUtilCard.getBestCreatureAI(options);
+    protected AiAbilityDecision canPlay(Player aiPlayer, SpellAbility sa) {
+        return new AiAbilityDecision(100, AiPlayDecision.WillPlay);
     }
 
     @Override
-    protected boolean doTriggerAINoCost(final Player aiPlayer, final SpellAbility sa, final boolean mandatory) {
-        return true;
+    protected Card chooseSingleCard(Player ai, SpellAbility sa, Iterable<Card> options, boolean isOptional, Player targetedPlayer, Map<String, Object> params) {
+        final Card host = sa.getHostCard();
+        Iterable<Card> candidates = options;
+        if (host != null && host.hasSVar("AIPreference")) {
+            String[] prefs = StringUtils.split(host.getSVar("AIPreference"), "$");
+            if (prefs != null && prefs.length == 2 && "SoulBond".equals(prefs[0])) {
+                String restriction = prefs[1];
+                if (params.get("Partner") instanceof Card partner && !partner.isValid(restriction, ai, host, sa)) {
+                    return null;
+                }
+                candidates = StreamUtil.stream(options)
+                        .filter(c -> c.isValid(restriction, ai, host, sa))
+                        .collect(Collectors.toList());
+            }
+        }
+        return ComputerUtilCard.getBestCreatureAI(candidates);
+    }
+
+    @Override
+    protected AiAbilityDecision doTriggerNoCost(final Player aiPlayer, final SpellAbility sa, final boolean mandatory) {
+        return new AiAbilityDecision(100, AiPlayDecision.WillPlay);
     }
 }

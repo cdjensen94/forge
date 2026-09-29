@@ -20,7 +20,6 @@ package forge.gamemodes.quest;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.Comparator;
 import java.util.Date;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
@@ -29,7 +28,7 @@ import java.util.Map;
 import java.util.Set;
 
 import forge.card.CardEdition;
-import forge.card.CardEdition.CardInSet;
+import forge.card.CardEdition.EditionEntry;
 import forge.card.CardRarity;
 import forge.deck.Deck;
 import forge.deck.DeckGroup;
@@ -63,7 +62,6 @@ import forge.util.storage.IStorage;
 public class QuestEventDraft implements IQuestEvent {
 
     public static class QuestDraftPrizes {
-
         public int credits;
         public List<BoosterPack> boosterPacks;
         public List<PaperCard> individualCards;
@@ -86,7 +84,6 @@ public class QuestEventDraft implements IQuestEvent {
         public void addSelectedCard(final PaperCard card) {
             FModel.getQuest().getCards().addSingleCard(card, 1);
         }
-
     }
 
     public static final String UNDETERMINED = "quest_draft_undetermined_place";
@@ -234,7 +231,6 @@ public class QuestEventDraft implements IQuestEvent {
     }
 
     public void setWinner(final String playerName) {
-
         if (QuestDraftUtils.TOURNAMENT_TOGGLE) {
             TournamentPairing pairing = bracket.getNextPairing();
             for(TournamentPlayer player : pairing.getPairedPlayers()) {
@@ -252,6 +248,7 @@ public class QuestEventDraft implements IQuestEvent {
         for (final String name : aiNames) {
             if (playerName.equals(name)) {
                 isHumanPlayer = false;
+                break;
             }
         }
 
@@ -290,7 +287,6 @@ public class QuestEventDraft implements IQuestEvent {
      * Generates the prizes for the player and saves them to the current quest.
      */
     public QuestDraftPrizes collectPrizes() {
-
         final int place = getPlayerPlacement();
         int prizePool = entryFee * 9;
 
@@ -300,11 +296,7 @@ public class QuestEventDraft implements IQuestEvent {
             int value;
             final String boosterName = FModel.getMagicDb().getEditions().get(boosterSet).getName() + " Booster Pack";
 
-            if (MAP_PRICES.containsKey(boosterName)) {
-                value = MAP_PRICES.get(boosterName);
-            } else {
-                value = 395;
-            }
+            value = MAP_PRICES.getOrDefault(boosterName, 395);
 
             boosterPrices += value;
         }
@@ -349,11 +341,9 @@ public class QuestEventDraft implements IQuestEvent {
         }
 
         return null;
-
     }
 
     private QuestDraftPrizes generateFirstPlacePrizes(final int prizePool) {
-
         int credits = 2 * (prizePool / 3); //First place gets 2/3 the total prize pool
         final List<PaperCard> cards = new ArrayList<>();
         final List<BoosterPack> boosters = new ArrayList<>();
@@ -370,11 +360,9 @@ public class QuestEventDraft implements IQuestEvent {
         awardSelectedRare(prizes);
 
         return prizes;
-
     }
 
     private QuestDraftPrizes generateSecondPlacePrizes(final int prizePool) {
-
         int credits = prizePool / 3; //Second place gets 1/3 the total prize pool
         final List<PaperCard> cards = new ArrayList<>();
         final List<BoosterPack> boosters = new ArrayList<>();
@@ -392,11 +380,9 @@ public class QuestEventDraft implements IQuestEvent {
         awardSelectedRare(prizes);
 
         return prizes;
-
     }
 
     private QuestDraftPrizes generateThirdPlacePrizes() {
-
         final int credits = 0;
         final List<PaperCard> cards = new ArrayList<>();
 
@@ -411,11 +397,9 @@ public class QuestEventDraft implements IQuestEvent {
         prizes.individualCards = cards;
 
         return prizes;
-
     }
 
     private QuestDraftPrizes generateFourthPlacePrizes() {
-
         final int credits = 0;
         final List<PaperCard> cards = new ArrayList<>();
 
@@ -444,17 +428,20 @@ public class QuestEventDraft implements IQuestEvent {
     }
 
     private void awardSelectedRare(final QuestDraftPrizes prizes) {
-
         final List<PaperCard> possibleCards = new ArrayList<>();
-        final List<String> cardNames = new ArrayList<>();
+        final HashSet<String> cardNames = new HashSet<>();
 
         for (final CardEdition edition : getAllEditions()) {
-            for (final CardInSet card : edition.getAllCardsInSet()) {
-                if (card.rarity == CardRarity.Rare || card.rarity == CardRarity.MythicRare) {
-                    final PaperCard cardToAdd = FModel.getMagicDb().getCommonCards().getCard(card.name, edition.getCode());
-                    if (cardToAdd != null && !cardNames.contains(cardToAdd.getName())) {
+            for (final EditionEntry card : edition.getObtainableCards()) {
+                if (cardNames.contains(card.name())) {
+                    continue;
+                }
+
+                if (card.rarity() == CardRarity.Rare || card.rarity() == CardRarity.MythicRare) {
+                    final PaperCard cardToAdd = FModel.getMagicDb().getCommonCards().getCard(card.name(), edition.getCode(), card.collectorNumber());
+                    if (cardToAdd != null) {
                         possibleCards.add(cardToAdd);
-                        cardNames.add(cardToAdd.getName());
+                        cardNames.add(card.name());
                     }
                 }
             }
@@ -465,32 +452,39 @@ public class QuestEventDraft implements IQuestEvent {
     }
 
     private BoosterPack getBoosterPack() {
-        return BoosterPack.FN_FROM_SET.apply(getRandomEdition());
+        CardEdition edition = getRandomEdition();
+        return BoosterPack.fromSet(edition);
     }
 
     private PaperCard getPromoCard() {
-
         final CardEdition randomEdition = getRandomEdition();
-        final List<CardInSet> cardsInEdition = new ArrayList<>();
-        final List<String> cardNames = new ArrayList<>();
+        final List<EditionEntry> cardsInEdition = new ArrayList<>();
+        final HashSet<String> cardNames = new HashSet<>();
 
-        for (final CardInSet card : randomEdition.getAllCardsInSet()) {
-            if (card.rarity == CardRarity.Rare || card.rarity == CardRarity.MythicRare) {
-                if (!cardNames.contains(card.name)) {
-                    cardsInEdition.add(card);
-                    cardNames.add(card.name);
-                }
+        for (final EditionEntry card : randomEdition.getObtainableCards()) {
+            if (cardNames.contains(card.name())) {
+                continue;
+            }
+
+            if (card.rarity() == CardRarity.Rare || card.rarity() == CardRarity.MythicRare) {
+                cardsInEdition.add(card);
+                cardNames.add(card.name());
             }
         }
 
-        CardInSet randomCard;
+        // For sets such as MB1 that only have cards from PLST, or without any rare+ at all
+        if (cardsInEdition.isEmpty()) {
+            return FModel.getQuest().getCards().addRandomRare();
+        }
+
+        EditionEntry randomCard;
         PaperCard promo = null;
 
         int attempts = 25;
 
         while (promo == null && attempts-- > 0) {
             randomCard = cardsInEdition.get((int) (MyRandom.getRandom().nextDouble() * cardsInEdition.size()));
-            promo = FModel.getMagicDb().getCommonCards().getCard(randomCard.name, randomEdition.getCode());
+            promo = FModel.getMagicDb().getCommonCards().getCard(randomCard.name(), randomEdition.getCode(), randomCard.collectorNumber());
         }
 
         if (promo == null) {
@@ -498,7 +492,6 @@ public class QuestEventDraft implements IQuestEvent {
         }
 
         return promo;
-
     }
 
     private CardEdition getRandomEdition() {
@@ -509,7 +502,6 @@ public class QuestEventDraft implements IQuestEvent {
         }
 
         return editions.get((int) (MyRandom.getRandom().nextDouble() * editions.size()));
-
     }
 
     private Set<CardEdition> getAllEditions() {
@@ -520,7 +512,6 @@ public class QuestEventDraft implements IQuestEvent {
         }
 
         return editions;
-
     }
 
     private static int getBoosterPrice(final BoosterPack booster) {
@@ -528,18 +519,12 @@ public class QuestEventDraft implements IQuestEvent {
 
         final String boosterName = booster.getName();
 
-        if (MAP_PRICES.containsKey(boosterName)) {
-            value = MAP_PRICES.get(boosterName);
-        } else {
-            value = 395;
-        }
+        value = MAP_PRICES.getOrDefault(boosterName, 395);
 
         return value;
-
     }
 
     public boolean playerHasMatchesLeft() {
-
         if (QuestDraftUtils.TOURNAMENT_TOGGLE) {
             return !bracket.isTournamentOver() && bracket.isPlayerRemaining(-1);
         }
@@ -592,7 +577,6 @@ public class QuestEventDraft implements IQuestEvent {
         }
 
         return nextMatchIndex != -1 && standings[nextMatchIndex].equals(UNDETERMINED);
-
     }
 
     public int getPlayerPlacement() {
@@ -629,11 +613,9 @@ public class QuestEventDraft implements IQuestEvent {
         }
 
         return -1;
-
     }
 
     public String getPlacementString() {
-
         final int place = getPlayerPlacement();
 
         String output;
@@ -657,7 +639,6 @@ public class QuestEventDraft implements IQuestEvent {
         }
 
         return output;
-
     }
 
     public boolean canEnter() {
@@ -668,7 +649,7 @@ public class QuestEventDraft implements IQuestEvent {
     public BoosterDraft enter() {
         FModel.getQuest().getAchievements().setCurrentDraft(this);
         FModel.getQuest().getAssets().subtractCredits(getEntryFee());
-        return BoosterDraft.createDraft(LimitedPoolType.Block, FModel.getBlocks().get(getBlock()), getBoosterConfiguration());
+        return BoosterDraft.createDraft(LimitedPoolType.Block, FModel.getBlocks().get(getBlock()), getBoosterConfiguration(), 8);
     }
 
     public boolean isStarted() {
@@ -690,7 +671,6 @@ public class QuestEventDraft implements IQuestEvent {
     }
 
     public static class QuestDraftFormat implements Comparable<QuestDraftFormat> {
-
         private CardEdition edition;
         private CardBlock block;
 
@@ -753,11 +733,9 @@ public class QuestEventDraft implements IQuestEvent {
         public int compareTo(final QuestDraftFormat other) {
             return toString().compareToIgnoreCase(other.toString());
         }
-
     }
 
     private static List<CardEdition> getAllowedSets(final QuestController quest) {
-
         final List<CardEdition> allowedQuestSets = new ArrayList<>();
 
         if (quest.getFormat() != null) {
@@ -778,11 +756,9 @@ public class QuestEventDraft implements IQuestEvent {
         }
 
         return allowedQuestSets;
-
     }
 
     private static List<CardBlock> getBlocks() {
-
         final List<CardBlock> blocks = new ArrayList<>();
         final IStorage<CardBlock> storage = FModel.getBlocks();
 
@@ -793,11 +769,9 @@ public class QuestEventDraft implements IQuestEvent {
         }
 
         return blocks;
-
     }
 
     public static List<QuestDraftFormat> getAvailableFormats(final QuestController quest) {
-
         final List<CardEdition> allowedQuestSets = getAllowedSets(quest);
         final List<QuestDraftFormat> possibleFormats = new ArrayList<>();
         final List<CardBlock> blocks = getBlocks();
@@ -812,13 +786,13 @@ public class QuestEventDraft implements IQuestEvent {
                 for (CardEdition set : block.getSets()) {
                     if (!allowedQuestSets.contains(set)) {
                         blockAllowed = false;
+                        break;
                     }
                 }
 
                 if (blockAllowed) {
                     possibleFormats.add(new QuestDraftFormat(block));
                 } 
-
             }
 
             for (CardEdition allowedQuestSet : allowedQuestSets) {
@@ -846,7 +820,6 @@ public class QuestEventDraft implements IQuestEvent {
 
         Collections.sort(possibleFormats);
         return possibleFormats;
-
     }
 
     /**
@@ -855,7 +828,6 @@ public class QuestEventDraft implements IQuestEvent {
      * @return The created draft or null in the event no draft could be created.
      */
     public static QuestEventDraft getRandomDraftOrNull(final QuestController quest) {
-
         final List<QuestDraftFormat> possibleFormats = getAvailableFormats(quest);
 
         if (possibleFormats.isEmpty()) {
@@ -864,7 +836,6 @@ public class QuestEventDraft implements IQuestEvent {
 
         Collections.shuffle(possibleFormats);
         return getDraftOrNull(quest, possibleFormats.get(0));
-
     }
 
     /**
@@ -872,7 +843,6 @@ public class QuestEventDraft implements IQuestEvent {
      * @return The created draft or null in the event no draft could be created.
      */
     public static QuestEventDraft getDraftOrNull(final QuestController quest, final QuestDraftFormat format) {
-
         final QuestEventDraft event = new QuestEventDraft(format.getName());
 
         if (format.isSet()) {
@@ -942,13 +912,11 @@ public class QuestEventDraft implements IQuestEvent {
             event.aiIcons[i] = icon;
             usedNames.add(event.aiNames[i]);
             usedIcons.add(icon);
-
         }
 
         event.bracket = createBracketFromStandings(event.standings, event.aiNames, event.aiIcons);
 
         return event;
-
     }
 
     private static int calculateEntryFee(final String[] boosters) {
@@ -959,18 +927,13 @@ public class QuestEventDraft implements IQuestEvent {
             int value;
             final String boosterName = FModel.getMagicDb().getEditions().get(boosterSet).getName() + " Booster Pack";
 
-            if (MAP_PRICES.containsKey(boosterName)) {
-                value = MAP_PRICES.get(boosterName);
-            } else {
-                value = 395;
-            }
+            value = MAP_PRICES.getOrDefault(boosterName, 395);
 
             entryFee += value;
 
         }
 
         return (int) (entryFee * 1.5);
-
     }
 
     private static Set<String> getSetCombos(final QuestController quest, final CardBlock block) {
@@ -1001,16 +964,13 @@ public class QuestEventDraft implements IQuestEvent {
         }
 
         final boolean oldSetsFirst = sets.get(0).getDate().before(FModel.getMagicDb().getEditions().get("SOM").getDate());
-        Collections.sort(allowedSets, new Comparator<CardEdition>() {
-            @Override
-            public int compare(final CardEdition edition1, final CardEdition edition2) {
-                if (edition1.getDate().before(edition2.getDate())) {
-                    return oldSetsFirst ? -1 : 1;
-                } else if (edition1.getDate().after(edition2.getDate())) {
-                    return oldSetsFirst ? 1 : -1;
-                }
-                return 0;
+        allowedSets.sort((edition1, edition2) -> {
+            if (edition1.getDate().before(edition2.getDate())) {
+                return oldSetsFirst ? -1 : 1;
+            } else if (edition1.getDate().after(edition2.getDate())) {
+                return oldSetsFirst ? 1 : -1;
             }
+            return 0;
         });
 
         boolean largeSetFound = false;
@@ -1054,7 +1014,6 @@ public class QuestEventDraft implements IQuestEvent {
         }
 
         return possibleCombinations;
-
     }
 
     public static TournamentBracket createBracketFromStandings(String[] standings, String[] aiNames, int[] aiIcons) {
@@ -1069,7 +1028,7 @@ public class QuestEventDraft implements IQuestEvent {
             if (standings[i].equals(HUMAN)) {
                 bracket.addTournamentPlayer(GamePlayerUtil.getGuiPlayer());
             } else {
-                int idx = Integer.valueOf(standings[i]) - 1;
+                int idx = Integer.parseInt(standings[i]) - 1;
                 bracket.addTournamentPlayer(GamePlayerUtil.createAiPlayer(aiNames[idx], aiIcons[idx]), idx);
             }
         }
@@ -1088,7 +1047,7 @@ public class QuestEventDraft implements IQuestEvent {
                 // Bracket now up to date!
                 break;
             } else {
-                int idx = standings[i].equals(HUMAN) ? -1 : Integer.valueOf(standings[i]) - 1;
+                int idx = standings[i].equals(HUMAN) ? -1 : Integer.parseInt(standings[i]) - 1;
                 pairing.setWinnerByIndex(idx);
                 bracket.reportMatchCompletion(pairing);
             }

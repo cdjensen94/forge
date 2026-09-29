@@ -1,21 +1,54 @@
 package forge.ai;
 
 public enum AiPlayDecision {
-    WillPlay, 
+    // ordered from generic to board-specific
+
+    // Play decision reasons
+    WillPlay,
+    MandatoryPlay,
+    PlayToEmptyHand,
+    AddBoardPresence,
+    ImpactCombat,
+    ResponseToStackResolve,
+    Removal,
+    Tempo,
+    CardAdvantage,
+
+    // Play later decisions
+    WaitForCombat,
+    WaitForMain2,
+    WaitForEndOfTurn,
+    StackNotEmpty,
+    AnotherTime,
+
+    // Don't play reasons
     CantPlaySa,
     CantPlayAi,
     CantAfford,
     CantAffordX,
-    WaitForMain2,
-    AnotherTime,
+    TargetingFailed,
+    StopRunawayActivations,
+    CostNotAcceptable,
+    DoesntImpactCombat,
+    DoesntImpactGame,
+    TimingRestrictions,
+    MissingPhaseRestrictions,
+    MissingLogic,
     MissingNeededCards,
     NeedsToPlayCriteriaNotMet,
-    TargetingFailed,
-    CostNotAcceptable,
-    WouldDestroyLegend,
-    WouldDestroyOtherPlaneswalker,
-    WouldBecomeZeroToughnessCreature,
-    WouldDestroyWorldEnchantment,
+    ConditionsNotMet,
+    IncreasesLifeInDanger,
     BadEtbEffects,
-    CurseEffects
+    CurseEffects,
+    WouldBecomeZeroToughnessCreature,
+    WouldDestroyLegend,
+    WouldDestroyWorldEnchantment,
+    HybridSimRejected;
+
+    public boolean willingToPlay() {
+        return switch (this) {
+            case WillPlay, MandatoryPlay, PlayToEmptyHand, AddBoardPresence, ImpactCombat, ResponseToStackResolve, Removal, Tempo, CardAdvantage -> true;
+            default -> false;
+        };
+    }
 }

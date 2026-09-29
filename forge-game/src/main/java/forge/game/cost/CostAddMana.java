@@ -17,16 +17,15 @@
  */
 package forge.game.cost;
 
-import java.util.ArrayList;
-import java.util.List;
-
-import org.apache.commons.lang3.StringUtils;
-
 import forge.card.mana.ManaAtom;
 import forge.game.card.Card;
 import forge.game.mana.Mana;
 import forge.game.player.Player;
 import forge.game.spellability.SpellAbility;
+import org.apache.commons.lang3.StringUtils;
+
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * The Class CostAddMana.
@@ -81,7 +80,7 @@ public class CostAddMana extends CostPart {
         for (int n = 0; n < decision.c; n++) {
             if (StringUtils.isNumeric(type)) {
                 for (int i = Integer.parseInt(type); i > 0; i--) {
-                    manaProduced.add(new Mana((byte)ManaAtom.COLORLESS, source, null));
+                    manaProduced.add(new Mana((byte)ManaAtom.COLORLESS, source, null, ai));
                 }
             } else {
                 byte attemptedMana = ManaAtom.fromName(type);
@@ -92,10 +91,10 @@ public class CostAddMana extends CostPart {
                         attemptedMana = (byte)ManaAtom.COLORLESS;
                     }
                 }*/
-                manaProduced.add(new Mana(attemptedMana, source, null));
+                manaProduced.add(new Mana(attemptedMana, source, null, ai));
             }
         }
-        ai.getManaPool().add(manaProduced);
+        ai.getManaPool().addMana(manaProduced);
         return true;
     }
 

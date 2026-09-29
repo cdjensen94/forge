@@ -8,8 +8,6 @@ import java.awt.Image;
 import java.awt.MouseInfo;
 import java.awt.Rectangle;
 import java.awt.RenderingHints;
-import java.awt.event.ActionEvent;
-import java.awt.event.ActionListener;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.util.List;
@@ -26,6 +24,7 @@ import javax.swing.border.EmptyBorder;
 import com.google.common.collect.Lists;
 
 import forge.Singletons;
+import forge.gamemodes.match.AbstractGuiGame;
 import forge.gui.framework.FScreen;
 import forge.gui.framework.ILocalRepaint;
 import forge.localinstance.properties.ForgePreferences;
@@ -187,6 +186,11 @@ public class FNavigationBar extends FTitleBarBase {
         }
     }
 
+    public boolean hasNetGame() {
+        return tabs.stream().filter(t -> t.getScreen().getController() instanceof AbstractGuiGame game
+                && game.isNetGame()).findAny().map(b -> true).orElse(false);
+    }
+
     @Override
     public void updateButtons() {
         super.updateButtons();
@@ -238,18 +242,8 @@ public class FNavigationBar extends FTitleBarBase {
                 }
             }
         });
-        incrementRevealTimer = new Timer(revealSpeed / visibleHeight, new ActionListener() {
-            @Override
-            public void actionPerformed(final ActionEvent e) {
-                incrementReveal();
-            }
-        });
-        checkForRevealChangeTimer = new Timer(revealDelay, new ActionListener() {
-            @Override
-            public void actionPerformed(final ActionEvent e) {
-                checkForRevealChange();
-            }
-        });
+        incrementRevealTimer = new Timer(revealSpeed / visibleHeight, e -> incrementReveal());
+        checkForRevealChangeTimer = new Timer(revealDelay, e -> checkForRevealChange());
     }
 
     private void startReveal() {
@@ -487,6 +481,10 @@ public class FNavigationBar extends FTitleBarBase {
             super.paintComponent(g);
         }
 
+        public FScreen getScreen() {
+            return screen;
+        }
+
         private void updateTitle() {
             setText(screen.getTabCaption());
         }
@@ -499,7 +497,7 @@ public class FNavigationBar extends FTitleBarBase {
                 addMouseListener(new MouseAdapter() {
                     @Override
                     public void mousePressed(final MouseEvent e) {
-                        if (!CloseButton.this.isEnabled()) { return; }
+                        if (!NavigationTab.CloseButton.this.isEnabled()) { return; }
                         if (SwingUtilities.isLeftMouseButton(e)) {
                             pressed = true;
                             repaintSelf();
@@ -517,7 +515,7 @@ public class FNavigationBar extends FTitleBarBase {
                     }
                     @Override
                     public void mouseEntered(final MouseEvent e) {
-                        if (!CloseButton.this.isEnabled()) { return; }
+                        if (!NavigationTab.CloseButton.this.isEnabled()) { return; }
                         hovered = true;
                         repaintSelf();
                     }

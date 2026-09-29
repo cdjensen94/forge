@@ -17,13 +17,9 @@
  */
 package forge.ai.ability;
 
-import java.util.List;
-import java.util.Map;
-
-import com.google.common.base.Predicate;
-import com.google.common.base.Predicates;
 import com.google.common.collect.Iterables;
-
+import forge.ai.AiAbilityDecision;
+import forge.ai.AiPlayDecision;
 import forge.ai.ComputerUtilCard;
 import forge.ai.SpellAbilityAi;
 import forge.game.card.Card;
@@ -32,6 +28,9 @@ import forge.game.card.CardPredicates;
 import forge.game.player.Player;
 import forge.game.spellability.SpellAbility;
 import forge.game.zone.ZoneType;
+
+import java.util.List;
+import java.util.Map;
 
 
 /**
@@ -44,34 +43,27 @@ import forge.game.zone.ZoneType;
  */
 public class ControlGainVariantAi extends SpellAbilityAi {
     @Override
-    protected boolean canPlayAI(final Player ai, final SpellAbility sa) {
-
+    protected AiAbilityDecision canPlay(final Player ai, final SpellAbility sa) {
         String logic = sa.getParam("AILogic");
 
         if ("GainControlOwns".equals(logic)) {
-            List<Card> list = CardLists.filter(ai.getGame().getCardsIn(ZoneType.Battlefield), new Predicate<Card>() {
-                @Override
-                public boolean apply(final Card crd) {
-                    return crd.isCreature() && !crd.getController().equals(crd.getOwner());
-                }
-            });
+            List<Card> list = CardLists.filter(ai.getGame().getCardsIn(ZoneType.Battlefield), crd -> crd.isCreature() && !crd.getController().equals(crd.getOwner()));
             if (list.isEmpty()) {
-                return false;
+                return new AiAbilityDecision(0, AiPlayDecision.TargetingFailed);
             }
             for (final Card c : list) {
                 if (ai.equals(c.getController())) {
-                    return false;
+                    return new AiAbilityDecision(0, AiPlayDecision.MissingNeededCards);
                 }
             }
         }
 
-        return true;
-
+        return new AiAbilityDecision(100, AiPlayDecision.WillPlay);
     }
 
     @Override
     public Card chooseSingleCard(Player ai, SpellAbility sa, Iterable<Card> options, boolean isOptional, Player targetedPlayer, Map<String, Object> params) {
-        Iterable<Card> otherCtrl = CardLists.filter(options, Predicates.not(CardPredicates.isController(ai)));
+        Iterable<Card> otherCtrl = CardLists.filter(options, CardPredicates.isController(ai).negate());
         if (Iterables.isEmpty(otherCtrl)) {
             return ComputerUtilCard.getWorstAI(options);
         } else {

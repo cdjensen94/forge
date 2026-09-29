@@ -3,27 +3,36 @@ package forge.toolbox;
 import static forge.card.CardRenderer.MANA_SYMBOL_SIZE;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
+import java.util.function.Function;
 
+import com.badlogic.gdx.graphics.Texture;
 import com.badlogic.gdx.utils.Align;
 
 import forge.Forge;
 import forge.Graphics;
+import forge.ImageKeys;
 import forge.assets.FSkin;
 import forge.assets.FSkinColor;
 import forge.assets.FSkinColor.Colors;
 import forge.assets.FSkinFont;
+import forge.assets.ImageCache;
 import forge.assets.TextRenderer;
 import forge.card.CardFaceSymbols;
 import forge.card.CardRenderer;
 import forge.card.CardRenderer.CardStackPosition;
+import forge.card.CardType;
 import forge.card.CardZoom;
 import forge.card.CardZoom.ActivateHandler;
+import forge.card.MagicColor;
 import forge.card.mana.ManaCost;
-import forge.card.mana.ManaCostParser;
 import forge.game.card.CardView;
+import forge.game.card.CounterKeywordType;
+import forge.game.card.CounterType;
 import forge.game.card.IHasCardView;
+import forge.game.keyword.Keyword;
 import forge.game.player.PlayerView;
 import forge.item.InventoryItem;
 import forge.item.PaperCard;
@@ -36,27 +45,34 @@ import forge.localinstance.skin.IHasSkinProp;
 import forge.screens.match.MatchController;
 import forge.screens.match.views.VAvatar;
 import forge.screens.match.views.VStack;
+import forge.util.CardRendererUtils;
 import forge.util.TextUtil;
 import forge.util.Utils;
 
 public class FChoiceList<T> extends FList<T> implements ActivateHandler {
+    private final String MORPH_KEY = Keyword.MORPH.getReminderText().split("\\. ")[0];
     public static FSkinColor getItemColor() {
         if (Forge.isMobileAdventureMode)
             return FSkinColor.get(Colors.ADV_CLR_ZEBRA);
         return FSkinColor.get(Colors.CLR_ZEBRA);
     }
+
     public static FSkinColor getAltItemColor() {
         return getItemColor().getContrastColor(-20);
     }
+
     public static FSkinColor getSelColor() {
         if (Forge.isMobileAdventureMode)
             return FSkinColor.get(Colors.ADV_CLR_ACTIVE);
         return FSkinColor.get(Colors.CLR_ACTIVE);
     }
+
     public static FSkinColor getBorderColor() {
         return FList.getForeColor();
     }
+
     public static final float DEFAULT_ITEM_HEIGHT = Utils.AVG_FINGER_HEIGHT * 0.75f;
+    private boolean hasCardView = false;
 
     protected final int minChoices, maxChoices;
     private final CompactModeHandler compactModeHandler = new CompactModeHandler();
@@ -65,15 +81,18 @@ public class FChoiceList<T> extends FList<T> implements ActivateHandler {
     public FChoiceList(Iterable<? extends T> items) {
         this(items, null);
     }
+
     protected FChoiceList(Iterable<? extends T> items, T typeItem) {
         this(items, 0, 1, typeItem);
         if (getCount() > 0) {
             addSelectedIndex(0); //select first item by default
         }
     }
+
     public FChoiceList(Iterable<? extends T> items, int minChoices0, int maxChoices0) {
         this(items, minChoices0, maxChoices0, null);
     }
+
     protected FChoiceList(Iterable<? extends T> items, int minChoices0, int maxChoices0, T typeItem) {
         super(items);
         minChoices = minChoices0;
@@ -84,23 +103,31 @@ public class FChoiceList<T> extends FList<T> implements ActivateHandler {
         final ItemRenderer renderer;
         if (item instanceof PaperCard) {
             renderer = new PaperCardItemRenderer();
-        }
-        else if (item instanceof CardView) {
+        } else if (item instanceof CardView) {
             renderer = new CardItemRenderer();
-        }
-        else if (item instanceof IHasCardView) {
+        } else if (item instanceof IHasCardView) {
             renderer = new IHasCardViewItemRenderer();
-        }
-        else if (item instanceof PlayerView) {
+        } else if (item instanceof PlayerView) {
             renderer = new PlayerItemRenderer();
-        }
-        else if (item instanceof Integer || item == FilterOperator.EQUALS) { //allow numeric operators to be selected horizontally
+        } else if (item instanceof MagicColor.Color) {
+            renderer = new MagicColorRenderer();
+        } else if (item instanceof CardType.CoreType) {
+            renderer = new CoreTypeRenderer();
+        } else if (item instanceof CardType.Supertype) {
+            renderer = new SuperTypeRenderer();
+        } else if (item instanceof CounterType) {
+            renderer = new CounterTypeRenderer();
+        } else if (item instanceof Integer || item == FilterOperator.EQUALS) { //allow numeric operators to be selected horizontally
             renderer = new NumberRenderer();
-        }
-        else if (item instanceof IHasSkinProp) {
+        } else if (item instanceof IHasSkinProp) {
             renderer = new IHasSkinPropRenderer();
-        }
-        else {
+        } else {
+            for (Object t : items) {
+                if (t instanceof CardView) {
+                    hasCardView = true;
+                    break;
+                }
+            }
             renderer = new DefaultItemRenderer();
         }
         setListItemRenderer(new ListItemRenderer<T>() {
@@ -130,14 +157,12 @@ public class FChoiceList<T> extends FList<T> implements ActivateHandler {
                             selectedIndices.remove(index);
                             onSelectionChange();
                         }
-                    }
-                    else if (selectedIndices.size() < maxChoices) {
+                    } else if (selectedIndices.size() < maxChoices) {
                         selectedIndices.add(index);
                         Collections.sort(selectedIndices); //ensure selected indices are sorted
                         onSelectionChange();
                     }
-                }
-                else if (maxChoices > 0) {
+                } else if (maxChoices > 0) {
                     selectedIndices.clear();
                     selectedIndices.add(index);
                     onSelectionChange();
@@ -260,6 +285,14 @@ public class FChoiceList<T> extends FList<T> implements ActivateHandler {
         setSelectedIndex(getIndexOf(choice));
     }
 
+    public void setSelectedItems(Collection<T> items) {
+        selectedIndices.clear();
+        items.stream().mapToInt(this::getIndexOf).filter(i -> i >= 0).forEach(selectedIndices::add);
+        if(!items.isEmpty())
+            scrollIntoView(getIndexOf(items.iterator().next()));
+        onSelectionChange();
+    }
+
     protected String getChoiceText(T choice) {
         return choice.toString();
     }
@@ -318,9 +351,13 @@ public class FChoiceList<T> extends FList<T> implements ActivateHandler {
 
     protected abstract class ItemRenderer {
         public abstract FSkinFont getDefaultFont();
+
         public abstract float getItemHeight();
+
         public abstract boolean tap(Integer index, T value, float x, float y, int count);
+
         public abstract boolean longPress(Integer index, T value, float x, float y);
+
         public abstract void drawValue(Graphics g, T value, FSkinFont font, FSkinColor foreColor, boolean pressed, float x, float y, float w, float h);
 
         public boolean layoutHorizontal() {
@@ -331,14 +368,20 @@ public class FChoiceList<T> extends FList<T> implements ActivateHandler {
             return null; //allow overriding to support advanced search
         }
     }
+
     protected class DefaultItemRenderer extends ItemRenderer {
         @Override
         public FSkinFont getDefaultFont() {
+            if (hasCardView)
+                return FSkinFont.get(14);
             return FSkinFont.get(12);
         }
 
         @Override
         public float getItemHeight() {
+            if (hasCardView) {
+                return CardRenderer.getCardListItemHeight(compactModeHandler.isCompactMode());
+            }
             if (allowDefaultItemWrap()) {
                 return DEFAULT_ITEM_HEIGHT * 1.5f; //provide more height for wrapping
             }
@@ -347,11 +390,17 @@ public class FChoiceList<T> extends FList<T> implements ActivateHandler {
 
         @Override
         public boolean tap(Integer index, T value, float x, float y, int count) {
+            if (value instanceof CardView)
+                return CardRenderer.cardListItemTap(items, index, FChoiceList.this, x, y, count, compactModeHandler.isCompactMode());
             return false;
         }
 
         @Override
         public boolean longPress(Integer index, T value, float x, float y) {
+            if (value instanceof CardView) {
+                CardZoom.show(items, index, FChoiceList.this);
+                return true;
+            }
             return false;
         }
 
@@ -366,7 +415,7 @@ public class FChoiceList<T> extends FList<T> implements ActivateHandler {
                 String title = value.toString().substring(0, manaStringindex - 1); //support ability/name with spaces...
                 String cost = TextUtil.fastReplace(value.toString().substring(manaStringindex), "}{", " ");
                 cost = TextUtil.fastReplace(TextUtil.fastReplace(cost, "{", ""), "}", "");
-                ManaCost manaCost = new ManaCost(new ManaCostParser(cost));
+                ManaCost manaCost = new ManaCost(cost);
                 CardFaceSymbols.drawManaCost(g, manaCost, x + font.getBounds(title).width, y + (h - MANA_SYMBOL_SIZE) / 2, MANA_SYMBOL_SIZE);
                 g.drawText(title, font, foreColor, x, y, w, h, allowDefaultItemWrap(), Align.left, true);
             } else {
@@ -375,6 +424,7 @@ public class FChoiceList<T> extends FList<T> implements ActivateHandler {
             }
         }
     }
+
     protected class NumberRenderer extends DefaultItemRenderer {
         @Override
         public FSkinFont getDefaultFont() {
@@ -402,26 +452,7 @@ public class FChoiceList<T> extends FList<T> implements ActivateHandler {
             g.drawText(getChoiceText(value), font, foreColor, x, y, w, h, false, Align.center, true);
         }
     }
-    //simple check for cardview needed on some special renderer for cards
-    private boolean showAlternate(CardView cardView, String value){
-        if(cardView == null)
-            return false;
-        boolean showAlt = false;
-        if(cardView.hasAlternateState()){
-            if(cardView.hasBackSide())
-                showAlt = value.contains(cardView.getBackSideName()) || cardView.getAlternateState().getAbilityText().contains(value);
-            else if (cardView.isAdventureCard())
-                showAlt = value.equals(cardView.getAlternateState().getAbilityText());
-            else if (cardView.isSplitCard()) {
-                //special case if aftermath cards can be cast from graveyard like yawgmoths will, you will have choices
-                if (cardView.getAlternateState().getOracleText().contains("Aftermath"))
-                    showAlt = cardView.getAlternateState().getOracleText().contains(value);
-                else
-                    showAlt = value.equals(cardView.getAlternateState().getAbilityText());
-            }
-        }
-        return showAlt;
-    }
+
     //special renderer for cards
     protected class PaperCardItemRenderer extends ItemRenderer {
         @Override
@@ -447,7 +478,7 @@ public class FChoiceList<T> extends FList<T> implements ActivateHandler {
 
         @Override
         public void drawValue(Graphics g, T value, FSkinFont font, FSkinColor foreColor, boolean pressed, float x, float y, float w, float h) {
-            CardRenderer.drawCardListItem(g, font, foreColor, (PaperCard)value, 0, null, x, y, w, h, compactModeHandler.isCompactMode());
+            CardRenderer.drawCardListItem(g, font, foreColor, (PaperCard) value, 0, null, x, y, w, h, compactModeHandler.isCompactMode());
         }
 
         @Override
@@ -474,6 +505,7 @@ public class FChoiceList<T> extends FList<T> implements ActivateHandler {
             return CardManager.createAdvancedSearchFilter(manager);
         }
     }
+
     //special renderer for cards
     protected class CardItemRenderer extends ItemRenderer {
         @Override
@@ -499,9 +531,10 @@ public class FChoiceList<T> extends FList<T> implements ActivateHandler {
 
         @Override
         public void drawValue(Graphics g, T value, FSkinFont font, FSkinColor foreColor, boolean pressed, float x, float y, float w, float h) {
-            CardRenderer.drawCardListItem(g, font, foreColor, (CardView)value, 0, null, x, y, w, h, compactModeHandler.isCompactMode());
+            CardRenderer.drawCardListItem(g, font, foreColor, (CardView) value, 0, null, x, y, w, h, compactModeHandler.isCompactMode());
         }
     }
+
     //special renderer for SpellAbilities
     protected class IHasCardViewItemRenderer extends ItemRenderer {
         private final TextRenderer textRenderer = new TextRenderer(true);
@@ -519,8 +552,19 @@ public class FChoiceList<T> extends FList<T> implements ActivateHandler {
         @Override
         public boolean tap(Integer index, T value, float x, float y, int count) {
             if (x <= VStack.CARD_WIDTH + 2 * FList.PADDING) {
-                CardView cv = ((IHasCardView)value).getCardView();
-                CardZoom.show(cv, showAlternate(cv, value.toString()));
+                try {
+                    if (value != null && value.toString().contains(MORPH_KEY)) {
+                        Texture morph = ImageCache.getInstance().getImage(ImageKeys.getTokenKey(ImageKeys.MORPH_IMAGE), false);
+                        if (morph != null) {
+                            CardZoom.show(morph);
+                            return true;
+                        }
+                    }
+                    CardView cv = ((IHasCardView) value).getCardView();
+                    CardZoom.show(cv, CardRendererUtils.canShowAlternate(cv, value.toString()));
+                } catch (Exception ignored) {
+                    //fixme: java.lang.ClassCastException for cards like Subtlety which should be cancelable instead...
+                }
                 return true;
             }
             return false;
@@ -528,8 +572,19 @@ public class FChoiceList<T> extends FList<T> implements ActivateHandler {
 
         @Override
         public boolean longPress(Integer index, T value, float x, float y) {
-            CardView cv = ((IHasCardView)value).getCardView();
-            CardZoom.show(cv, showAlternate(cv, value.toString()));
+            try {
+                if (value != null && value.toString().contains(MORPH_KEY)) {
+                    Texture morph = ImageCache.getInstance().getImage(ImageKeys.getTokenKey(ImageKeys.MORPH_IMAGE), false);
+                    if (morph != null) {
+                        CardZoom.show(morph);
+                        return true;
+                    }
+                }
+                CardView cv = ((IHasCardView) value).getCardView();
+                CardZoom.show(cv, CardRendererUtils.canShowAlternate(cv, value.toString()));
+            } catch (Exception ignored) {
+                //fixme: java.lang.ClassCastException for cards like Subtlety which should be cancelable instead...
+            }
             return true;
         }
 
@@ -538,11 +593,25 @@ public class FChoiceList<T> extends FList<T> implements ActivateHandler {
             //should fix NPE ie Thief of Sanity, Gonti... etc
             try {
                 CardView cv = ((IHasCardView) value).getCardView();
-                if (cv != null) {
-                    boolean showAlternate = showAlternate(cv, value.toString());
-                    CardRenderer.drawCardWithOverlays(g, cv, x, y, VStack.CARD_WIDTH, VStack.CARD_HEIGHT, CardStackPosition.Top, false, showAlternate, true);
+                if (value != null && value.toString().contains(MORPH_KEY)) {
+                    Texture morph = ImageCache.getInstance().getImage(ImageKeys.getTokenKey(ImageKeys.MORPH_IMAGE), false);
+                    if (morph != null) {
+                        g.drawImage(morph, x, y, VStack.CARD_WIDTH, VStack.CARD_HEIGHT);
+                    } else if (cv != null) {
+                        boolean showAlternate = CardRendererUtils.canShowAlternate(cv, value.toString());
+                        if (!cv.isFaceDown())
+                            CardRenderer.drawCardWithOverlays(g, cv, x, y, VStack.CARD_WIDTH, VStack.CARD_HEIGHT, CardStackPosition.Top, false, showAlternate, true);
+                        else
+                            CardRenderer.drawCard(g, cv, x, y, VStack.CARD_WIDTH, VStack.CARD_HEIGHT, CardStackPosition.Top, false, showAlternate, true, false);
+                    }
+                } else if (cv != null) {
+                    boolean showAlternate = CardRendererUtils.canShowAlternate(cv, value.toString());
+                    if (!cv.isFaceDown())
+                        CardRenderer.drawCardWithOverlays(g, cv, x, y, VStack.CARD_WIDTH, VStack.CARD_HEIGHT, CardStackPosition.Top, false, showAlternate, true);
+                    else
+                        CardRenderer.drawCard(g, cv, x, y, VStack.CARD_WIDTH, VStack.CARD_HEIGHT, CardStackPosition.Top, false, showAlternate, true, false);
                 }
-            } catch (Exception e) {
+            } catch (Exception ignored) {
                 //fixme: java.lang.ClassCastException for cards like Subtlety which should be cancelable instead...
             }
 
@@ -552,6 +621,7 @@ public class FChoiceList<T> extends FList<T> implements ActivateHandler {
             textRenderer.drawText(g, value.toString(), font, foreColor, x, y, w, h, y, h, true, Align.left, true);
         }
     }
+
     protected class PlayerItemRenderer extends ItemRenderer {
         @Override
         public FSkinFont getDefaultFont() {
@@ -565,40 +635,93 @@ public class FChoiceList<T> extends FList<T> implements ActivateHandler {
 
         @Override
         public boolean tap(Integer index, T value, float x, float y, int count) {
+            if (value instanceof CardView)
+                return CardRenderer.cardListItemTap(items, index, FChoiceList.this, x, y, count, compactModeHandler.isCompactMode());
             return false;
         }
 
         @Override
         public boolean longPress(Integer index, T value, float x, float y) {
+            if (value instanceof CardView) {
+                CardZoom.show(items, index, FChoiceList.this);
+                return true;
+            }
             return false;
         }
 
         @Override
         public void drawValue(Graphics g, T value, FSkinFont font, FSkinColor foreColor, boolean pressed, float x, float y, float w, float h) {
-            PlayerView player = (PlayerView)value;
+            PlayerView player = (PlayerView) value;
             g.drawImage(MatchController.getPlayerAvatar(player), x - FList.PADDING, y - FList.PADDING, VAvatar.WIDTH, VAvatar.HEIGHT);
             x += VAvatar.WIDTH;
             w -= VAvatar.WIDTH;
             g.drawText(player.getName() + " (" + player.getLife() + ")", font, foreColor, x, y, w, h, false, Align.left, true);
         }
     }
-    protected class IHasSkinPropRenderer extends DefaultItemRenderer {
+
+    protected class AbstractIHasSkinPropRenderer extends DefaultItemRenderer {
         private final TextRenderer textRenderer = new TextRenderer(true);
+        private final Function<T, String> displayFunction;
+        private final Function<T, FSkinProp> skinFunction;
+
+        public AbstractIHasSkinPropRenderer(Function<T, String> displayFunction, Function<T, FSkinProp> skinFunction) {
+            this.displayFunction = displayFunction;
+            this.skinFunction = skinFunction;
+        }
 
         @Override
         public void drawValue(Graphics g, T value, FSkinFont font, FSkinColor foreColor, boolean pressed, float x, float y, float w, float h) {
-            FSkinProp skinProp = ((IHasSkinProp)value).getSkinProp();
+            FSkinProp skinProp = skinFunction.apply(value);
+
+            float iconSize = h * 0.8f;
+            float offset = (h - iconSize) / 2;
+
             if (skinProp != null) {
-                float iconSize = h * 0.8f;
-                float offset = (h - iconSize) / 2;
-
                 g.drawImage(FSkin.getImages().get(skinProp), x + offset - 1, y + offset, iconSize, iconSize);
-
-                float dx = iconSize + PADDING + 2 * offset - 1;
-                x += dx;
-                w -= dx;
             }
-            textRenderer.drawText(g, value.toString(), font, foreColor, x, y, w, h, y, h, true, Align.left, true);
+            // this renderer always should indent because there could be an icon
+
+            float dx = iconSize + PADDING + 2 * offset - 1;
+            x += dx;
+            w -= dx;
+
+            textRenderer.drawText(g, displayFunction.apply(value), font, foreColor, x, y, w, h, y, h, true, Align.left, true);
+        }
+    }
+
+    protected class IHasSkinPropRenderer extends AbstractIHasSkinPropRenderer {
+        public IHasSkinPropRenderer() {
+            super(v -> v.toString(), v -> ((IHasSkinProp)v).getSkinProp());
+        }
+    }
+
+    protected class MagicColorRenderer extends AbstractIHasSkinPropRenderer {
+        public MagicColorRenderer() {
+            super(v -> ((MagicColor.Color)v).getTranslatedName(), v -> FSkinProp.iconFromColor((MagicColor.Color)v));
+        }
+    }
+
+    protected class CoreTypeRenderer extends AbstractIHasSkinPropRenderer {
+        public CoreTypeRenderer() {
+            super(v -> ((CardType.CoreType)v).getTranslatedName(), v -> FSkinProp.iconFromCoreType((CardType.CoreType)v));
+        }
+    }
+
+    protected class SuperTypeRenderer extends AbstractIHasSkinPropRenderer {
+        public SuperTypeRenderer() {
+            super(v -> ((CardType.Supertype)v).getTranslatedName(), v -> null);
+        }
+    }
+
+    protected class CounterTypeRenderer extends AbstractIHasSkinPropRenderer {
+        public CounterTypeRenderer() {
+            super(v -> ((CounterType)v).getTranslatedName(), v -> {
+                if (v instanceof CounterKeywordType ck) {
+                    return FSkinProp.iconFromKeyword(ck.keyword());
+                } else {
+                    return null;
+                }
+            });
         }
     }
 

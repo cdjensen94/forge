@@ -1,14 +1,12 @@
 package forge.game.ability.effects;
 
 import java.util.List;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
-import com.google.common.base.Predicate;
-import com.google.common.base.Predicates;
-import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 
 import forge.StaticData;
-import forge.card.CardRulesPredicates;
 import forge.card.ColorSet;
 import forge.card.MagicColor;
 import forge.game.Game;
@@ -18,6 +16,7 @@ import forge.game.card.CardFactory;
 import forge.game.player.Player;
 import forge.game.spellability.SpellAbility;
 import forge.item.PaperCard;
+import forge.item.PaperCardPredicates;
 import forge.util.Aggregates;
 
 public class PlayLandVariantEffect extends SpellAbilityEffect {
@@ -28,10 +27,10 @@ public class PlayLandVariantEffect extends SpellAbilityEffect {
         final Player activator = sa.getActivatingPlayer();
         final Game game = source.getGame();
         final String landType = sa.getParam("Clone");
-        List<PaperCard> cards = Lists.newArrayList(StaticData.instance().getCommonCards().getUniqueCards());
+        StaticData.instance().ensureAllCardsLoaded();
+        Stream<PaperCard> cardStream = StaticData.instance().getCommonCards().streamUniqueCards();
         if ("BasicLand".equals(landType)) {
-            final Predicate<PaperCard> cpp = Predicates.compose(CardRulesPredicates.Presets.IS_BASIC_LAND, PaperCard.FN_GET_RULES);
-            cards = Lists.newArrayList(Iterables.filter(cards, cpp));
+            cardStream = cardStream.filter(PaperCardPredicates.IS_BASIC_LAND);
         }
         // current color of source card
         final ColorSet color = source.getColor();
@@ -47,13 +46,8 @@ public class PlayLandVariantEffect extends SpellAbilityEffect {
             }
         }
 
-        final Predicate<PaperCard> cp = Predicates.compose(new Predicate<String>() {
-            @Override
-            public boolean apply(final String name) {
-                return landNames.contains(name);
-            }
-        }, PaperCard.FN_GET_NAME);
-        cards = Lists.newArrayList(Iterables.filter(cards, cp));
+        cardStream = cardStream.filter(x -> landNames.contains(x.getName()));
+        List<PaperCard> cards = cardStream.collect(Collectors.toList());
         // get a random basic land
         Card random;
         // if activator cannot play the random land, loop
@@ -62,11 +56,11 @@ public class PlayLandVariantEffect extends SpellAbilityEffect {
             PaperCard ran = Aggregates.random(cards);
             random = CardFactory.getCard(ran, activator, game);
             cards.remove(ran);
-        } while (!activator.canPlayLand(random, false));
+        } while (!activator.canPlayLand(random, false, random.getFirstSpellAbility()));
 
         source.addCloneState(CardFactory.getCloneStates(random, source, sa), game.getNextTimestamp());
         source.updateStateForView();
 
-        activator.playLandNoCheck(source, sa);
+        activator.playLand(source, sa);
     }
 }

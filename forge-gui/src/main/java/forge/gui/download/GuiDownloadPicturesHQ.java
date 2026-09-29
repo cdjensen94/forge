@@ -17,17 +17,14 @@
  */
 package forge.gui.download;
 
-import java.io.File;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Map;
-import java.util.Set;
-import java.util.TreeMap;
-
+import forge.card.CardEdition;
 import forge.item.PaperCard;
 import forge.localinstance.properties.ForgeConstants;
 import forge.model.FModel;
 import forge.util.ImageUtil;
+
+import java.io.File;
+import java.util.*;
 
 public class GuiDownloadPicturesHQ extends GuiDownloadService {
     final Map<String, String> downloads = new TreeMap<>(String.CASE_INSENSITIVE_ORDER);
@@ -97,7 +94,7 @@ public class GuiDownloadPicturesHQ extends GuiDownloadService {
         cardname = cardname.replace(" ", "+");
         cardname = cardname.replace("'", "");
         String scryfallurl = ForgeConstants.URL_PIC_SCRYFALL_DOWNLOAD + "named?fuzzy=" + cardname;
-        if(!setCode.equals("???")) scryfallurl += "&set=" + setCode.toLowerCase();
+        if(!setCode.equals(CardEdition.UNKNOWN_CODE)) scryfallurl += "&set=" + setCode.toLowerCase();
         if(face.equals("back")) scryfallurl += "&face=back";
         scryfallurl += "&format=image";
 

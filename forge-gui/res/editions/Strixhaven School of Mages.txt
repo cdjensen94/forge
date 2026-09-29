@@ -2,11 +2,10 @@
 Code=STX
 Date=2021-04-23
 Name=Strixhaven: School of Mages
-Code2=STX
 Type=Expansion
 BoosterCovers=5
 DraftBooster=1 fromSheet("STX lesson"), 9 Common:fromSheet("STX cards"), 3 Uncommon:fromSheet("STX cards"), 1 RareMythic:fromSheet("STX cards"), 1 Any STA
-CollectorBooster=2 Uncommon:fromSheet("STA")+, 2 RareMythic:fromSheet("STA")+, 1 RareMythic:fromSheet("STX extended art"), 1 RareMythic C21, 1 fromSheet("STX lesson")+, 1 RareMythic+, 2 Uncommon+, 5 Common+
+CollectorBooster=2 Uncommon:fromSheet("STA cards")+, 2 RareMythic:fromSheet("STA cards")+, 1 RareMythic:fromSheet("STX extended art"), 1 RareMythic C21, 1 fromSheet("STX lesson")+, 1 RareMythic+, 2 Uncommon+, 5 Common+
 Prerelease=6 Boosters, 1 RareMythic+
 FatPackExtraSlots=20 BasicLands, 20 BasicLands+
 ScryfallCode=STX
@@ -146,7 +145,7 @@ ScryfallCode=STX
 132 U Fortifying Draught @Andrey Kuzinskiy
 133 R Gnarled Professor @Simon Dominic
 134 U Honor Troll @Jesper Ejsing
-135 U Karok Wrangler @Dan Scott
+135 U Karok Wrangler @Dan Murayama Scott
 136 C Leyline Invocation @Liiga Smilshkalne
 137 C Mage Duel @Randy Vargas
 138 U Master Symmetrist @Forrest Imel
@@ -165,7 +164,7 @@ ScryfallCode=STX
 151 M Jadzi, Oracle of Arcavios @Chris Rahn
 152 R Kianne, Dean of Substance @Ryan Pancoast
 153 M Mila, Crafty Companion @Kieran Yanner
-154 R Pestilent Cauldron @Dan Scott
+154 R Pestilent Cauldron @Dan Murayama Scott
 155 R Plargg, Dean of Chaos @Bryan Sola
 156 M Rowan, Scholar of Sparks @Magali Villeneuve
 157 R Selfless Glyphweaver @Johannes Voss
@@ -344,7 +343,7 @@ ScryfallCode=STX
 324 R Flamescroll Celebrant @Uriah Voth
 325 M Jadzi, Oracle of Arcavios @Chris Rahn
 326 R Kianne, Dean of Substance @Ryan Pancoast
-327 R Pestilent Cauldron @Dan Scott
+327 R Pestilent Cauldron @Dan Murayama Scott
 328 R Plargg, Dean of Chaos @Bryan Sola
 329 R Selfless Glyphweaver @Johannes Voss
 330 R Shaile, Dean of Radiance @Yongjae Choi
@@ -408,45 +407,48 @@ ScryfallCode=STX
 382 U Decisive Denial @Lorenzo Mastroianni
 
 [rebalanced]
-A15 U A-Dueling Coach @Caio Monteiro
-A41 U A-Divide by Zero @Liiga Smilshkalne
-A46 U A-Mentor's Guidance @Brian Valeza
-A56 U A-Symmetry Sage @Jehan Choo
-A88 U A-Tenured Inkcaster @Jake Murray
-A92 U A-Ardent Dustspeaker @Mads Ahm
-A117 C A-Tome Shredder @Sam Rowan
-A156 M A-Rowan, Scholar of Sparks @Magali Villeneuve
-A202 U A-Maelstrom Muse @Michele Parisi
-A240 M A-Tanazir Quandrix @Raymond Swanland
-A258 U A-Spell Satchel @YW Tang
+A-15 U A-Dueling Coach @Caio Monteiro
+A-46 U A-Mentor's Guidance @Brian Valeza
+A-56 U A-Symmetry Sage @Jehan Choo
+A-88 U A-Tenured Inkcaster @Jake Murray
+A-92 U A-Ardent Dustspeaker @Mads Ahm
+A-117 C A-Tome Shredder @Sam Rowan
+A-156 M A-Rowan, Scholar of Sparks @Magali Villeneuve
+A-202 U A-Maelstrom Muse @Michele Parisi
+A-240 M A-Tanazir Quandrix @Raymond Swanland
+A-258 U A-Spell Satchel @YW Tang
 
 [lesson]
-2 Environmental Sciences
-2 Expanded Anatomy
-2 Introduction to Annihilation
-2 Introduction to Prophecy
-1 Mascot Exhibition
-1 Academic Probation
-2 Reduce to Memory
-2 Mercurial Transformation
-1 Teachings of the Archaics
-1 Confront the Past
-2 Necrotic Fumes
-1 Illuminate History
-2 Start from Scratch
-1 Basic Conjuration
-2 Containment Breach
-2 Elemental Summoning
-2 Fractal Summoning
-2 Inkling Summoning
-2 Pest Summoning
-2 Spirit Summoning
+2 Environmental Sciences|STX
+2 Expanded Anatomy|STX
+2 Introduction to Annihilation|STX
+2 Introduction to Prophecy|STX
+1 Mascot Exhibition|STX
+1 Academic Probation|STX
+2 Reduce to Memory|STX
+2 Mercurial Transformation|STX
+1 Teachings of the Archaics|STX
+1 Confront the Past|STX
+2 Necrotic Fumes|STX
+1 Illuminate History|STX
+2 Start from Scratch|STX
+1 Basic Conjuration|STX
+2 Containment Breach|STX
+2 Elemental Summoning|STX
+2 Fractal Summoning|STX
+2 Inkling Summoning|STX
+2 Pest Summoning|STX
+2 Spirit Summoning|STX
 
 [tokens]
-bg_1_1_pest_lifegain
-br_3_6_avatar_haste_bolt
-c_a_treasure_sac
-gu_0_0_fractal
-rw_3_2_spirit
-ur_4_4_elemental
-wb_2_1_inkling_flying
+1 br_3_6_avatar_haste_bolt @Bryan Sola
+2 ur_4_4_elemental @Alayna Danner
+3 gu_0_0_fractal @Andreas Zafiratos
+4 wb_2_1_inkling_flying @Scott Murphy
+5 bg_1_1_pest_lifegain @Ilse Gort
+6 rw_3_2_spirit @David Rapoza
+7 c_a_treasure_sac @Andrew Mar
+
+[other]
+8 emblem_lukka_wayward_bonder @Kieran Yanner
+9 emblem_rowan_scholar_of_sparks @Magali Villeneuve

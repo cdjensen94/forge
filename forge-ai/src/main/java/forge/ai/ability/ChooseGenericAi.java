@@ -1,14 +1,12 @@
 package forge.ai.ability;
 
-import com.google.common.base.Predicate;
-import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 import forge.ai.*;
 import forge.card.MagicColor;
 import forge.game.Game;
-import forge.game.card.*;
+import forge.game.card.Card;
+import forge.game.card.CardCollectionView;
 import forge.game.cost.Cost;
-import forge.game.phase.PhaseHandler;
 import forge.game.phase.PhaseType;
 import forge.game.player.Player;
 import forge.game.spellability.AbilitySub;
@@ -19,7 +17,7 @@ import forge.util.collect.FCollection;
 
 import java.util.List;
 import java.util.Map;
-
+import java.util.stream.Collectors;
 
 public class ChooseGenericAi extends SpellAbilityAi {
 
@@ -29,13 +27,10 @@ public class ChooseGenericAi extends SpellAbilityAi {
             return true;
         } else if ("Pump".equals(aiLogic) || "BestOption".equals(aiLogic)) {
             for (AbilitySub sb : sa.getAdditionalAbilityList("Choices")) {
-                if (SpellApiToAi.Converter.get(sb.getApi()).canPlayAIWithSubs(ai, sb)) {
+                if (SpellApiToAi.Converter.get(sb).canPlayWithSubs(ai, sb).willingToPlay()) {
                     return true;
                 }
             }
-        } else if ("AtOppEOT".equals(aiLogic)) {
-            PhaseHandler ph = ai.getGame().getPhaseHandler();
-            return ph.is(PhaseType.END_OF_TURN) && ph.getNextTurn() == ai;
         } else if ("Always".equals(aiLogic)) {
             return true;
         }
@@ -43,40 +38,50 @@ public class ChooseGenericAi extends SpellAbilityAi {
     }
 
     @Override
-    protected boolean checkApiLogic(final Player ai, final SpellAbility sa) {
-        return sa.hasParam("AILogic");
+    protected AiAbilityDecision checkApiLogic(final Player ai, final SpellAbility sa) {
+        if (sa.hasParam("AILogic")) {
+            // This is equivalent to what was here before but feels bad
+            return new AiAbilityDecision(100, AiPlayDecision.WillPlay);
+        }
+
+        return new AiAbilityDecision(0, AiPlayDecision.CantPlayAi);
     }
 
     /* (non-Javadoc)
      * @see forge.card.abilityfactory.SpellAiLogic#chkAIDrawback(java.util.Map, forge.card.spellability.SpellAbility, forge.game.player.Player)
      */
     @Override
-    public boolean chkAIDrawback(SpellAbility sa, Player aiPlayer) {
-        return sa.isTrigger() ? doTriggerAINoCost(aiPlayer, sa, sa.isMandatory()) : checkApiLogic(aiPlayer, sa);
+    public AiAbilityDecision chkDrawback(Player aiPlayer, SpellAbility sa) {
+        AiAbilityDecision decision;
+        if (sa.isTrigger()) {
+            decision = doTriggerNoCost(aiPlayer, sa, sa.isMandatory());
+        } else {
+            decision = checkApiLogic(aiPlayer, sa);
+        }
+
+        return decision;
     }
 
     @Override
-    protected boolean doTriggerAINoCost(final Player aiPlayer, final SpellAbility sa, final boolean mandatory) {
+    protected AiAbilityDecision doTriggerNoCost(final Player aiPlayer, final SpellAbility sa, final boolean mandatory) {
         if ("CombustibleGearhulk".equals(sa.getParam("AILogic")) || "SoulEcho".equals(sa.getParam("AILogic"))) {
             for (final Player p : aiPlayer.getOpponents()) {
                 if (p.canBeTargetedBy(sa)) {
                     sa.resetTargets();
                     sa.getTargets().add(p);
-                    return true;
+                    return new AiAbilityDecision(100, AiPlayDecision.WillPlay);
                 }
             }
-            return true; // perhaps the opponent(s) had Sigarda, Heron's Grace or another effect giving hexproof in play, still play the creature as 6/6
+            return new AiAbilityDecision(100, AiPlayDecision.WillPlay); // perhaps the opponent(s) had Sigarda, Heron's Grace or another effect giving hexproof in play, still play the creature as 6/6
         }
         if (ComputerUtilAbility.getAbilitySourceName(sa).equals("Deathmist Raptor")) {
-            return true;
+            return new AiAbilityDecision(100, AiPlayDecision.WillPlay);
         }
-
-        return super.doTriggerAINoCost(aiPlayer, sa, mandatory);
+        return super.doTriggerNoCost(aiPlayer, sa, mandatory);
     }
 
     @Override
-    public SpellAbility chooseSingleSpellAbility(Player player, SpellAbility sa, List<SpellAbility> spells,
-            Map<String, Object> params) {
+    public SpellAbility chooseSingleSpellAbility(Player player, SpellAbility sa, List<SpellAbility> spells, Map<String, Object> params) {
         Card host = sa.getHostCard();
         final Game game = host.getGame();
         final String logic = sa.getParam("AILogic");
@@ -85,22 +90,17 @@ public class ChooseGenericAi extends SpellAbilityAi {
         } else if ("Random".equals(logic)) {
             return Aggregates.random(spells);
         } else if ("Phasing".equals(logic)) { // Teferi's Realm : keep aggressive
-            List<SpellAbility> filtered = Lists.newArrayList(Iterables.filter(spells, new Predicate<SpellAbility>() {
-                @Override
-                public boolean apply(final SpellAbility sp) {
-                    return !sp.getDescription().contains("Creature") && !sp.getDescription().contains("Land");
-                }
-            }));
+            List<SpellAbility> filtered = spells.stream()
+                    .filter(sp -> !sp.getDescription().contains("Creature") && !sp.getDescription().contains("Land"))
+                    .collect(Collectors.toList());
             return Aggregates.random(filtered);
         } else if ("PayUnlessCost".equals(logic)) {
             for (final SpellAbility sp : spells) {
                 String unlessCost = sp.getParam("UnlessCost");
-                sp.setActivatingPlayer(sa.getActivatingPlayer(), true);
+                sp.setActivatingPlayer(sa.getActivatingPlayer());
                 Cost unless = new Cost(unlessCost, false);
-                SpellAbility paycost = new SpellAbility.EmptySa(sa.getHostCard(), player);
-                paycost.setPayCosts(unless);
-                if (ComputerUtilCost.willPayUnlessCost(sp, player, unless, false, new FCollection<>(player))
-                        && ComputerUtilCost.canPayCost(paycost, player, true)) {
+                if (SpellApiToAi.Converter.get(sp).willPayUnlessCost(player, sp, unless, false, new FCollection<>(player))
+                        && ComputerUtilCost.canPayCost(unless, sp, player, true)) {
                     return sp;
                 }
             }
@@ -167,10 +167,10 @@ public class ChooseGenericAi extends SpellAbilityAi {
                 }
             }
             // FatespinnerSkipDraw,FatespinnerSkipMain,FatespinnerSkipCombat
-            if (game.getReplacementHandler().wouldPhaseBeSkipped(player, "Draw")) {
+            if (game.getReplacementHandler().wouldPhaseBeSkipped(player, PhaseType.DRAW)) {
                 return skipDraw;
             }
-            if (game.getReplacementHandler().wouldPhaseBeSkipped(player, "BeginCombat")) {
+            if (game.getReplacementHandler().wouldPhaseBeSkipped(player, PhaseType.COMBAT_BEGIN)) {
                 return skipCombat;
             }
 
@@ -268,7 +268,7 @@ public class ChooseGenericAi extends SpellAbilityAi {
             List<SpellAbility> filtered = Lists.newArrayList();
             // filter first for the spells which can be done
             for (SpellAbility sp : spells) {
-                if (SpellApiToAi.Converter.get(sp.getApi()).canPlayAIWithSubs(player, sp)) {
+                if (SpellApiToAi.Converter.get(sp).canPlayWithSubs(player, sp).willingToPlay()) {
                     filtered.add(sp);
                 }
             }

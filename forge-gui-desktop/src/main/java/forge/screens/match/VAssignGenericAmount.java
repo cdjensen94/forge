@@ -19,8 +19,6 @@ package forge.screens.match;
 
 import java.awt.Dialog.ModalityType;
 import java.awt.Dimension;
-import java.awt.event.ActionEvent;
-import java.awt.event.ActionListener;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.util.ArrayList;
@@ -170,10 +168,8 @@ public class VAssignGenericAmount {
             }
         }
 
-        btnOK.addActionListener(new ActionListener() {
-            @Override public void actionPerformed(ActionEvent arg0) { finish(); } });
-        btnReset.addActionListener(new ActionListener() {
-            @Override public void actionPerformed(ActionEvent arg0) { resetAssignedAmount(); initialAssignAmount(); } });
+        btnOK.addActionListener(arg0 -> finish());
+        btnReset.addActionListener(arg0 -> { resetAssignedAmount(); initialAssignAmount(); });
 
         // Final UI layout
         pnlMain.setLayout(new MigLayout("insets 0, gap 0, wrap 2, ax center"));
@@ -218,22 +214,8 @@ public class VAssignGenericAmount {
             pnlTargets.add(mp, "w 145px!, h 170px!, gap 5px 5px 3px 3px, ax center");
             mp.addMouseListener(mad);
             targetsMap.put(mp, at);
-        } else if (at.entity instanceof Byte) {
-            SkinImage manaSymbol;
-            Byte color = (Byte) at.entity;
-            if (color == MagicColor.WHITE) {
-                manaSymbol = FSkin.getImage(FSkinProp.IMG_MANA_W);
-            } else if (color == MagicColor.BLUE) {
-                manaSymbol = FSkin.getImage(FSkinProp.IMG_MANA_U);
-            } else if (color == MagicColor.BLACK) {
-                manaSymbol = FSkin.getImage(FSkinProp.IMG_MANA_B);
-            } else if (color == MagicColor.RED) {
-                manaSymbol = FSkin.getImage(FSkinProp.IMG_MANA_R);
-            } else if (color == MagicColor.GREEN) {
-                manaSymbol = FSkin.getImage(FSkinProp.IMG_MANA_G);
-            } else { // Should never come here, but add this to avoid compile error
-                manaSymbol = FSkin.getImage(FSkinProp.IMG_MANA_COLORLESS);
-            }
+        } else if (at.entity instanceof MagicColor.Color color) {
+            SkinImage manaSymbol = FSkin.getImage(FSkinProp.MANA_IMG.get(color.getShortName()));
             final MiscCardPanel mp = new MiscCardPanel(matchUI, "", manaSymbol);
             mp.setCardBounds(0, 0, 70, 70);
             pnlTargets.add(mp, "w 100px!, h 150px!, gap 5px 5px 3px 3px, ax center");

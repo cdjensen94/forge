@@ -1,8 +1,9 @@
 package forge.game.ability.effects;
 
-import java.util.Map;
+import com.google.common.collect.Multiset;
 
 import forge.game.Game;
+import forge.game.GameEntity;
 import forge.game.GameEntityCounterTable;
 import forge.game.ability.SpellAbilityEffect;
 import forge.game.card.Card;
@@ -28,7 +29,7 @@ public class CountersMultiplyEffect extends SpellAbilityEffect {
         }
         sb.append(" on ");
 
-        sb.append(Lang.joinHomogenous(getTargetCards(sa)));
+        sb.append(Lang.joinHomogenous(getTargetEntities(sa)));
 
         sb.append(".");
 
@@ -42,26 +43,30 @@ public class CountersMultiplyEffect extends SpellAbilityEffect {
         final Player player = sa.getActivatingPlayer();
 
         final CounterType counterType = getCounterType(sa);
-        final int n = Integer.valueOf(sa.getParamOrDefault("Multiplier", "2")) - 1;
+        final int n = Integer.parseInt(sa.getParamOrDefault("Multiplier", "2")) - 1;
 
         GameEntityCounterTable table = new GameEntityCounterTable();
-        for (final Card tgtCard : getTargetCards(sa)) {
-            Card gameCard = game.getCardState(tgtCard, null);
-            // gameCard is LKI in that case, the card is not in game anymore
-            // or the timestamp did change
-            // this should check Self too
-            if (gameCard == null || !tgtCard.equalsWithGameTimestamp(gameCard)) {
-                continue;
+        for (GameEntity ge : getTargetEntities(sa)) {
+            if (ge instanceof Card) {
+                Card gameCard = game.getCardState((Card) ge, null);
+                // gameCard is LKI in that case, the card is not in game anymore
+                // or the timestamp did change
+                // this should check Self too
+                if (gameCard == null || !((Card) ge).equalsWithGameTimestamp(gameCard)) {
+                    continue;
+                }
+                ge = gameCard;
             }
+
             if (counterType != null) {
-                gameCard.addCounter(counterType, gameCard.getCounters(counterType) * n, player, table);
+                ge.addCounter(counterType, ge.getCounters(counterType) * n, player, table);
             } else {
-                for (Map.Entry<CounterType, Integer> e : gameCard.getCounters().entrySet()) {
-                    gameCard.addCounter(e.getKey(), e.getValue() * n, player, table);
+                for (Multiset.Entry<CounterType> e : ge.getCounters().entrySet()) {
+                    ge.addCounter(e.getElement(), e.getCount() * n, player, table);
                 }
             }
         }
-        table.replaceCounterEffect(game, sa, true);
+        table.replaceCounterEffect(game, sa);
     }
 
     private CounterType getCounterType(SpellAbility sa) {

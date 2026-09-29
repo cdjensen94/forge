@@ -2,10 +2,9 @@
 Code=CN2
 Date=2016-08-26
 Name=Conspiracy: Take the Crown
-Code2=CN2
 Type=Draft
 BoosterCovers=3
-Booster=10 Common:!fromSheet("CN2 Draft Matters"), 3 Uncommon:!fromSheet("CN2 Draft Matters"), 1 RareMythic:!fromSheet("CN2 Draft Matters"), 1 fromSheet("CN2 Draft Matters")
+Booster=10 Common:!fromSheet("CN2 Draft Matters"), 3 Uncommon:!fromSheet("CN2 Draft Matters"), 1 RareMythic:!fromSheet("CN2 Draft Matters"):fromSheet("CN2 cards"), 1 fromSheet("CN2 Draft Matters")
 AdditionalSheetForFoils=fromSheet("CN2 Foil Kaya")
 ScryfallCode=CN2
 
@@ -162,7 +161,7 @@ ScryfallCode=CN2
 150 C Unnerve @Terese Nielsen
 151 U Burn Away @Vincent Proce
 152 R Burning Wish @Scott M. Fischer
-153 R Charmbreaker Devils @Dan Scott
+153 R Charmbreaker Devils @Dan Murayama Scott
 154 U Coordinated Assault @John Severin Brassell
 155 C Ember Beast @David Rapoza
 156 C Fiery Fall @Daarken
@@ -265,14 +264,17 @@ Weight Advantage
 Kaya, Ghost Assassin|CN2|2
 
 [tokens]
-w_1_1_soldier
-w_1_2_soldier_defender
-w_1_1_spirit_flying
-b_1_1_assassin_deathtouch_haste
-b_2_2_zombie
-r_5_5_dragon_flying
-r_1_1_goblin_noblock
-r_8_8_lizard
-g_3_3_beast
-g_1_1_insect
-c_1_1_a_construct_defender
+2 w_1_1_soldier @Greg Staples
+3 w_1_2_soldier_defender @Jason A. Engle
+4 w_1_1_spirit_flying @Jeff Simpson
+5 b_1_1_assassin_deathtouch_haste @Josu Hernaiz
+6 b_2_2_zombie @Seb McKinnon
+7 r_5_5_dragon_flying @Raymond Swanland
+8 r_1_1_goblin_noblock @Jason A. Engle
+9 r_8_8_lizard @Filip Burburan
+10 g_3_3_beast @Jesper Ejsing
+11 g_1_1_insect @Carl Critchlow
+12 c_1_1_a_construct_defender @Victor Adame Minguez
+
+[other]
+1 monarch @Mike Bierek

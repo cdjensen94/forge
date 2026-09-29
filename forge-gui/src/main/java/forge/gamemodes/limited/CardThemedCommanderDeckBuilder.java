@@ -1,9 +1,8 @@
 package forge.gamemodes.limited;
 
 import java.util.List;
+import java.util.stream.Collectors;
 
-import com.google.common.base.Predicates;
-import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 
 import forge.card.CardRulesPredicates;
@@ -11,6 +10,7 @@ import forge.card.ColorSet;
 import forge.deck.DeckFormat;
 import forge.deck.generation.DeckGenPool;
 import forge.item.PaperCard;
+import forge.item.PaperCardPredicates;
 import forge.model.FModel;
 
 /**
@@ -25,18 +25,17 @@ public class CardThemedCommanderDeckBuilder extends CardThemedDeckBuilder {
         secondKeyCard = partner0;
         // remove Unplayables
         if(isForAI) {
-            final Iterable<PaperCard> playables = Iterables.filter(availableList,
-                    Predicates.compose(CardRulesPredicates.IS_KEPT_IN_AI_DECKS, PaperCard.FN_GET_RULES));
-            this.aiPlayables = Lists.newArrayList(playables);
+            this.aiPlayables = availableList.stream()
+                    .filter(PaperCardPredicates.fromRules(CardRulesPredicates.IS_KEPT_IN_AI_DECKS))
+                    .collect(Collectors.toList());
         }else{
             this.aiPlayables = Lists.newArrayList(availableList);
         }
         this.availableList.removeAll(aiPlayables);
         targetSize=format.getMainRange().getMinimum();
         colors = keyCard.getRules().getColorIdentity();
-        colors = ColorSet.fromMask(colors.getColor() | keyCard.getRules().getColorIdentity().getColor());
         if (secondKeyCard != null && !format.equals(DeckFormat.Oathbreaker)) {
-            colors = ColorSet.fromMask(colors.getColor() | secondKeyCard.getRules().getColorIdentity().getColor());
+            colors = ColorSet.combine(colors, secondKeyCard.getRules().getColorIdentity());
             targetSize--;
         }
         numSpellsNeeded = ((Double)Math.floor(targetSize*(getCreaturePercentage()+getSpellPercentage()))).intValue();

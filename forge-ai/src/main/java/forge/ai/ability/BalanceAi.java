@@ -1,5 +1,7 @@
 package forge.ai.ability;
 
+import forge.ai.AiAbilityDecision;
+import forge.ai.AiPlayDecision;
 import forge.ai.SpellAbilityAi;
 import forge.game.card.CardCollectionView;
 import forge.game.card.CardLists;
@@ -11,7 +13,7 @@ import forge.util.MyRandom;
 
 public class BalanceAi extends SpellAbilityAi {
     @Override
-    protected boolean canPlayAI(Player aiPlayer, SpellAbility sa) {
+    protected AiAbilityDecision canPlay(Player aiPlayer, SpellAbility sa) {
         String logic = sa.getParam("AILogic");
         int diff = 0;
         Player opp = aiPlayer.getWeakestOpponent();
@@ -25,10 +27,10 @@ public class BalanceAi extends SpellAbilityAi {
         
         if ("BalanceCreaturesAndLands".equals(logic)) {
             // TODO Copied over from hardcoded Balance. We should be checking value of the lands/creatures for each opponent, not just counting
-            diff += CardLists.filter(humPerms, CardPredicates.Presets.LANDS).size() - 
-                    CardLists.filter(compPerms, CardPredicates.Presets.LANDS).size();
-            diff += 1.5 * (CardLists.filter(humPerms, CardPredicates.Presets.CREATURES).size() - 
-                    CardLists.filter(compPerms, CardPredicates.Presets.CREATURES).size());
+            diff += CardLists.filter(humPerms, CardPredicates.LANDS).size() -
+                    CardLists.filter(compPerms, CardPredicates.LANDS).size();
+            diff += 1.5 * (CardLists.filter(humPerms, CardPredicates.CREATURES).size() -
+                    CardLists.filter(compPerms, CardPredicates.CREATURES).size());
         }
         else if ("BalancePermanents".equals(logic)) {
             // Don't cast if you have to sacrifice permanents
@@ -37,7 +39,7 @@ public class BalanceAi extends SpellAbilityAi {
 
         if (diff < 0) {
             // Don't sacrifice permanents even if opponent has a ton of cards in hand
-            return false;
+            return new AiAbilityDecision(0, forge.ai.AiPlayDecision.CantPlayAi);
         }
 
         final CardCollectionView humHand = opp.getCardsIn(ZoneType.Hand);
@@ -45,6 +47,7 @@ public class BalanceAi extends SpellAbilityAi {
         diff += 0.5 * (humHand.size() - compHand.size());
 
         // Larger differential == more chance to actually cast this spell
-        return diff > 2 && MyRandom.getRandom().nextInt(100) < diff*10;
+        boolean willPlay = diff > 2 && MyRandom.getRandom().nextInt(100) < diff*10;
+        return new AiAbilityDecision(willPlay ? 100 : 0, willPlay ? forge.ai.AiPlayDecision.WillPlay : AiPlayDecision.StopRunawayActivations);
     }
 }

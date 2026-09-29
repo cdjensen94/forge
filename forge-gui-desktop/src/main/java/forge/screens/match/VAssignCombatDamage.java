@@ -19,8 +19,6 @@ package forge.screens.match;
 
 import java.awt.Dialog.ModalityType;
 import java.awt.Dimension;
-import java.awt.event.ActionEvent;
-import java.awt.event.ActionListener;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.util.List;
@@ -216,12 +214,9 @@ public class VAssignCombatDamage {
             pnlDefenders.add(l.label, "w 145px!, h 30px!, gap 5px 5px 0 5px");
         }
 
-        btnOK.addActionListener(new ActionListener() {
-            @Override public void actionPerformed(ActionEvent arg0) { finish(); } });
-        btnReset.addActionListener(new ActionListener() {
-            @Override public void actionPerformed(ActionEvent arg0) { resetAssignedDamage(); initialAssignDamage(false); } });
-        btnAuto.addActionListener(new ActionListener() {
-            @Override public void actionPerformed(ActionEvent arg0) { resetAssignedDamage(); initialAssignDamage(true); finish(); } });
+        btnOK.addActionListener(arg0 -> finish());
+        btnReset.addActionListener(arg0 -> { resetAssignedDamage(); initialAssignDamage(false); });
+        btnAuto.addActionListener(arg0 -> { resetAssignedDamage(); initialAssignDamage(true); finish(); });
 
         // Final UI layout
         pnlMain.setLayout(new MigLayout("insets 0, gap 0, wrap 2, ax center"));
@@ -238,20 +233,14 @@ public class VAssignCombatDamage {
 
         if (maySkip) {
             pnlButtons.add(btnSkip, "gap 0 10px 0 0, w 110px!, h 30px!");
-            btnSkip.addActionListener(new ActionListener() {
-                @Override public void actionPerformed(ActionEvent arg0) { skip = true; finish(); } });
+            btnSkip.addActionListener(arg0 -> { skip = true; finish(); });
         }
 
         pnlMain.add(pnlButtons, "ax center, w 500px!, gap 10px 10px 10px 10px, span 2");
         overlay.add(pnlMain);
 
         pnlMain.getRootPane().setDefaultButton(btnOK);
-        SwingUtilities.invokeLater(new Runnable() {
-            @Override
-            public void run() {
-                btnAuto.requestFocusInWindow();
-            }
-        });
+        SwingUtilities.invokeLater(btnAuto::requestFocusInWindow);
 
         initialAssignDamage(false);
         SOverlayUtils.showOverlay();
@@ -290,7 +279,7 @@ public class VAssignCombatDamage {
      * TODO: Write javadoc for this method.
      * @param source
      * @param meta
-     * @param isLMB
+     * @param isAdding
      */
     private void assignDamageTo(CardView source, final boolean meta, final boolean isAdding) {
         if (!damage.containsKey(source))
@@ -333,6 +322,9 @@ public class VAssignCombatDamage {
             return;
 
         addDamage(source, damageToAdd);
+
+        btnAuto.setEnabled(allDamageToAssign());
+
         checkDamageQueue();
         updateLabels();
     }
@@ -384,8 +376,10 @@ public class VAssignCombatDamage {
 
     /** Reset Assign Damage back to how it was at the beginning. */
     private void resetAssignedDamage() {
-        for (DamageTarget dt : defenders)
+        for (DamageTarget dt : defenders) {
             dt.damage = 0;
+        }
+        btnAuto.setEnabled(true);
     }
 
     private void addDamage(final CardView card, int addedDamage) {
@@ -411,8 +405,17 @@ public class VAssignCombatDamage {
         return totalDamageToAssign - spent;
     }
 
+    private boolean allDamageToAssign() {
+        for (DamageTarget dt : defenders) {
+            if (dt.damage > 0) {
+                return false;
+            }
+        }
+        return true;
+    }
+
     /** Updates labels and other UI elements.
-     * @param index index of the last assigned damage*/
+     **/
     private void updateLabels() {
         int damageLeft = totalDamageToAssign;
         boolean allHaveLethal = true;
@@ -436,6 +439,9 @@ public class VAssignCombatDamage {
 
         lblTotalDamage.setText(TextUtil.concatNoSpace(localizer.getMessage("lblAvailableDamagePoints"), ": " , String.valueOf(damageLeft), " (of ", String.valueOf(totalDamageToAssign), ")"));
         btnOK.setEnabled(damageLeft == 0);
+        if (btnOK.isEnabled()) {
+            btnOK.requestFocus();
+        }
         lblAssignRemaining.setVisible(allHaveLethal && damageLeft > 0);
     }
 
@@ -459,12 +465,12 @@ public class VAssignCombatDamage {
             }
             else if (defender instanceof CardView) { // planeswalker
                 final CardView pw = (CardView)defender;
-                lethalDamage = Integer.valueOf(pw.getCurrentState().getLoyalty());
+                lethalDamage = Integer.parseInt(pw.getCurrentState().getLoyalty());
             }
         } else {
             lethalDamage = Math.max(0, card.getLethalDamage());
             if (card.getCurrentState().isPlaneswalker()) {
-                lethalDamage = Integer.valueOf(card.getCurrentState().getLoyalty());
+                lethalDamage = Integer.parseInt(card.getCurrentState().getLoyalty());
             } else if (attackerHasDeathtouch) {
                 lethalDamage = Math.min(lethalDamage, 1);
             }

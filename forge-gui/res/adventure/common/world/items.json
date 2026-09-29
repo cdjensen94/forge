@@ -1,17 +1,17 @@
 [
   {
     "name": "Challenge Coin",
-    "description": "A heavy coin made of gold.",
+    "description": "A heavy coin made of gold",
     "iconName": "ChallengeCoin"
   },
   {
     "name": "Silver Challenge Coin",
-    "description": "A decorative coin made of silver.",
+    "description": "A weighty coin made of silver",
     "iconName": "SilverChallengeCoin"
   },
   {
     "name": "Bronze Challenge Coin",
-    "description": "A lightweight coin made of bronze.",
+    "description": "A lightweight coin made of bronze",
     "iconName": "BronzeChallengeCoin"
   },
   {
@@ -141,28 +141,231 @@
     "name": "Landscape Sketchbook",
     "description": "A leather bound notebook containing sketches of various landscapes across Shandalar",
     "iconName": "LandscapeSketchbook",
-    "questItem": true
+    "questItem": true,
+    "usableInPoi": true,
+    "dialogOnUse": {
+      "text": "You found this sketchbook at the dig site.",
+      "options": [
+        {
+          "name": "You can't quite make heads nor tails of the sketches inside, but you better hold onto it..."
+        }
+      ]
+    }
   },
   {
     "name": "Landscape Sketchbook - Mirage",
     "description": "A leather bound notebook containing sketches of tropical locations",
-    "iconName": "LandscapeSketchbook"
+    "iconName": "LandscapeSketchbook",
+    "questItem": true
   },
   {
     "name": "Landscape Sketchbook - Urza's Saga",
     "description": "A leather bound notebook containing many different angles of the same terrain features",
-    "iconName": "LandscapeSketchbook"
+    "iconName": "LandscapeSketchbook",
+    "questItem": true
   },
   {
     "name": "Landscape Sketchbook - Coldsnap",
     "description": "A leather bound notebook containing sketches of frost covered vistas",
+    "iconName": "LandscapeSketchbook",
+    "questItem": true
+  },
+  {
+    "name": "Landscape Sketchbook - Zendikar",
+    "description": "A leather bound notebook filled with sketches of floating landmasses and ancient ruins",
+    "iconName": "LandscapeSketchbook"
+  },
+  {
+    "name": "Landscape Sketchbook - Innistrad",
+    "description": "A leather bound notebook containing eerie sketches of foggy, gothic landscapes",
+    "iconName": "LandscapeSketchbook"
+  },
+  {
+    "name": "Landscape Sketchbook - Ravnica Allegiance",
+    "description": "A leather bound notebook filled with intricate sketches of a vast cityscape",
+    "iconName": "LandscapeSketchbook"
+  },
+  {
+    "name": "Landscape Sketchbook - Theros",
+    "description": "A leather bound notebook containing sketches of ancient monuments and starry skies",
+    "iconName": "LandscapeSketchbook"
+  },
+  {
+    "name": "Landscape Sketchbook - Kamigawa Neon Dynasty",
+    "description": "A leather bound notebook containing sketches of spiritual shrines and cherry blossoms",
+    "iconName": "LandscapeSketchbook"
+  },
+  {
+    "name": "Landscape Sketchbook - Dominaria",
+    "description": "A leather bound notebook containing diverse sketches of the multiverse's nexus",
+    "iconName": "LandscapeSketchbook"
+  },
+  {
+    "name": "Landscape Sketchbook - Lorwyn",
+    "description": "A leather bound notebook filled with whimsical sketches of idyllic meadows",
+    "iconName": "LandscapeSketchbook"
+  },
+  {
+    "name": "Landscape Sketchbook - Shards of Alara",
+    "description": "A leather bound notebook containing vibrant sketches of five distinct terrains",
+    "iconName": "LandscapeSketchbook"
+  },
+  {
+    "name": "Landscape Sketchbook - Amonkhet",
+    "description": "A leather bound notebook filled with sketches of desert landscapes and grand monuments",
+    "iconName": "LandscapeSketchbook"
+  },
+  {
+    "name": "Landscape Sketchbook - Ixalan",
+    "description": "A leather bound notebook containing sketches of lush jungles and ancient temples",
+    "iconName": "LandscapeSketchbook"
+  },
+  {
+    "name": "Landscape Sketchbook - 30th Anniversary Edition",
+    "description": "A leather bound notebook filled with sketches of iconic landscapes from throughout Magic's history",
+    "iconName": "LandscapeSketchbook"
+  },
+  {
+    "name": "Landscape Sketchbook - Aetherdrift",
+    "description": "A leather bound notebook containing sketches of futuristic landscapes blending magic and technology",
+    "iconName": "LandscapeSketchbook"
+  },
+  {
+    "name": "Landscape Sketchbook - Strixhaven: School of Mages",
+    "description": "A leather bound notebook filled with sketches of a magical university and its diverse campus grounds",
+    "iconName": "LandscapeSketchbook"
+  },
+  {
+    "name": "Landscape Sketchbook - Streets of New Capenna",
+    "description": "A leather bound notebook containing art deco sketches of towering skyscrapers and elegant plazas",
+    "iconName": "LandscapeSketchbook"
+  },
+  {
+    "name": "Landscape Sketchbook - Kaldheim",
+    "description": "A leather bound notebook filled with sketches of snow-covered realms and Viking-inspired landscapes",
+    "iconName": "LandscapeSketchbook"
+  },
+  {
+    "name": "Landscape Sketchbook - Ikoria: Lair of Behemoths",
+    "description": "A leather bound notebook containing sketches of bizarre wilderness and enormous creatures",
+    "iconName": "LandscapeSketchbook"
+  },
+  {
+    "name": "Landscape Sketchbook - Thrones of Eldraine",
+    "description": "A leather bound notebook filled with fairy tale sketches of enchanted castles and mystical groves",
+    "iconName": "LandscapeSketchbook"
+  },
+  {
+    "name": "Landscape Sketchbook - Shadows Over Innistrad",
+    "description": "A leather bound notebook containing sketches of twisted landscapes under the influence of eldritch horrors",
+    "iconName": "LandscapeSketchbook"
+  },
+  {
+    "name": "Landscape Sketchbook - Battle for Zendikar",
+    "description": "A leather bound notebook filled with sketches of a world being consumed by alien entities",
+    "iconName": "LandscapeSketchbook"
+  },
+  {
+    "name": "Landscape Sketchbook - Khans of Tarkir",
+    "description": "A leather bound notebook containing sketches of a wartorn land with five distinct clans",
+    "iconName": "LandscapeSketchbook"
+  },
+  {
+    "name": "Landscape Sketchbook - Hour of Devastation",
+    "description": "A leather bound notebook filled with sketches of monuments crumbling under draconic influence",
+    "iconName": "LandscapeSketchbook"
+  },
+  {
+    "name": "Landscape Sketchbook - Kaladesh",
+    "description": "A leather bound notebook containing intricate sketches of brass and copper cityscapes",
+    "iconName": "LandscapeSketchbook"
+  },
+  {
+    "name": "Landscape Sketchbook - Mercadian Masques",
+    "description": "A leather bound notebook filled with sketches of an isolated city-state and surrounding countryside",
+    "iconName": "LandscapeSketchbook"
+  },
+  {
+    "name": "Landscape Sketchbook - New Phyrexia",
+    "description": "A leather bound notebook filled with disturbing sketches of a metal-infused wasteland",
+    "iconName": "LandscapeSketchbook"
+  },
+  {
+    "name": "Landscape Sketchbook - Mirrodin Besieged",
+    "description": "A leather bound notebook containing sketches of a metal world at war",
+    "iconName": "LandscapeSketchbook"
+  },
+  {
+    "name": "Landscape Sketchbook - Scars of Mirrodin",
+    "description": "A leather bound notebook filled with sketches of a metal paradise being slowly corrupted",
+    "iconName": "LandscapeSketchbook"
+  },
+  {
+    "name": "Landscape Sketchbook - Magic Origins",
+    "description": "A leather bound notebook containing sketches of the home planes of five iconic planeswalkers",
+    "iconName": "LandscapeSketchbook"
+  },
+  {
+    "name": "Landscape Sketchbook - Magic 2021",
+    "description": "A leather bound notebook filled with sketches of diverse landscapes from across the multiverse",
+    "iconName": "LandscapeSketchbook"
+  },
+  {
+    "name": "Landscape Sketchbook - Modern Horizons",
+    "description": "A leather bound notebook containing sketches of various planes throughout Magic's history",
+    "iconName": "LandscapeSketchbook"
+  },
+  {
+    "name": "Landscape Sketchbook - Tempest",
+    "description": "A leather bound notebook filled with sketches of storm-ravaged islands and floating strongholds",
+    "iconName": "LandscapeSketchbook"
+  },
+  {
+    "name": "Landscape Sketchbook - Onslaught",
+    "description": "A leather bound notebook containing detailed sketches of tribal territories and battlegrounds",
+    "iconName": "LandscapeSketchbook"
+  },
+  {
+    "name": "Landscape Sketchbook - Odyssey",
+    "description": "A leather bound notebook filled with sketches of a plane in recovery after apocalyptic events",
+    "iconName": "LandscapeSketchbook"
+  },
+  {
+    "name": "Landscape Sketchbook - Rise of the Eldrazi",
+    "description": "A leather bound notebook containing sketches of hedrons and otherworldly monstrosities",
+    "iconName": "LandscapeSketchbook"
+  },
+  {
+    "name": "Landscape Sketchbook - Dragons of Tarkir",
+    "description": "A leather bound notebook filled with sketches of a plane dominated by mighty dragons",
+    "iconName": "LandscapeSketchbook"
+  },
+  {
+    "name": "Landscape Sketchbook - Duskmourn: House of Horror",
+    "description": "A leather bound notebook filled with sketches of twilit forests and mysterious ruins",
+    "iconName": "LandscapeSketchbook"
+  },
+  {
+    "name": "Landscape Sketchbook - Outlaws of Thunder Junction",
+    "description": "A leather bound notebook containing sketches of wild western frontiers and dusty canyons",
+    "iconName": "LandscapeSketchbook"
+  },
+  {
+    "name": "Landscape Sketchbook - Bloomburrow",
+    "description": "A leather bound notebook filled with sketches of charming villages and lush countryside",
+    "iconName": "LandscapeSketchbook"
+  },
+  {
+    "name": "Landscape Sketchbook - The Brothers War",
+    "description": "A leather bound notebook containing sketches of devastating battlefields covered with mechanical debris",
     "iconName": "LandscapeSketchbook"
   },
   {
     "name": "Chandra's Tome",
-    "description": "Draft a Chandra themed card that can be cast with mana of any color.",
+    "description": "Draft a Chandra themed card that can be cast with mana of any color",
     "equipmentSlot": "Left",
     "iconName": "ChandrasTome",
+    "cost": 8000,
     "effect": {
       "startBattleWithCardInCommandZone": [
         "Chandra's Tome"
@@ -170,11 +373,11 @@
     }
   },
   {
-
     "name": "Phoenix Charm",
-    "description": "Draft a Phoenix card, or conjure one to be cast with mana of any color.",
+    "description": "Draft a Phoenix card, or conjure one to be cast with mana of any color",
     "equipmentSlot": "Neck",
     "iconName": "PhoenixCharm",
+    "cost": 8000,
     "effect": {
       "startBattleWithCardInCommandZone": [
         "Phoenix Charm"
@@ -183,12 +386,12 @@
   },
   {
     "name": "Chandra's Stone",
-    "description": "A small red gemstone recovered after your battle with Chandra.",
+    "description": "A small red gemstone recovered after your battle with Chandra",
     "iconName": "r"
   },
   {
     "name": "Phoenix",
-    "description": "Draft a Phoenix card, or conjure one to be cast with mana of any color.",
+    "description": "Draft a Phoenix card, or conjure one to be cast with mana of any color",
     "equipmentSlot": "Neck",
     "iconName": "PhoenixCharm",
     "effect": {
@@ -199,7 +402,7 @@
   },
   {
     "name": "Liliana's Stone",
-    "description": "A small black gemstone recovered after your battle with Liliana.",
+    "description": "A small black gemstone recovered after your battle with Liliana",
     "iconName": "b"
   },
   {
@@ -207,6 +410,7 @@
     "description": "Sign away your soul to know what the future holds",
     "equipmentSlot": "Right",
     "iconName": "DemonicContract",
+    "cost": 15000,
     "effect": {
       "startBattleWithCardInCommandZone": [
         "Demonic Contract"
@@ -217,7 +421,7 @@
     "name": "Piper's Charm",
     "equipmentSlot": "Neck",
     "iconName": "PipersCharm",
-    "cost": 4000,
+    "cost": 1500,
     "effect": {
       "startBattleWithCardInCommandZone": [
         "Piper's Charm"
@@ -227,7 +431,7 @@
   {
     "name": "Sleep Wand",
     "equipmentSlot": "Left",
-    "cost": 4000,
+    "cost": 1500,
     "iconName": "SleepWand",
     "effect": {
       "startBattleWithCardInCommandZone": [
@@ -238,7 +442,7 @@
   {
     "name": "Hill Giant Club",
     "equipmentSlot": "Right",
-    "cost": 2000,
+    "cost": 2500,
     "iconName": "HillGiantClub",
     "effect": {
       "startBattleWithCardInCommandZone": [
@@ -250,7 +454,7 @@
     "name": "Cursed Treasure",
     "equipmentSlot": "Right",
     "iconName": "CursedTreasure",
-    "cost": 4000,
+    "cost": 6000,
     "effect": {
       "startBattleWithCardInCommandZone": [
         "Cursed Treasure"
@@ -272,6 +476,7 @@
     "name": "Sol Ring",
     "equipmentSlot": "Left",
     "iconName": "SolRing",
+    "cost": 25000,
     "effect": {
       "startBattleWithCard": [
         "Sol Ring"
@@ -282,6 +487,7 @@
     "name": "Mox Emerald",
     "equipmentSlot": "Neck",
     "iconName": "MoxEmerald",
+    "cost": 25000,
     "effect": {
       "startBattleWithCard": [
         "Mox Emerald"
@@ -292,6 +498,7 @@
     "name": "Black Lotus",
     "equipmentSlot": "Right",
     "iconName": "BlackLotus",
+    "cost": 30000,
     "effect": {
       "startBattleWithCard": [
         "Black Lotus"
@@ -302,6 +509,7 @@
     "name": "Mox Jet",
     "equipmentSlot": "Neck",
     "iconName": "MoxJet",
+    "cost": 25000,
     "effect": {
       "startBattleWithCard": [
         "Mox Jet"
@@ -312,6 +520,7 @@
     "name": "Mox Pearl",
     "equipmentSlot": "Neck",
     "iconName": "MoxPearl",
+    "cost": 25000,
     "effect": {
       "startBattleWithCard": [
         "Mox Pearl"
@@ -322,6 +531,7 @@
     "name": "Mox Ruby",
     "equipmentSlot": "Neck",
     "iconName": "MoxRuby",
+    "cost": 25000,
     "effect": {
       "startBattleWithCard": [
         "Mox Ruby"
@@ -332,6 +542,7 @@
     "name": "Mox Sapphire",
     "equipmentSlot": "Neck",
     "iconName": "MoxSapphire",
+    "cost": 25000,
     "effect": {
       "startBattleWithCard": [
         "Mox Sapphire"
@@ -342,6 +553,7 @@
     "name": "Battle Standard",
     "equipmentSlot": "Left",
     "iconName": "BattleStandard",
+    "cost": 1500,
     "effect": {
       "lifeModifier": -1,
       "startBattleWithCard": [
@@ -353,6 +565,7 @@
     "name": "Hivestone",
     "equipmentSlot": "Left",
     "iconName": "Hivestone",
+    "cost": 4000,
     "effect": {
       "startBattleWithCard": [
         "Hivestone"
@@ -419,7 +632,7 @@
     "questItem": true
   },
   {
-    "name": "Grolnoks Key",
+    "name": "Grolnok's Key",
     "iconName": "StrangeKey",
     "questItem": true
   },
@@ -478,7 +691,7 @@
     "name": "Iron Shield",
     "equipmentSlot": "Right",
     "iconName": "IronShield",
-    "cost": 3500,
+    "cost": 6500,
     "effect": {
       "lifeModifier": 2
     }
@@ -537,6 +750,7 @@
     "name": "Armor of the Hivelord",
     "equipmentSlot": "Body",
     "iconName": "HiveLordArmor",
+    "cost": 20000,
     "effect": {
       "lifeModifier": 5,
       "changeStartCards": 1
@@ -546,6 +760,7 @@
     "name": "Leather Boots",
     "equipmentSlot": "Boots",
     "iconName": "LeatherBoots",
+    "cost": 500,
     "effect": {
       "moveSpeed": 1.15
     }
@@ -554,7 +769,7 @@
     "name": "Jungle Shield",
     "equipmentSlot": "Right",
     "iconName": "JungleShield",
-    "cost": 2500,
+    "cost": 4500,
     "effect": {
       "startBattleWithCard": [
         "g_0_1_plant"
@@ -565,6 +780,7 @@
    "name": "Sorin's Amulet",
     "equipmentSlot": "Neck",
     "iconName": "SorinAmulet",
+    "cost": 12000,
     "effect": {
       "lifeModifier": 2,
       "startBattleWithCardInCommandZone": [
@@ -576,7 +792,7 @@
     "name": "Dagger",
     "equipmentSlot": "Left",
     "iconName": "Dagger",
-    "cost": 2500,
+    "cost": 2000,
     "effect": {
       "startBattleWithCard": [
         "Spare Dagger"
@@ -587,6 +803,7 @@
     "name": "Cheat",
     "equipmentSlot": "Neck",
     "iconName": "Goose",
+    "cost": 50000,
     "effect": {
       "startBattleWithCard": [
         "Blightsteel Colossus",
@@ -598,7 +815,7 @@
   {
     "name": "Aladdin's Ring",
     "equipmentSlot": "Right",
-    "cost": 3000,
+    "cost": 1500,
     "iconName": "AladdinsRing",
     "effect": {
       "startBattleWithCard": [
@@ -610,7 +827,7 @@
     "name": "Spell Book",
     "iconName": "SpellBook",
     "equipmentSlot": "Left",
-    "cost": 3000,
+    "cost": 8000,
     "effect": {
       "changeStartCards": 1
     }
@@ -619,6 +836,7 @@
     "name": "Cursed Ring",
     "equipmentSlot": "Right",
     "iconName": "CursedRing",
+    "cost": 4000,
     "effect": {
       "startBattleWithCard": [
         "c_0_1_a_goblin_construct_noblock_ping",
@@ -641,7 +859,7 @@
     "name": "Mithril Shield",
     "equipmentSlot": "Right",
     "iconName": "MithrilShield",
-    "cost": 4500,
+    "cost": 6500,
     "effect": {
       "startBattleWithCard": [
         "c_0_4_a_wall_defender"
@@ -662,6 +880,7 @@
     "name": "Presence of the Hydra",
     "equipmentSlot": "Left",
     "iconName": "PresenceoftheHydra",
+    "cost": 4000,
     "effect": {
       "lifeModifier": 2,
       "startBattleWithCardInCommandZone": [
@@ -673,6 +892,7 @@
     "name": "Death Ring",
     "equipmentSlot": "Right",
     "iconName": "DeathRing",
+    "cost": 3500,
     "effect": {
       "startBattleWithCardInCommandZone": [
         "Death Ring"
@@ -682,6 +902,7 @@
   {
     "name": "Flame Sword",
     "equipmentSlot": "Left",
+    "cost": 6000,
     "iconName": "FlameSword",
     "effect": {
       "startBattleWithCardInCommandZone": [
@@ -692,6 +913,7 @@
   {
     "name": "Mirror Shield",
     "equipmentSlot": "Right",
+    "cost": 2500,
     "iconName": "MirrorShield",
     "effect": {
       "startBattleWithCard": [
@@ -700,9 +922,51 @@
     }
   },
   {
+     "name": "Basilisk Collar",
+    "equipmentSlot": "Neck",
+    "cost": 25000,
+    "description": "Equipment that gives deathouch and lifelink",
+    "iconName": "BasiliskCollar",
+    "effect": {
+      "lifeModifier": 1,
+      "changeStartCards": -1,
+      "startBattleWithCard": [
+        "Basilisk Collar"
+      ]
+    }
+  },
+  {
+    "name": "Evil Ankh",
+    "equipmentSlot": "Right",
+    "description": "Start with Ankh of Mishra",
+    "cost": 25000,
+    "iconName": "EvilAnkh",
+    "effect": {
+      "lifeModifier": 1,
+      "changeStartCards": -1,
+      "startBattleWithCard": [
+        "Ankh of Mishra"
+      ]
+    }
+  },
+  {
+    "name": "Staff of the Demoncaller",
+    "equipmentSlot": "Left",
+    "description": "Griselbrand starts in the command zone, but there's a catch ...",
+    "cost": 25000,
+    "iconName": "DemonCallerStaff",
+    "effect": {
+      "lifeModifier": 3,
+      "startBattleWithCardInCommandZone": [
+        "Staff of the Demoncaller Effect"
+      ]
+    }
+  },
+  {
     "name": "Dungeon Map",
     "equipmentSlot": "Right",
     "iconName": "DungeonMap",
+    "cost": 12000,
     "effect": {
       "startBattleWithCard": [
         "Dungeon Map"
@@ -710,9 +974,87 @@
     }
   },
   {
+    "name": "Concordant Boots",
+    "description": "All creatures have haste",
+    "equipmentSlot": "Boots",
+    "iconName": "ConcordantBoots",
+    "cost": 9000,
+    "effect": {
+      "startBattleWithCard": [
+        "Concordant Crossroads|LEG"
+      ]
+    }
+  },
+  {
+    "name": "Crown of Growth",
+    "description": "Start with Season of Growth",
+    "equipmentSlot": "Neck",
+    "iconName": "CrownofGrowth",
+    "cost": 3000,
+     "effect": {
+      "lifeModifier": 1,
+      "changeStartCards": -1,
+      "startBattleWithCard": [
+        "Season of Growth"
+      ]
+    }
+  },
+  {
+    "name": "Mantle of Denial",
+    "description": "Start with Hesitation",
+    "equipmentSlot": "Body",
+    "iconName": "MantleofDenial",
+    "cost": 3000,
+     "effect": {
+      "lifeModifier": 1,
+      "changeStartCards": 1,
+      "startBattleWithCard": [
+        "Hesitation"
+      ]
+    }
+  },
+  {
+  "name": "Raptor Bondband",
+    "description": "4/2 dinosaur",
+    "equipmentSlot": "Boots",
+    "iconName": "RaptorBondband",
+    "cost": 4000,
+    "effect": {
+        "lifeModifier": -3,
+        "startBattleWithCard": [
+        "Frenzied Raptor|IKO"
+     ]
+    }
+  },
+    {
+        "name": "Golden Egg",
+    "description": "Filter mana or pay 2 for 3 life",
+    "equipmentSlot": "Left",
+    "iconName": "GoldenEgg",
+    "cost": 2000,
+    "effect": {
+        "startBattleWithCard": [
+        "Golden Egg|ELD"
+     ]
+    }
+  },
+    {
+        "name": "Amulet of Telepathy",
+    "description": "Your opponent plays with their hand revealed",
+    "equipmentSlot": "Neck",
+    "iconName": "RelicAmulet",
+    "cost": 3000,
+    "effect": {
+      "startBattleWithCard": [
+        "Telepathy|USG"
+      ]
+    }
+  },
+  {
     "name": "Aladdin's Lamp",
     "equipmentSlot": "Right",
     "iconName": "AladdinsLamp",
+    "cost": 1000,
     "effect": {
       "startBattleWithCard": [
         "Aladdin's Lamp"
@@ -723,6 +1065,7 @@
     "name": "Heart-Piercer",
     "equipmentSlot": "Left",
     "iconName": "CompositeBow",
+    "cost": 2000,
     "effect": {
       "startBattleWithCard": [
         "Heart-Piercer Bow"
@@ -730,17 +1073,81 @@
     }
   },
   {
+    "name": "Warren Tender's Baton",
+    "equipmentSlot": "Left",
+    "iconName": "WarrenTendersBaton",
+    "cost": 3000,
+    "effect": {
+      "lifeModifier": 1,
+      "startBattleWithCard": [
+        "Goblin Warrens|FEM"
+      ]
+    },
+    "description": "Pay 2R and sac 2 Goblins to create 3 1/1 Goblin tokens"
+  },
+  {
+   "name": "Prayerbook of Ire",
+    "description": "3R for 5 damage to a player",
+    "equipmentSlot": "Left",
+    "iconName": "PrayerbookofIre",
+    "cost": 3000,
+    "effect": {
+        "startBattleWithCard": [
+        "Font of Ire|JOU"
+     ]
+    }
+  },
+    {
     "name": "Wood Bow",
     "equipmentSlot": "Left",
     "iconName": "WoodBow",
+    "cost": 1000,
     "effect": {
       "startBattleWithCard": [ "Fyndhorn Bow" ]
     }
   },
   {
+      "name": "Robes of Omniscience",
+    "equipmentSlot": "Body",
+    "iconName": "RobesOfOmniscience",
+    "cost": 10000,
+    "effect": {
+      "lifeModifier": -6,
+      "changeStartCards": 2
+    },
+    "description": "-6 life. Draw 2 extra cards at game start"
+  },
+  {
+      "name": "Angelic Armaments",
+    "description": "Equip 4, +2/+2 and flying and become an angel",
+    "equipmentSlot": "Right",
+    "iconName": "AngelicArmaments",
+    "cost": 10000,
+    "effect": {
+        "lifeModifier": 4,
+        "startBattleWithCard": [
+        "Angelic Armaments|AVR"
+     ]
+    }
+  },
+    {
+        "name": "Angelic Greaves",
+    "description": "0/4 wall with flying",
+    "equipmentSlot": "Boots",
+    "iconName": "AngelicGreaves",
+      "cost": 8000,
+    "effect": {
+         "lifeModifier": 2,
+        "startBattleWithCard": [
+        "Angelic Wall|PO2"
+     ]
+    }
+  },
+    {
     "name": "Sandals",
     "equipmentSlot": "Boots",
     "iconName": "Sandals",
+    "cost": 100,
     "effect": {
       "moveSpeed": 1.1
     }
@@ -749,6 +1156,7 @@
     "name": "Gold Boots",
     "equipmentSlot": "Boots",
     "iconName": "GoldBoots",
+    "cost": 10000,
     "effect": {
       "lifeModifier": 2,
       "moveSpeed": 1.3
@@ -758,6 +1166,7 @@
     "name": "Gold Shield",
     "equipmentSlot": "Right",
     "iconName": "GoldShield",
+    "cost": 13000,
     "effect": {
       "lifeModifier": 3
     }
@@ -766,6 +1175,7 @@
     "name": "Gold Armor",
     "equipmentSlot": "Body",
     "iconName": "GoldArmor",
+    "cost": 15000,
     "effect": {
       "lifeModifier": 4
     }
@@ -811,6 +1221,7 @@
     "name": "Blood Vial",
     "equipmentSlot": "Right",
     "iconName": "Blood",
+    "cost": 1000,
     "effect": {
       "startBattleWithCard": [
         "c_a_blood_draw"
@@ -821,6 +1232,7 @@
     "name": "Charm",
     "equipmentSlot": "Right",
     "iconName": "Clue",
+    "cost": 3000,
     "effect": {
       "startBattleWithCard": [
         "c_a_clue_draw"
@@ -831,6 +1243,7 @@
     "name": "Snack",
     "equipmentSlot": "Right",
     "iconName": "Cheese",
+    "cost": 1000,
     "effect": {
       "startBattleWithCard": [
         "c_a_food_sac"
@@ -841,6 +1254,7 @@
     "name": "Change",
     "equipmentSlot": "Right",
     "iconName": "GoldStack",
+    "cost": 5000,
     "effect": {
       "startBattleWithCard": [
         "c_a_gold_draw"
@@ -851,6 +1265,7 @@
     "name": "Treasure",
     "equipmentSlot": "Right",
     "iconName": "Treasure",
+    "cost": 5000,
     "effect": {
       "startBattleWithCard": [
         "c_a_treasure_sac"
@@ -861,6 +1276,7 @@
     "name": "Magic Shard",
     "equipmentSlot": "Right",
     "iconName": "Shard",
+    "cost": 3500,
     "effect": {
       "startBattleWithCard": [
         "c_e_shard_draw"
@@ -871,6 +1287,7 @@
     "name": "Mad Staff",
     "equipmentSlot": "Left",
     "iconName": "MadStaff",
+    "cost": 4000,
     "effect": {
       "startBattleWithCard": [
         "Power Struggle"
@@ -892,6 +1309,7 @@
     "name": "Pandora's Box",
     "equipmentSlot": "Right",
     "iconName": "PandorasBox",
+    "cost": 1500,
     "effect": {
       "startBattleWithCard": [
         "Pandora's Box"
@@ -902,6 +1320,7 @@
     "name": "Disrupting Scepter",
     "equipmentSlot": "Left",
     "iconName": "DisruptingScepter",
+    "cost": 2500,
     "effect": {
       "startBattleWithCard": [
         "Disrupting Scepter"
@@ -912,6 +1331,7 @@
     "name": "Entrancing Lyre",
     "equipmentSlot": "Right",
     "iconName": "EntrancingLyre",
+    "cost": 6000,
     "effect": {
       "startBattleWithCard": [
         "Entrancing Lyre"
@@ -922,6 +1342,7 @@
     "name": "Heavy Arbalest",
     "equipmentSlot": "Left",
     "iconName": "HeavyArbalest",
+    "cost": 1500,
     "effect": {
       "startBattleWithCard": [
         "Heavy Arbalest"
@@ -932,6 +1353,7 @@
     "name": "Ring of Three Wishes",
     "equipmentSlot": "Right",
     "iconName": "RingofThreeWishes",
+    "cost": 2500,
     "effect": {
       "startBattleWithCard": [
         "Ring of Three Wishes"
@@ -942,6 +1364,7 @@
     "name": "The Blackstaff of Waterdeep",
     "equipmentSlot": "Left",
     "iconName": "TheBlackstaffofWaterdeep",
+    "cost": 3500,
     "effect": {
       "startBattleWithCard": [
         "The Blackstaff of Waterdeep"
@@ -952,6 +1375,7 @@
     "name": "Unerring Sling",
     "equipmentSlot": "Left",
     "iconName": "UnerringSling",
+    "cost": 4000,
     "effect": {
       "startBattleWithCard": [
         "Unerring Sling"
@@ -961,6 +1385,7 @@
   {
     "name": "Jeweled Amulet",
     "equipmentSlot": "Neck",
+    "cost": 5000,
     "iconName": "JeweledAmulet",
     "effect": {
       "startBattleWithCard": [
@@ -972,6 +1397,7 @@
     "name": "Traveler's Amulet",
     "equipmentSlot": "Neck",
     "iconName": "TravelersAmulet",
+    "cost": 5000,
     "effect": {
       "startBattleWithCard": [
         "Traveler's Amulet"
@@ -982,6 +1408,7 @@
     "name": "Relic Amulet",
     "equipmentSlot": "Neck",
     "iconName": "RelicAmulet",
+    "cost": 2500,
     "effect": {
       "startBattleWithCard": [
         "Relic Amulet"
@@ -992,6 +1419,7 @@
     "name": "Amulet of Kroog",
     "equipmentSlot": "Neck",
     "iconName": "AmuletofKroog",
+    "cost": 3000,
     "effect": {
       "startBattleWithCard": [
         "Amulet of Kroog"
@@ -1002,6 +1430,7 @@
     "name": "Amulet of Vigor",
     "equipmentSlot": "Neck",
     "iconName": "AmuletofVigor",
+    "cost": 7000,
     "effect": {
       "startBattleWithCard": [
         "Amulet of Vigor"
@@ -1012,6 +1441,7 @@
     "name": "Veilstone Amulet",
     "equipmentSlot": "Neck",
     "iconName": "VeilstoneAmulet",
+    "cost": 5000,
     "effect": {
       "startBattleWithCard": [
         "Veilstone Amulet"
@@ -1022,6 +1452,7 @@
     "name": "Jandor's Ring",
     "equipmentSlot": "Right",
     "iconName": "JandorsRing",
+    "cost": 2500,
     "effect": {
       "startBattleWithCard": [
         "Jandor's Ring"
@@ -1032,6 +1463,7 @@
     "name": "Jinxed Ring",
     "equipmentSlot": "Right",
     "iconName": "JinxedRing",
+    "cost": 2500,
     "effect": {
       "opponent": {
         "startBattleWithCard": [
@@ -1044,6 +1476,7 @@
     "name": "Nine-Ringed Bo",
     "equipmentSlot": "Left",
     "iconName": "Nine-RingedBo",
+    "cost": 1000,
     "effect": {
       "startBattleWithCard": [
         "Nine-Ringed Bo"
@@ -1054,6 +1487,7 @@
     "name": "Ring of Immortals",
     "equipmentSlot": "Right",
     "iconName": "RingofImmortals",
+    "cost": 4000,
     "effect": {
       "startBattleWithCard": [
         "Ring of Immortals"
@@ -1064,6 +1498,7 @@
     "name": "Prism Ring",
     "equipmentSlot": "Right",
     "iconName": "PrismRing",
+    "cost": 2000,
     "effect": {
       "startBattleWithCard": [
         "Prism Ring"
@@ -1074,6 +1509,7 @@
     "name": "Ring of Renewal",
     "equipmentSlot": "Right",
     "iconName": "RingofRenewal",
+    "cost": 5000,
     "effect": {
       "startBattleWithCard": [
         "Ring of Renewal"
@@ -1084,6 +1520,7 @@
     "name": "Kite Shield",
     "equipmentSlot": "Right",
     "iconName": "KiteShield",
+    "cost": 1500,
     "effect": {
       "startBattleWithCard": [
         "Kite Shield"
@@ -1093,6 +1530,7 @@
   {
     "name": "Shell Wand",
     "equipmentSlot": "Left",
+    "cost": 4000,
     "effect": {
       "opponent": {
         "lifeModifier": -2
@@ -1107,12 +1545,14 @@
     "effect": {
       "colorView": true
     },
-    "description": "Grants Manasight, letting you know the colors used by your adversaries.",
-    "iconName": "RelicAmulet"
+    "description": "Grants Manasight, letting you know the colors used by your adversaries",
+    "iconName": "RelicAmulet",
+    "cost": 4000
   },
   {
     "name": "Lightbringers Boots",
     "equipmentSlot": "Boots",
+    "cost": 8000,
     "effect": {
       "opponent": {
         "lifeModifier": 5
@@ -1133,7 +1573,8 @@
       "cardRewardBonus": 1
     },
     "description": "",
-    "iconName": "FortuneCoin"
+    "iconName": "FortuneCoin",
+    "cost": 10000
   },
   {
     "name": "Colorless rune",
@@ -1156,7 +1597,6 @@
     "description": "Teleports you to the plains",
     "commandOnUse": "teleport to poi \"Plains Capital\"",
     "iconName": "WhiteRune",
-    "questItem": true,
     "shardsNeeded": 1,
     "cost": 100
   },
@@ -1170,7 +1610,6 @@
     "description": "Teleports you to the swamp",
     "commandOnUse": "teleport to poi \"Swamp Capital\"",
     "iconName": "BlackRune",
-    "questItem": true,
     "shardsNeeded": 1,
     "cost": 100
   },
@@ -1184,7 +1623,6 @@
     "description": "Teleports you to the island",
     "commandOnUse": "teleport to poi \"Island Capital\"",
     "iconName": "BlueRune",
-    "questItem": true,
     "shardsNeeded": 1,
     "cost": 100
   },
@@ -1198,7 +1636,6 @@
     "description": "Teleports you to the mountain",
     "commandOnUse": "teleport to poi \"Mountain Capital\"",
     "iconName": "RedRune",
-    "questItem": true,
     "shardsNeeded": 1,
     "cost": 100
   },
@@ -1212,7 +1649,6 @@
     "description": "Teleports you to the forest",
     "commandOnUse": "teleport to poi \"Forest Capital\"",
     "iconName": "GreenRune",
-    "questItem": true,
     "shardsNeeded": 1,
     "cost": 100
   },
@@ -1293,6 +1729,7 @@
     "name": "Slimefoot's Slimy Staff",
     "equipmentSlot": "Left",
     "iconName": "GreenStaff",
+    "cost": 8000,
     "effect": {
       "lifeModifier": 2,
       "startBattleWithCardInCommandZone": [
@@ -1304,6 +1741,7 @@
     "name": "Kiora's Bident",
     "equipmentSlot": "Left",
     "iconName": "SleepWand",
+    "cost": 10000,
     "effect": {
       "lifeModifier": -1,
       "startBattleWithCard": [
@@ -1318,6 +1756,7 @@
     "name": "Slime-Covered Boots",
     "equipmentSlot": "Boots",
     "iconName": "SteelBoots",
+    "cost": 6000,
     "effect": {
       "lifeModifier": -1,
       "moveSpeed": 1.20,
@@ -1328,8 +1767,9 @@
   },
   {
     "name": "Amulet of the Deceiver",
-    "equipmentSlot": "Head",
+    "equipmentSlot": "Neck",
     "iconName": "MoxJet",
+    "cost": 10000,
     "effect": {
       "lifeModifier": -1,
       "moveSpeed": 1.20,
@@ -1347,6 +1787,7 @@
     "name": "Jace's Signature Hoodie",
     "equipmentSlot": "Body",
     "iconName": "BlueRobes",
+    "cost": 12000,
     "effect": {
       "lifeModifier": -1,
       "cardRewardBonus": 1,
@@ -1359,6 +1800,7 @@
     "name": "Teferi's Staff",
     "equipmentSlot": "Left",
     "iconName": "MadStaff",
+    "cost": 12000,
     "effect": {
       "lifeModifier": 1,
       "cardRewardBonus": 1,
@@ -1371,6 +1813,7 @@
     "name": "Garruk's Mighty Axe",
     "equipmentSlot": "Left",
     "iconName": "GarrukAxe",
+    "cost": 12000,
     "effect": {
       "lifeModifier": 3,
       "startBattleWithCardInCommandZone": [
@@ -1382,6 +1825,7 @@
     "name": "Nahiri's Armory",
     "equipmentSlot": "Right",
     "iconName": "Armory",
+    "cost": 12000,
     "effect": {
       "lifeModifier": 3,
       "startBattleWithCardInCommandZone": [
@@ -1393,6 +1837,7 @@
     "name": "Giant Scythe",
     "equipmentSlot": "Left",
     "iconName": "Scythe",
+    "cost": 6000,
     "effect": {
       "lifeModifier": 1,
       "startBattleWithCardInCommandZone": [
@@ -1404,6 +1849,7 @@
     "name": "Chicken Egg",
     "equipmentSlot": "Right",
     "iconName": "ChickenEgg",
+    "cost": 3000,
     "effect": {
       "lifeModifier": 1,
       "startBattleWithCard": [
@@ -1415,6 +1861,7 @@
     "name": "Tibalt's Bag of Tricks",
     "equipmentSlot": "Left",
     "iconName": "BurningBook",
+    "cost": 6000,
     "effect": {
       "lifeModifier": 1,
       "startBattleWithCardInCommandZone": [
@@ -1426,6 +1873,7 @@
     "name": "Xira's Fancy Hat",
     "equipmentSlot": "Neck",
     "iconName": "BrownHat",
+    "cost": 10000,
     "effect": {
       "lifeModifier": 2,
       "startBattleWithCard": [
@@ -1437,6 +1885,7 @@
     "name": "The Underworld Cookbook",
     "equipmentSlot": "Left",
     "iconName": "UnderworldCookbook",
+    "cost": 4000,
     "effect": {
       "startBattleWithCard": [
         "The Underworld Cookbook"
@@ -1447,6 +1896,7 @@
     "name": "Mantle of Ancient Lore",
     "equipmentSlot": "Body",
     "iconName": "Conjurer's Mantle",
+    "cost": 5000,
     "effect": {
       "lifeModifier": 1,
       "startBattleWithCardInCommandZone": [
@@ -1458,6 +1908,7 @@
     "name": "Zedruu's Lantern",
     "equipmentSlot": "Left",
     "iconName": "ZedruuLantern",
+    "cost": 8000,
     "effect": {
       "lifeModifier": 1,
       "startBattleWithCardInCommandZone": [
@@ -1469,6 +1920,7 @@
     "name": "Grolnok's Skin",
     "equipmentSlot": "Right",
     "iconName": "FrogSkin",
+    "cost": 10000,
     "effect": {
       "lifeModifier": 3,
       "startBattleWithCardInCommandZone": [
@@ -1480,6 +1932,7 @@
     "name": "Slobad's Iron Boots",
     "equipmentSlot": "Boots",
     "iconName": "MetallicBoots",
+    "cost": 10000,
     "effect": {
       "lifeModifier": 1,
       "moveSpeed": 1.35,
@@ -1490,9 +1943,10 @@
   },
   {
     "name": "Hallowed Sigil",
-    "description": "Turn a creature hexproof until end of turn.",
+    "description": "Give a creature hexproof until end of turn",
     "equipmentSlot": "Neck",
     "iconName": "HallowedSigil",
+    "cost": 6000,
     "effect": {
       "startBattleWithCard": [
         "Hallowed Sigil"
@@ -1501,9 +1955,10 @@
   },
   {
     "name": "Unhallowed Sigil",
-    "description": "Devour the life of an enemy creature, killing it.",
+    "description": "Devour the life of an enemy creature, killing it",
     "equipmentSlot": "Right",
     "iconName": "UnhallowedSigil",
+    "cost": 6000,
     "effect": {
       "startBattleWithCard": [
         "Sigil of Torment"

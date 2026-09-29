@@ -28,7 +28,7 @@ import forge.deck.DeckSection;
 import forge.gui.util.SGuiChoose;
 import forge.gui.util.SOptionPane;
 import forge.item.PaperCard;
-import forge.item.SealedProduct;
+import forge.item.SealedTemplate;
 import forge.item.generation.IUnOpenedProduct;
 import forge.item.generation.UnOpenedProduct;
 import forge.localinstance.properties.ForgeConstants;
@@ -68,6 +68,9 @@ public class SealedCardPoolGenerator {
 
     /** The Land set code. */
     private String landSetCode = null;
+
+    /** Human-readable name of the specific block / edition / custom pool chosen (null for Full). */
+    private String productName = null;
 
     public static DeckGroup generateSealedDeck(final boolean addBasicLands) {
         final String prompt = Localizer.getInstance().getMessage("lblChooseSealedDeckFormat");
@@ -160,11 +163,11 @@ public class SealedCardPoolGenerator {
      * @param poolType
      *            a {@link java.lang.String} object.
      */
-    private SealedCardPoolGenerator(final LimitedPoolType poolType) {
+    public SealedCardPoolGenerator(final LimitedPoolType poolType) {
         switch(poolType) {
             case Full:
                 // Choose number of boosters
-                if (!chooseNumberOfBoosters(new UnOpenedProduct(SealedProduct.Template.genericDraftBooster))) {
+                if (!chooseNumberOfBoosters(new UnOpenedProduct(SealedTemplate.genericDraftBooster))) {
                     return;
                 }
                 landSetCode = CardEdition.Predicates.getRandomSetWithAllBasicLands(FModel.getMagicDb().getEditions()).getCode();
@@ -218,7 +221,7 @@ public class SealedCardPoolGenerator {
                         List<Pair<String, Integer>> promoSlot = new ArrayList<>();
                         promoSlot.add(Pair.of(pieces[1], num));
 
-                        SealedProduct.Template promoProduct = new SealedProduct.Template("Prerelease Promo", promoSlot);
+                        SealedTemplate promoProduct = new SealedTemplate("Prerelease Promo", promoSlot);
 
                         // Create a "booster" with just the promo card. Rarity + Edition into a Template
                         this.product.add(new UnOpenedProduct(promoProduct, FModel.getMagicDb().getCommonCards().getAllCards(chosenEdition)));
@@ -229,6 +232,7 @@ public class SealedCardPoolGenerator {
 
                 //chosenEdition but really it should be defined by something in the edition file?
                 landSetCode = chosenEdition.getCode();
+                productName = chosenEdition.getName();
 
                 break;
             case Block:
@@ -253,6 +257,7 @@ public class SealedCardPoolGenerator {
                     sets.push(ms);
                 }
 
+                String packSummary = null;
                 if (sets.size() > 1 ) {
                     final List<String> setCombos = getSetCombos(sets, nPacks);
                     if (setCombos == null || setCombos.isEmpty()) {
@@ -262,6 +267,7 @@ public class SealedCardPoolGenerator {
                     final String p = setCombos.size() > 1 ? SGuiChoose.oneOrNone(Localizer.getInstance().getMessage("lblChoosePackNumberToPlay"), setCombos) : setCombos.get(0);
                     if (p == null) { return; }
 
+                    packSummary = p;
                     for (String pz : TextUtil.split(p, ',')) {
                         String[] pps = TextUtil.splitWithParenthesis(pz.trim(), ' ');
                         String setCode = pps[pps.length - 1];
@@ -272,6 +278,7 @@ public class SealedCardPoolGenerator {
                     }
                 }
                 else {
+                    packSummary = sets.get(0);
                     IUnOpenedProduct prod = block.getBooster(sets.get(0));
                     for (int i = 0; i < nPacks; i++) {
                         this.product.add(prod);
@@ -279,6 +286,7 @@ public class SealedCardPoolGenerator {
                 }
 
                 landSetCode = block.getLandSet().getCode();
+                productName = block.getName() + " (" + packSummary + ")";
                 break;
 
             case Custom:
@@ -324,6 +332,41 @@ public class SealedCardPoolGenerator {
                 }
 
                 landSetCode = draft.getLandSetCode();
+                productName = draft.getName();
+                break;
+            case Import:
+                /*
+                  Import a cube from CubeCobra.
+                  Default settings include a variable number of boosters with a size of 15 cards.
+                 */
+                String inputCubeId = SOptionPane.showInputDialog(
+                        Localizer.getInstance().getMessage("lblEnterCubeCobraURL") + ":",
+                        Localizer.getInstance().getMessage("lblImportCube"),
+                        null);
+
+                if (inputCubeId == null) {
+                    return;
+                }
+
+                try {
+                    CubeImporter importer = new CubeImporter(inputCubeId);
+                    CustomLimited importedDraft = importer.importCube();
+
+                    if (importedDraft == null) {
+                        SOptionPane.showErrorDialog(Localizer.getInstance().getMessage("lblFailedToImportCube") + ": " + inputCubeId);
+                        return;
+                    }
+                    UnOpenedProduct importedProduct = new UnOpenedProduct(importedDraft.getSealedProductTemplate(), importedDraft.getCardPool());
+                    importedProduct.setLimitedPool(importedDraft.isSingleton());
+                    if (!chooseNumberOfBoosters(importedProduct)) {
+                        return;
+                    }
+                    this.product.add(importedProduct);
+
+                } catch (Exception e) {
+                    SOptionPane.showErrorDialog(Localizer.getInstance().getMessage("lblErrorImportingCube") + ": " + e.getMessage());
+                    return;
+                }
                 break;
         }
     }
@@ -524,11 +567,19 @@ public class SealedCardPoolGenerator {
 
     /**
      * Gets the land set code.
-     * 
+     *
      * @return the landSetCode
      */
     public String getLandSetCode() {
         return this.landSetCode;
+    }
+
+    /**
+     * Human-readable name of the specific block / edition / custom pool chosen
+     * during construction, or null if the pool type has no sub-selection (Full).
+     */
+    public String getProductName() {
+        return this.productName;
     }
 
     public boolean isEmpty() {

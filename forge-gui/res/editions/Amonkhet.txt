@@ -2,16 +2,14 @@
 Code=AKH
 Date=2017-04-28
 Name=Amonkhet
-Code2=AKH
 Type=Expansion
 BoosterCovers=5
-Booster=10 Common:!fromSheet("AKH Planeswalker Decks and Toolkit"), 3 Uncommon:!fromSheet("AKH Planeswalker Decks and Toolkit"), 1 RareMythic:!fromSheet("AKH Planeswalker Decks and Toolkit"), 1 BasicLand AKH
-AdditionalSheetForFoils=fromSheet("MPS Amonkhet Invocations")
+Booster=10 Common:fromSheet("AKH cards"), 3 Uncommon:fromSheet("AKH cards"), 1 RareMythic:fromSheet("AKH cards"), 1 BasicLand AKH
+AdditionalSheetForFoils=fromSheet("MPS_AKH cards")
 FatPack=10
 FatPackExtraSlots=80 BasicLands
 AdditionalSetUnlockedInQuest=MPS_AKH
 ChaosDraftThemes=GRAVEYARD_MATTERS
-ScryfallCode=AKH
 
 [cards]
 1 M Angel of Sanctions @Min Yum
@@ -39,7 +37,7 @@ ScryfallCode=AKH
 23 U Protection of the Hekma @Ryan Alexander Lee
 24 R Regal Caracal @Filip Burburan
 25 U Renewed Faith @Wesley Burt
-26 C Rhet-Crop Spearmaster @Dan Scott
+26 C Rhet-Crop Spearmaster @Dan Murayama Scott
 27 C Sacred Cat @Zezhou Chen
 28 U Seraph of the Suns @Winona Nelson
 29 C Sparring Mummy @Ryan Pancoast
@@ -131,7 +129,7 @@ ScryfallCode=AKH
 115 C Wander in Death @Seb McKinnon
 116 C Wasteland Scorpion @Yeong-Hao Han
 117 U Ahn-Crop Crasher @Seb McKinnon
-118 U Battlefield Scavenger @Dan Scott
+118 U Battlefield Scavenger @Dan Murayama Scott
 119 C Blazing Volley @Zezhou Chen
 120 C Bloodlust Inciter @Anthony Palumbo
 121 U Bloodrage Brawler @Lars Grant-West
@@ -157,7 +155,7 @@ ScryfallCode=AKH
 141 C Magma Spray @Svetlin Velinov
 142 C Manticore of the Gauntlet @James Paick
 143 C Minotaur Sureshot @Joseph Meehan
-144 C Nef-Crop Entangler @Dan Scott
+144 C Nef-Crop Entangler @Dan Murayama Scott
 145 C Nimble-Blade Khenra @Tomasz Jedruszek
 146 C Pathmaker Initiate @Josu Hernaiz
 147 C Pursue Glory @Johann Bodin
@@ -187,7 +185,7 @@ ScryfallCode=AKH
 171 C Haze of Pollen @Mark Zug
 172 R Honored Hydra @Todd Lockwood
 173 C Hooded Brawler @Daarken
-174 C Initiate's Companion @Dan Scott
+174 C Initiate's Companion @Dan Murayama Scott
 175 U Manglehorn @Lius Lasahido
 176 C Naga Vitalist @James Ryman
 177 C Oashra Cultivator @Sara Winters
@@ -201,7 +199,7 @@ ScryfallCode=AKH
 185 C Shed Weakness @Christine Choi
 186 U Shefet Monitor @Viktor Titov
 187 U Sixth Sense @Zoltan Boros
-188 C Spidery Grasp @Dan Scott
+188 C Spidery Grasp @Dan Murayama Scott
 189 C Stinging Shot @Scott Murphy
 190 U Synchronized Strike @David Palumbo
 191 U Trial of Strength @Kieran Yanner
@@ -283,6 +281,8 @@ ScryfallCode=AKH
 267 L Forest @Titus Lunter
 268 L Forest @Titus Lunter
 269 L Forest @Matt Stewart
+
+[precon product]
 270 M Gideon, Martial Paragon @Daarken
 271 U Companion of the Trials @Aaron Miller
 272 R Gideon's Resolve @Jakub Kasper
@@ -300,32 +300,32 @@ ScryfallCode=AKH
 284 C Submerged Boneyard @Christine Choi
 285 C Timber Gorge @Cliff Childs
 286 C Tranquil Expanse @Sam Burley
-287 C Woodland Stream @Efflam Mercier
+287 C Woodland Stream @Enora Mercier
 
 [tokens]
-w_1_1_cat_lifelink
-w_1_1_warrior_vigilance
-u_2_2_drake_flying
-b_1_1_insect
-b_2_2_zombie
-g_4_2_beast
-g_3_3_hippo
-g_1_1_snake_deathtouch
-g_5_5_wurm
+16 w_1_1_cat_lifelink @Filip Burburan
+17 w_1_1_warrior_vigilance @Magali Villeneuve
+18 u_2_2_drake_flying @John Severin Brassell
+19 b_1_1_insect @Jason A. Engle
+20 b_2_2_zombie @Igor Kieryluk
+21 g_4_2_beast @Kieran Yanner
+22 g_3_3_hippo @Zack Stella
+23 g_1_1_snake_deathtouch @Tyler Jacobson
+24 g_5_5_wurm @Slawomir Maniak
 
 [other]
-embalm_angel_of_sanctions
-embalm_anointer_priest
-embalm_aven_initiate
-embalm_aven_wind_guide
-embalm_glyph_keeper
-embalm_heart-piercer_manticore
-embalm_honored_hydra
-embalm_labyrinth_guardian
-embalm_oketra's_attendant
-embalm_sacred_cat
-embalm_tah-crop_skirmisher
-embalm_temmet_vizier_of_naktamun
-embalm_trueheart_duelist
-embalm_unwavering_initiate
-embalm_vizier_of_many_faces
+1 embalm_angel_of_sanctions @Min Yum
+2 embalm_anointer_priest @Lake Hurwitz
+3 embalm_aven_initiate @Jakub Kasper
+4 embalm_aven_wind_guide @Sidharth Chaturvedi
+5 embalm_glyph_keeper @Chris Rahn
+6 embalm_heart-piercer_manticore @Scott Murphy
+7 embalm_honored_hydra @Todd Lockwood
+8 embalm_labyrinth_guardian @Yeong-Hao Han
+9 embalm_oketra's_attendant @Lake Hurwitz
+10 embalm_sacred_cat @Zezhou Chen
+11 embalm_tah-crop_skirmisher @Victor Adame Minguez
+12 embalm_temmet_vizier_of_naktamun @Anna Steinbauer
+13 embalm_trueheart_duelist @Izzy
+14 embalm_unwavering_initiate @Greg Opalinski
+15 embalm_vizier_of_many_faces @Ryan Yee

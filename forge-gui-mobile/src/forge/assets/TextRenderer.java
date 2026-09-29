@@ -33,13 +33,55 @@ public class TextRenderer {
     private boolean wrap, needClip;
     private List<Piece> pieces = new ArrayList<>();
     private List<Float> lineWidths = new ArrayList<>();
-    private BreakIterator boundary = BreakIterator.getLineInstance(new Locale(Forge.locale));
+    private static final TextBounds bounds = new TextBounds();
+    private static final TextBounds textBounds = new TextBounds();
+    // iOS-compatible: BreakIterator may not be available (missing ICU resources in RoboVM)
+    private BreakIterator boundary;
+
+    {
+        try {
+            boundary = BreakIterator.getLineInstance(new Locale(Forge.locale));
+        } catch (Exception e) {
+            // RoboVM on iOS doesn't have ICU resources - use simple space-based breaking instead
+            boundary = null;
+        }
+    }
 
     public TextRenderer() {
         this(false);
     }
     public TextRenderer(boolean parseReminderText0) {
         parseReminderText = parseReminderText0;
+    }
+
+    /**
+     * iOS-compatible: Enhanced word breaking fallback for when BreakIterator is unavailable.
+     * Breaks at spaces, punctuation, and MTG-specific characters for proper card text wrapping.
+     */
+    private int findNextSpace(String text, int startIndex) {
+        if (startIndex >= text.length()) {
+            return BreakIterator.DONE;
+        }
+        for (int i = startIndex; i < text.length(); i++) {
+            char c = text.charAt(i);
+            // Break at whitespace
+            if (c == ' ' || c == '\n' || c == '\t') {
+                return i + 1; // Return position after the whitespace
+            }
+            // Break after punctuation (for card text like "Draw a card, then...")
+            if (c == '.' || c == ',' || c == ';' || c == ':' || c == '!' || c == '?') {
+                return i + 1; // Break after punctuation
+            }
+            // Break after closing symbols (for mana costs like "{2}{U}{U}")
+            if (c == '}' || c == ')' || c == ']') {
+                return i + 1; // Break after closing brace/paren
+            }
+            // Break after hyphens and slashes (for "creature/token" or compound words)
+            if (c == '-' || c == '/') {
+                return i + 1; // Break after hyphen or slash
+            }
+        }
+        return BreakIterator.DONE;
     }
 
     //break text in pieces
@@ -60,7 +102,10 @@ public class TextRenderer {
             needClip = true;
         }
 
-        boundary.setText(fullText);
+        // iOS-compatible: Use simple space-based breaking if BreakIterator unavailable
+        if (boundary != null) {
+            boundary.setText(fullText);
+        }
         ForgePreferences prefs = FModel.getPreferences();
         boolean hideReminderText = prefs != null && prefs.getPrefBoolean(FPref.UI_HIDE_REMINDER_TEXT);
 
@@ -69,7 +114,7 @@ public class TextRenderer {
         float y = 0;
         float pieceWidth = 0;
         float lineHeight = font.getLineHeight();
-        int nextSpaceIdx = boundary.first();
+        int nextSpaceIdx = boundary != null ? boundary.first() : findNextSpace(fullText, 0);
         int lastSpaceIdx = -1;
         int lineNum = 0;
         StringBuilder text = new StringBuilder();
@@ -84,7 +129,7 @@ public class TextRenderer {
             atReminderTextEnd = false;
             if (i == nextSpaceIdx) {
                 lastSpaceIdx = text.length();
-                nextSpaceIdx = boundary.next();
+                nextSpaceIdx = boundary != null ? boundary.next() : findNextSpace(fullText, i + 1);
             }
             try {
                 ch = fullText.charAt(i);
@@ -177,7 +222,7 @@ public class TextRenderer {
                                     needClip = true;
                                 }
                             }
-                            addPiece(new SymbolPiece(symbol, inReminderTextCount > 0), lineNum, x, y - font.getAscent() + (lineHeight - pieceWidth) / 2, pieceWidth, pieceWidth);
+                            addPiece(new SymbolPiece(symbol, inReminderTextCount > 0), lineNum, x, y - lineHeight / 4, pieceWidth, pieceWidth);
                             x += pieceWidth;
                             pieceWidth = 0;
                             text.setLength(0);
@@ -378,8 +423,7 @@ public class TextRenderer {
                                 lastPieceIdx = pieces.size() - 1; //don't re-wrap anything if reached previous line
                                 break;
                             }
-                            if (lastPiece instanceof TextPiece) {
-                                TextPiece textPiece = (TextPiece)lastPiece;
+                            if (lastPiece instanceof TextPiece textPiece) {
                                 int index = textPiece.text.lastIndexOf(' ');
                                 if (index != -1) {
                                     if (index == 0) {
@@ -506,26 +550,28 @@ public class TextRenderer {
         }
     }
 
-    private TextBounds getCurrentBounds() {
+    private void getCurrentBounds(TextBounds outBounds) {
         float maxWidth = 0;
-        for (Float lineWidth : lineWidths) {
+        int size = lineWidths.size();
+        for (int i = 0; i < size; i++) {
+            float lineWidth = lineWidths.get(i);
             if (lineWidth > maxWidth) {
                 maxWidth = lineWidth;
             }
         }
-        TextBounds bounds = new TextBounds();
-        bounds.width = maxWidth;
-        bounds.height = totalHeight;
-        return bounds;
+        outBounds.set(maxWidth, totalHeight);
     }
 
     public TextBounds getBounds(String text, FSkinFont skinFont) {
         setProps(text, skinFont, Float.MAX_VALUE, Float.MAX_VALUE, false);
-        return getCurrentBounds();
+        getCurrentBounds(textBounds);
+        return textBounds;
     }
+
     public TextBounds getWrappedBounds(String text, FSkinFont skinFont, float maxWidth) {
         setProps(text, skinFont, maxWidth, Float.MAX_VALUE, true);
-        return getCurrentBounds();
+        getCurrentBounds(textBounds);
+        return textBounds;
     }
 
     public void drawText(Graphics g, String text, FSkinFont skinFont, FSkinColor skinColor, float x, float y, float w, float h, float visibleStartY, float visibleHeight, boolean wrap0, int horzAlignment, boolean centerVertically) {

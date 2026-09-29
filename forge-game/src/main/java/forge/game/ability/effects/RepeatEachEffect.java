@@ -2,7 +2,6 @@ package forge.game.ability.effects;
 
 import java.util.*;
 
-import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 
@@ -22,6 +21,7 @@ import forge.game.spellability.SpellAbilityStackInstance;
 import forge.game.trigger.TriggerType;
 import forge.game.trigger.WrappedAbility;
 import forge.game.zone.ZoneType;
+import forge.util.IterableUtil;
 import forge.util.collect.FCollection;
 
 public class RepeatEachEffect extends SpellAbilityEffect {
@@ -56,8 +56,7 @@ public class RepeatEachEffect extends SpellAbilityEffect {
             } else {
                 zone.add(ZoneType.Battlefield);
             }
-            repeatCards = CardLists.getValidCards(game.getCardsIn(zone),
-                    sa.getParam("RepeatCards"), source.getController(), source, sa);
+            repeatCards = CardLists.getValidCards(game.getCardsIn(zone), sa.getParam("RepeatCards"), source.getController(), source, sa);
         }
         else if (sa.hasParam(("RepeatSpellAbilities"))) {
             repeatSas = Lists.newArrayList();
@@ -72,15 +71,14 @@ public class RepeatEachEffect extends SpellAbilityEffect {
         else if (sa.hasParam("DefinedCards")) {
             repeatCards = AbilityUtils.getDefinedCards(source, sa.getParam("DefinedCards"), sa);
         }
-        boolean loopOverCards = repeatCards != null && !repeatCards.isEmpty();
 
         if (sa.hasParam("ClearRemembered")) {
             source.clearRemembered();
         }
 
         if (sa.hasParam("DamageMap")) {
-            sa.setDamageMap(new CardDamageMap());
-            sa.setPreventMap(new CardDamageMap());
+            sa.setDamageMap(new CardDamageTable());
+            sa.setPreventMap(new CardDamageTable());
             sa.setCounterTable(new GameEntityCounterTable());
         }
         if (sa.hasParam("ChangeZoneTable")) {
@@ -90,7 +88,7 @@ public class RepeatEachEffect extends SpellAbilityEffect {
             sa.setLoseLifeMap(Maps.newHashMap());
         }
 
-        if (loopOverCards) {
+        if (repeatCards != null && !repeatCards.isEmpty()) {
             if (sa.hasParam("ChooseOrder") && repeatCards.size() > 1) {
                 final Player chooser = sa.getParam("ChooseOrder").equals("True") ? activator :
                         AbilityUtils.getDefinedPlayers(source, sa.getParam("ChooseOrder"), sa).get(0);
@@ -139,12 +137,8 @@ public class RepeatEachEffect extends SpellAbilityEffect {
                 final String[] workingCopy = def.split("_");
                 final String validFilter = workingCopy[1];
                 res = CardUtil.getThisTurnCast(validFilter, source, sa, activator);
-            } else if (def.startsWith("Defined ")) {
-                res = AbilityUtils.getDefinedCards(source, def.substring(8), sa);
             } else {
-                final ZoneType zone = sa.hasParam("TypesFromZone") ?
-                        ZoneType.smartValueOf(sa.getParam("TypesFromZone")) : ZoneType.Battlefield;
-                res = CardLists.getValidCards(game.getCardsIn(zone), def, source.getController(), source, sa);
+                res = AbilityUtils.getDefinedCards(source, def, sa);
             }
             for (final Card c : res) {
                 for (CardType.CoreType type : c.getType().getCoreTypes()) {
@@ -158,7 +152,7 @@ public class RepeatEachEffect extends SpellAbilityEffect {
                 chooser = AbilityUtils.getDefinedPlayers(source, sa.getParam("ChooseOrder"), sa).get(0);
             }
             while (!validTypes.isEmpty()) {
-                String chosenT = chooser.getController().chooseSomeType("card", sa, validTypes, null);
+                String chosenT = chooser.getController().chooseSomeType("Card", sa, validTypes);
                 source.setChosenType(chosenT);
                 AbilityUtils.resolve(repeat);
                 validTypes.remove(chosenT);
@@ -167,37 +161,29 @@ public class RepeatEachEffect extends SpellAbilityEffect {
         }
 
         if (sa.hasParam("RepeatPlayers")) {
-            final FCollection<Player> repeatPlayers = AbilityUtils.getDefinedPlayers(source, sa.getParam("RepeatPlayers"), sa);
+            final FCollection<Player> repeatPlayers = getDefinedPlayersOrTargeted(sa, "RepeatPlayers");
             if (sa.hasParam("ClearRememberedBeforeLoop")) {
                 source.clearRemembered();
             }
             boolean optional = sa.hasParam("RepeatOptionalForEachPlayer");
             boolean nextTurn = sa.hasParam("NextTurnForEachPlayer");
-            if (sa.hasParam("StartingWithActivator")) {
-                int aidx = repeatPlayers.indexOf(activator);
-                if (aidx != -1) {
-                    Collections.rotate(repeatPlayers, -aidx);
-                }
-            }
+
             for (final Player p : repeatPlayers) {
                 if (optional && !p.getController().confirmAction(repeat, null, sa.getParam("RepeatOptionalMessage"), null)) {
                     continue;
                 }
                 if (nextTurn) {
-                    game.getCleanup().addUntil(p, new GameCommand() {
-                        @Override
-                        public void run() {
-                            List<Object> tempRemembered = Lists.newArrayList(Iterables.filter(source.getRemembered(), Player.class));
-                            source.removeRemembered(tempRemembered);
-                            source.addRemembered(p);
-                            AbilityUtils.resolve(repeat);
-                            source.removeRemembered(p);
-                            source.addRemembered(tempRemembered);
-                        }
+                    game.getCleanup().addUntil(p, (GameCommand) () -> {
+                        List<Object> tempRemembered = Lists.newArrayList(IterableUtil.filter(source.getRemembered(), Player.class));
+                        source.removeRemembered(tempRemembered);
+                        source.addRemembered(p);
+                        AbilityUtils.resolve(repeat);
+                        source.removeRemembered(p);
+                        source.addRemembered(tempRemembered);
                     });
                 } else {
                     // to avoid risk of collision with other abilities swap out other Remembered Player while resolving
-                    List<Object> tempRemembered = Lists.newArrayList(Iterables.filter(source.getRemembered(), Player.class));
+                    List<Object> tempRemembered = Lists.newArrayList(IterableUtil.filter(source.getRemembered(), Player.class));
                     source.removeRemembered(tempRemembered);
                     source.addRemembered(p);
                     if (sa.hasParam("AmountFromVotes")) {
@@ -227,7 +213,7 @@ public class RepeatEachEffect extends SpellAbilityEffect {
         }
     }
 
-    private void setVoteAmount (Object o, SpellAbility sa) {
+    private void setVoteAmount(Object o, SpellAbility sa) {
         SpellAbility rootAbility = sa.getRootAbility();
         if (rootAbility.isWrapper()) {
             rootAbility = ((WrappedAbility) rootAbility).getWrappedAbility();

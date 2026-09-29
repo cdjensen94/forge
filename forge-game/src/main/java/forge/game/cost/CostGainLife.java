@@ -17,12 +17,11 @@
  */
 package forge.game.cost;
 
-import java.util.List;
-
 import com.google.common.collect.Lists;
-
 import forge.game.player.Player;
 import forge.game.spellability.SpellAbility;
+
+import java.util.List;
 
 /**
  * The Class CostGainLife.
@@ -87,7 +86,7 @@ public class CostGainLife extends CostPart {
 
     @Override
     public final boolean payAsDecided(final Player ai, final PaymentDecision decision, SpellAbility ability, final boolean effect) {
-        Integer c = this.getAbilityAmount(ability);
+        int c = this.getAbilityAmount(ability);
         
         int playersLeft = cntPlayers;
         for (final Player opp : decision.players) {

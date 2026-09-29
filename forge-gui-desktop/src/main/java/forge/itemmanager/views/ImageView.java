@@ -2,6 +2,7 @@ package forge.itemmanager.views;
 
 import forge.ImageCache;
 import forge.card.ColorSet;
+import forge.deck.Deck;
 import forge.deck.DeckProxy;
 import forge.deck.io.DeckPreferences;
 import forge.game.card.Card;
@@ -38,6 +39,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.TreeMap;
+import java.util.stream.IntStream;
 
 public class ImageView<T extends InventoryItem> extends ItemView<T> {
     private static final int PADDING = 5;
@@ -81,20 +83,17 @@ public class ImageView<T extends InventoryItem> extends ItemView<T> {
             super(new FLabel.ButtonBuilder());
             setFocusable(false);
             updateToolTip();
-            setCommand(new Runnable() {
-                @Override
-                public void run() {
-                    if (groupBy == null || model.getItems().isEmpty()) { return; }
+            setCommand((Runnable) () -> {
+                if (groupBy == null || model.getItems().isEmpty()) { return; }
 
-                    boolean collapsed = !isAllCollapsed;
-                    for (Group group : groups) {
-                        group.isCollapsed = collapsed;
-                    }
-
-                    updateIsAllCollapsed();
-                    clearSelection(); //must clear selection since indices and visible items will be changing
-                    updateLayout(false);
+                boolean collapsed = !isAllCollapsed;
+                for (Group group : groups) {
+                    group.isCollapsed = collapsed;
                 }
+
+                updateIsAllCollapsed();
+                clearSelection(); //must clear selection since indices and visible items will be changing
+                updateLayout(false);
             });
         }
 
@@ -154,44 +153,33 @@ public class ImageView<T extends InventoryItem> extends ItemView<T> {
 
         SItemManagerUtil.populateImageViewOptions(itemManager0, cbGroupByOptions, cbPileByOptions);
 
-        for (Integer i = MIN_COLUMN_COUNT; i <= MAX_COLUMN_COUNT; i++) {
-            cbColumnCount.addItem(i);
-        }
+        IntStream.rangeClosed(MIN_COLUMN_COUNT, MAX_COLUMN_COUNT).forEach(cbColumnCount::addItem);
         cbGroupByOptions.setMaximumRowCount(cbGroupByOptions.getItemCount());
         cbPileByOptions.setMaximumRowCount(cbPileByOptions.getItemCount());
         cbColumnCount.setMaximumRowCount(cbColumnCount.getItemCount());
         cbColumnCount.setSelectedIndex(columnCount - MIN_COLUMN_COUNT);
 
-        cbGroupByOptions.addActionListener(new ActionListener() {
-            @Override
-            public void actionPerformed(ActionEvent e) {
-                focus();
-                if (cbGroupByOptions.getSelectedIndex() > 0) {
-                    setGroupBy((GroupDef) cbGroupByOptions.getSelectedItem());
-                }
-                else {
-                    setGroupBy(null);
-                }
+        cbGroupByOptions.addActionListener(e -> {
+            focus();
+            if (cbGroupByOptions.getSelectedIndex() > 0) {
+                setGroupBy((GroupDef) cbGroupByOptions.getSelectedItem());
+            }
+            else {
+                setGroupBy(null);
             }
         });
-        cbPileByOptions.addActionListener(new ActionListener() {
-            @Override
-            public void actionPerformed(ActionEvent e) {
-                focus();
-                if (cbPileByOptions.getSelectedIndex() > 0) {
-                    setPileBy((ColumnDef) cbPileByOptions.getSelectedItem());
-                }
-                else {
-                    setPileBy(null);
-                }
+        cbPileByOptions.addActionListener(e -> {
+            focus();
+            if (cbPileByOptions.getSelectedIndex() > 0) {
+                setPileBy((ColumnDef) cbPileByOptions.getSelectedItem());
+            }
+            else {
+                setPileBy(null);
             }
         });
-        cbColumnCount.addActionListener(new ActionListener() {
-            @Override
-            public void actionPerformed(ActionEvent e) {
-                focus();
-                setColumnCount(cbColumnCount.getSelectedItem());
-            }
+        cbColumnCount.addActionListener(e -> {
+            focus();
+            setColumnCount(cbColumnCount.getSelectedItem());
         });
 
         //setup display
@@ -278,12 +266,7 @@ public class ImageView<T extends InventoryItem> extends ItemView<T> {
 
                 if (selectItem(e)) {
                     setLockHoveredItem(true); //lock hoveredItem while context menu open
-                    itemManager.showContextMenu(e, new Runnable() {
-                        @Override
-                        public void run() {
-                            setLockHoveredItem(false);
-                        }
-                    });
+                    itemManager.showContextMenu(e, () -> setLockHoveredItem(false));
                 }
             }
 
@@ -609,10 +592,12 @@ public class ImageView<T extends InventoryItem> extends ItemView<T> {
                 Map<Comparable<?>, Pile> piles = new TreeMap<>();
                 for (ItemInfo itemInfo : group.items) {
                     Comparable<?> key = groupPileBy.fnSort.apply(itemInfo);
-                    if (!piles.containsKey(key)) {
+                    if (key != null && !piles.containsKey(key)) {
                         piles.put(key, new Pile());
                     }
-                    piles.get(key).items.add(itemInfo);
+                    Pile p = key == null ? null : piles.getOrDefault(key, null);
+                    if (p != null)
+                        p.items.add(itemInfo);
                 }
                 group.piles.clear();
                 group.piles.addAll(piles.values());
@@ -871,9 +856,7 @@ public class ImageView<T extends InventoryItem> extends ItemView<T> {
     @Override
     public void selectAll() {
         clearSelection();
-        for (Integer i = 0; i < getCount(); i++) {
-            selectedIndices.add(i);
-        }
+        IntStream.range(0, getCount()).forEach(selectedIndices::add);
         updateSelection();
     }
 
@@ -1110,9 +1093,9 @@ public class ImageView<T extends InventoryItem> extends ItemView<T> {
                         InventoryItem item = itemInfo.item;
                         itemInfo.alt = false;
                         if (!FModel.getPreferences().getPref(FPref.UI_SWITCH_STATES_DECKVIEW).equals(ForgeConstants.SWITCH_CARDSTATES_DECK_NEVER)) {
-                            if ((hoveredItem == null || !hoveredItem.item.equals(item)) || (FModel.getPreferences().getPref(FPref.UI_SWITCH_STATES_DECKVIEW).equals(ForgeConstants.SWITCH_CARDSTATES_DECK_ALWAYS))) {
-                                if (item instanceof PaperCard) {
-                                    if (((PaperCard)item).hasBackFace()) {
+                            if ((hoveredItem == null || !hoveredItem.item.equals(item)) || FModel.getPreferences().getPref(FPref.UI_SWITCH_STATES_DECKVIEW).equals(ForgeConstants.SWITCH_CARDSTATES_DECK_ALWAYS)) {
+                                if (item instanceof PaperCard pc) {
+                                    if (pc.hasBackFace()) {
                                         if (item.equals(lastAltCard)) {
                                             itemInfo.alt = true;
                                             lastAltCard = null;
@@ -1138,12 +1121,7 @@ public class ImageView<T extends InventoryItem> extends ItemView<T> {
             }
 
             if (lockInput) { //unlock input after repaint finishes if needed
-                SwingUtilities.invokeLater(new Runnable() {
-                    @Override
-                    public void run() {
-                        lockInput = false;
-                    }
-                });
+                SwingUtilities.invokeLater(() -> lockInput = false);
             }
         }
 
@@ -1238,7 +1216,7 @@ public class ImageView<T extends InventoryItem> extends ItemView<T> {
                 g.setColor(Color.white);
                 Shape clip = g.getClip();
                 g.setClip(bounds);
-                g.drawString(item.getName(), bounds.x + 10, bounds.y + 20);
+                g.drawString(item.getDisplayName(), bounds.x + 10, bounds.y + 20);
                 g.setClip(clip);
             }
 
@@ -1258,6 +1236,12 @@ public class ImageView<T extends InventoryItem> extends ItemView<T> {
                     }
                     CardPanel.drawFoilEffect(g, card, bounds.x, bounds.y, bounds.width, bounds.height, borderSize);
                 }
+                
+                // Draw key card indicator if applicable
+                if (paperCard instanceof PaperCard pc) {
+                    drawKeyCardIndicator(g, pc, bounds);
+                }
+
                 //draw draft ranking
                 if (showRanking && FModel.getPreferences().getPrefBoolean(ForgePreferences.FPref.UI_OVERLAY_DRAFT_RANKING)) {
                     double score = CardRanker.getRawScore((PaperCard) item);
@@ -1284,6 +1268,24 @@ public class ImageView<T extends InventoryItem> extends ItemView<T> {
                     g.drawString(value, x-w/2, y);
                     g.setClip(clip);
                 }
+            }
+        }
+
+        private void drawKeyCardIndicator(Graphics g, PaperCard card, Rectangle bounds) {
+            try {
+                final Deck currentDeck = (Deck) CDeckEditorUI.SINGLETON_INSTANCE.getCurrentEditorController().getDeckController().getModel();
+                
+                if (currentDeck != null && currentDeck.isKeyCard(card.getName())) {
+                    g.setColor(Color.yellow);
+                    g.setFont(g.getFont().deriveFont(Font.BOLD, 14f));
+                    FontMetrics fm = g.getFontMetrics();
+                    String indicator = "⭐";
+                    int x = bounds.x + bounds.width - fm.stringWidth(indicator) - 3;
+                    int y = bounds.y + fm.getAscent() + 3;
+                    g.drawString(indicator, x, y);
+                }
+            } catch (Exception e) {
+                // Silently ignore if deck context is not available
             }
         }
     }

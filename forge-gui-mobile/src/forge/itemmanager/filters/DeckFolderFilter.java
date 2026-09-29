@@ -2,8 +2,7 @@ package forge.itemmanager.filters;
 
 import java.util.HashSet;
 import java.util.Set;
-
-import com.google.common.base.Predicate;
+import java.util.function.Predicate;
 
 import forge.deck.DeckProxy;
 import forge.itemmanager.ItemManager;
@@ -30,17 +29,14 @@ public class DeckFolderFilter extends ListLabelFilter<DeckProxy> {
 
     @Override
     protected final Predicate<DeckProxy> buildPredicate() {
-        return new Predicate<DeckProxy>() {
-            @Override
-            public boolean apply(DeckProxy input) {
-                String path = input.getPath();
-                for (String folder : folders) {
-                    if (path.startsWith(folder)) {
-                        return true;
-                    }
+        return input -> {
+            String path = input.getPath();
+            for (String folder : folders) {
+                if (path.startsWith(folder)) {
+                    return true;
                 }
-                return false;
             }
+            return false;
         };
     }
 

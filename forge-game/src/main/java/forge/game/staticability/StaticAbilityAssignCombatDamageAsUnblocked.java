@@ -6,8 +6,6 @@ import forge.game.zone.ZoneType;
 
 public class StaticAbilityAssignCombatDamageAsUnblocked {
 
-    static String MODE = "AssignCombatDamageAsUnblocked";
-
     public static boolean assignCombatDamageAsUnblocked(final Card card) {
         return assignCombatDamageAsUnblocked(card, true);
     }
@@ -16,18 +14,12 @@ public class StaticAbilityAssignCombatDamageAsUnblocked {
         final Game game = card.getGame();
         for (final Card ca : game.getCardsIn(ZoneType.STATIC_ABILITIES_SOURCE_ZONES)) {
             for (final StaticAbility stAb : ca.getStaticAbilities()) {
-                if (!stAb.checkConditions(MODE)) {
+                if (!stAb.checkConditions(StaticAbilityMode.AssignCombatDamageAsUnblocked)) {
                     continue;
                 }
 
-                if (stAb.hasParam("Optional")) {
-                    if (!optional) {
-                        continue;
-                    }
-                } else {
-                    if (optional) {
-                        continue;
-                    }
+                if (stAb.hasParam("Optional") != optional) {
+                    continue;
                 }
 
                 if (applyAssignCombatDamageAsUnblocked(stAb, card)) {

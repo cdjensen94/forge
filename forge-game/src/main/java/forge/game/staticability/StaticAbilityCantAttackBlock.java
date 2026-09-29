@@ -20,15 +20,11 @@ package forge.game.staticability;
 import org.apache.commons.lang3.tuple.MutablePair;
 import org.apache.commons.lang3.tuple.Pair;
 
-import com.google.common.collect.Iterables;
-
 import forge.game.Game;
 import forge.game.GameEntity;
 import forge.game.ability.AbilityUtils;
 import forge.game.card.Card;
 import forge.game.card.CardCollection;
-import forge.game.card.CardCollectionView;
-import forge.game.card.CardPredicates;
 import forge.game.cost.Cost;
 import forge.game.keyword.Keyword;
 import forge.game.player.Player;
@@ -38,11 +34,6 @@ import forge.game.zone.ZoneType;
  * The Class StaticAbility_CantBeCast.
  */
 public class StaticAbilityCantAttackBlock {
-    public static String CantAttackMode = "CantAttack";
-    public static String CantBlockByMode = "CantBlockBy";
-    public static String CanAttackIfHasteMode = "CanAttackIfHaste";
-    public static String CanBlockIfReachMode = "CanBlockIfReach";
-    public static String MinMaxBlockerMode = "MinMaxBlocker";
 
     public static boolean cantAttack(final Card attacker, final GameEntity defender) {
         // Keywords
@@ -51,9 +42,13 @@ public class StaticAbilityCantAttackBlock {
             return true;
         }
 
+        if (attacker.isDetained()) {
+            return true;
+        }
+
         for (final Card ca : attacker.getGame().getCardsIn(ZoneType.STATIC_ABILITIES_SOURCE_ZONES)) {
             for (final StaticAbility stAb : ca.getStaticAbilities()) {
-                if (!stAb.checkConditions(CantAttackMode)) {
+                if (!stAb.checkConditions(StaticAbilityMode.CantAttack)) {
                     continue;
                 }
 
@@ -79,16 +74,17 @@ public class StaticAbilityCantAttackBlock {
         if (!stAb.matchesValidParam("ValidCard", card)) {
             return false;
         }
+        if (stAb.getIgnoreEffectCards().contains(card)) {
+            return false;
+        }
 
         if (!stAb.matchesValidParam("Target", target)) {
             return false;
         }
 
-        if (stAb.isKeyword(Keyword.DEFENDER)) {
-            // check for "can attack as if didn't have defender" static
-            if (StaticAbilityCanAttackDefender.canAttack(card, target)) {
-                return false;
-            }
+        // check for "can attack as if didn't have defender" static
+        if (stAb.isKeyword(Keyword.DEFENDER) && canAttackDefender(card, target)) {
+            return false;
         }
 
         final Player defender;
@@ -103,22 +99,6 @@ public class StaticAbilityCantAttackBlock {
             }
         }
 
-        if (stAb.hasParam("UnlessDefenderControls")) {
-            String type = stAb.getParam("UnlessDefenderControls");
-            CardCollectionView list = defender.getCardsIn(ZoneType.Battlefield);
-            if (Iterables.any(list,
-                    CardPredicates.restriction(type.split(","), hostCard.getController(), hostCard, stAb))) {
-                return false;
-            }
-        }
-        if (stAb.hasParam("IfDefenderControls")) {
-            String type = stAb.getParam("IfDefenderControls");
-            CardCollectionView list = defender.getCardsIn(ZoneType.Battlefield);
-            if (!Iterables.any(list,
-                    CardPredicates.restriction(type.split(","), hostCard.getController(), hostCard, stAb))) {
-                return false;
-            }
-        }
         if (stAb.hasParam("DefenderNotNearestToYouInChosenDirection")) {
             if (hostCard.getChosenDirection() == null) {
                 return false;
@@ -144,16 +124,96 @@ public class StaticAbilityCantAttackBlock {
         return true;
     }
 
+    public static boolean canAttackDefender(final Card card, final GameEntity target) {
+        for (final Card ca : card.getGame().getCardsIn(ZoneType.STATIC_ABILITIES_SOURCE_ZONES)) {
+            for (final StaticAbility stAb : ca.getStaticAbilities()) {
+                if (!stAb.checkConditions(StaticAbilityMode.CanAttackDefender)) {
+                    continue;
+                }
+
+                if (applyCanAttackDefenderAbility(stAb, card, target)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    public static boolean applyCanAttackDefenderAbility(final StaticAbility stAb, final Card card, final GameEntity target) {
+        if (!stAb.matchesValidParam("ValidCard", card)) {
+            return false;
+        }
+
+        if (!stAb.matchesValidParam("ValidAttacked", target)) {
+            return false;
+        }
+
+        return true;
+    }
+
+    public static boolean cantBlock(final Card blocker) {
+        if (blocker.isDetained()) {
+            return true;
+        }
+
+        CardCollection list = new CardCollection(blocker);
+        list.addAll(blocker.getGame().getCardsIn(ZoneType.STATIC_ABILITIES_SOURCE_ZONES));
+        for (final Card ca : list) {
+            for (final StaticAbility stAb : ca.getStaticAbilities()) {
+                if (!stAb.checkConditions(StaticAbilityMode.CantBlock)) {
+                    continue;
+                }
+                if (applyCantBlockAbility(stAb, blocker)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    public static boolean applyCantBlockAbility(final StaticAbility stAb, final Card blocker) {
+        if (!stAb.matchesValidParam("ValidCard", blocker)) {
+            return false;
+        }
+        if (stAb.getIgnoreEffectCards().contains(blocker)) {
+            return false;
+        }
+        return true;
+    }
+
+    public static boolean canBlockTapped(final Card card)  {
+        final Game game = card.getGame();
+        for (final Card ca : game.getCardsIn(ZoneType.STATIC_ABILITIES_SOURCE_ZONES)) {
+            for (final StaticAbility stAb : ca.getStaticAbilities()) {
+                if (!stAb.checkConditions(StaticAbilityMode.BlockTapped)) {
+                    continue;
+                }
+
+                if (applyBlockTapped(stAb, card)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    private static boolean applyBlockTapped(final StaticAbility stAb, final Card card) {
+        if (!stAb.matchesValidParam("ValidCard", card)) {
+            return false;
+        }
+        return true;
+    }
+
     public static boolean cantBlockBy(final Card attacker, final Card blocker) {
-        CardCollection list = new CardCollection(attacker.getGame().getCardsIn(ZoneType.STATIC_ABILITIES_SOURCE_ZONES));
-        // add attacker and blocker in case of LKI
-        list.add(attacker);
+        // add attacker and blocker first in case of LKI
+        CardCollection list = new CardCollection(attacker);
         if (blocker != null) {
             list.add(blocker);
         }
+        list.addAll(attacker.getGame().getCardsIn(ZoneType.STATIC_ABILITIES_SOURCE_ZONES));
         for (final Card ca : list) {
             for (final StaticAbility stAb : ca.getStaticAbilities()) {
-                if (!stAb.checkConditions(CantBlockByMode)) {
+                if (!stAb.checkConditions(StaticAbilityMode.CantBlockBy)) {
                     continue;
                 }
                 if (applyCantBlockByAbility(stAb, attacker, blocker)) {
@@ -186,6 +246,10 @@ public class StaticAbilityCantAttackBlock {
                     if (v.contains("withoutReach") && canBlockIfReach(attacker, blocker)) {
                         stillblock = true;
                     }
+                    // Heartwood Dryad / Wall of Diffusion / Aetherflame Wall / Aether Web check
+                    if (v.contains("withoutShadow") && canBlockIfShadow(attacker, blocker)) {
+                        stillblock = true;
+                    }
                     if (!stillblock) {
                         break;
                     }
@@ -216,7 +280,7 @@ public class StaticAbilityCantAttackBlock {
     public static boolean canBlockIfReach(final Card attacker, final Card blocker) {
         for (final Card ca : attacker.getGame().getCardsIn(ZoneType.STATIC_ABILITIES_SOURCE_ZONES)) {
             for (final StaticAbility stAb : ca.getStaticAbilities()) {
-                if (!stAb.checkConditions(CanBlockIfReachMode)) {
+                if (!stAb.checkConditions(StaticAbilityMode.CanBlockIfReach)) {
                     continue;
                 }
                 if (applyCanBlockIfReachAbility(stAb, attacker, blocker)) {
@@ -227,8 +291,31 @@ public class StaticAbilityCantAttackBlock {
         return false;
     }
 
-    public static boolean applyCanBlockIfReachAbility(final StaticAbility stAb, final Card attacker,
-            final Card blocker) {
+    public static boolean applyCanBlockIfReachAbility(final StaticAbility stAb, final Card attacker, final Card blocker) {
+        if (!stAb.matchesValidParam("ValidAttacker", attacker)) {
+            return false;
+        }
+        if (!stAb.matchesValidParam("ValidBlocker", blocker)) {
+            return false;
+        }
+        return true;
+    }
+
+    public static boolean canBlockIfShadow(final Card attacker, final Card blocker) {
+        for (final Card ca : attacker.getGame().getCardsIn(ZoneType.STATIC_ABILITIES_SOURCE_ZONES)) {
+            for (final StaticAbility stAb : ca.getStaticAbilities()) {
+                if (!stAb.checkConditions(StaticAbilityMode.CanBlockIfShadow)) {
+                    continue;
+                }
+                if (applyCanBlockIfShadowAbility(stAb, attacker, blocker)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    public static boolean applyCanBlockIfShadowAbility(final StaticAbility stAb, final Card attacker, final Card blocker) {
         if (!stAb.matchesValidParam("ValidAttacker", attacker)) {
             return false;
         }
@@ -317,7 +404,7 @@ public class StaticAbilityCantAttackBlock {
         }
         for (final Card ca : game.getCardsIn(ZoneType.STATIC_ABILITIES_SOURCE_ZONES)) {
             for (final StaticAbility stAb : ca.getStaticAbilities()) {
-                if (!stAb.checkConditions(CanAttackIfHasteMode)) {
+                if (!stAb.checkConditions(StaticAbilityMode.CanAttackIfHaste)) {
                     continue;
                 }
                 if (applyCanAttackHasteAbility(stAb, attacker, defender)) {
@@ -343,7 +430,6 @@ public class StaticAbilityCantAttackBlock {
     public static Pair<Integer, Integer> getMinMaxBlocker(final Card attacker, final Player defender) {
         MutablePair<Integer, Integer> result = MutablePair.of(1, Integer.MAX_VALUE);
 
-        // Menace keyword
         if (attacker.hasKeyword(Keyword.MENACE)) {
             result.setLeft(2);
         }
@@ -351,7 +437,7 @@ public class StaticAbilityCantAttackBlock {
         final Game game = attacker.getGame();
         for (final Card ca : game.getCardsIn(ZoneType.STATIC_ABILITIES_SOURCE_ZONES)) {
             for (final StaticAbility stAb : ca.getStaticAbilities()) {
-                if (!stAb.checkConditions(MinMaxBlockerMode)) {
+                if (!stAb.checkConditions(StaticAbilityMode.MinMaxBlocker)) {
                     continue;
                 }
                 applyMinMaxBlockerAbility(stAb, attacker, defender, result);
@@ -379,5 +465,28 @@ public class StaticAbilityCantAttackBlock {
         if (stAb.hasParam("Max")) {
             result.setRight(AbilityUtils.calculateAmount(stAb.getHostCard(), stAb.getParam("Max"), stAb));
         }
+    }
+
+    public static boolean attackVigilance(final Card card)  {
+        final Game game = card.getGame();
+        for (final Card ca : game.getCardsIn(ZoneType.STATIC_ABILITIES_SOURCE_ZONES)) {
+            for (final StaticAbility stAb : ca.getStaticAbilities()) {
+                if (!stAb.checkConditions(StaticAbilityMode.AttackVigilance)) {
+                    continue;
+                }
+
+                if (applyAttackVigilanceAbility(stAb, card)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    public static boolean applyAttackVigilanceAbility(final StaticAbility stAb, final Card card) {
+        if (!stAb.matchesValidParam("ValidCard", card)) {
+            return false;
+        }
+        return true;
     }
 }

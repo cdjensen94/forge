@@ -41,8 +41,7 @@ public class TokenEffect extends TokenEffectBase {
             final Card host = sa.getHostCard();
             String desc = sa.getParam("SpellDescription");
             List<String> words = Arrays.asList(desc.split(" "));
-            final List<Player> creators = AbilityUtils.getDefinedPlayers(host, sa.getParamOrDefault("TokenOwner",
-                    "You"), sa);
+            final List<Player> creators = getDefinedPlayersOrTargeted(sa, "TokenOwner");
             if (!words.get(0).equalsIgnoreCase("Create") && desc.contains(" create")) {
                 String[] parts = desc.split(" create", 2);
                 desc = parts[0] + " " + Lang.joinHomogenous(creators) + " create" + parts[1];
@@ -123,10 +122,13 @@ public class TokenEffect extends TokenEffectBase {
             useZoneTable = true;
         }
 
-        makeTokenTable(AbilityUtils.getDefinedPlayers(host, sa.getParamOrDefault("TokenOwner", "You"), sa),
-                sa.getParam("TokenScript").split(","),
-                AbilityUtils.calculateAmount(host, sa.getParamOrDefault("TokenAmount", "1"), sa),
-                false, triggerList, combatChanged, sa);
+        int amount = AbilityUtils.calculateAmount(host, sa.getParamOrDefault("TokenAmount", "1"), sa);
+        if (amount < 1) {
+            return;
+        }
+
+        makeTokenTable(getDefinedPlayersOrTargeted(sa, "TokenOwner"), sa.getParam("TokenScript").split(","),
+                amount, false, triggerList, combatChanged, sa);
 
         if (!useZoneTable) {
             triggerList.triggerChangesZoneAll(game, sa);

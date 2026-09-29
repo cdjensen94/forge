@@ -1,8 +1,7 @@
 [metadata]
 Code=C18
-Date=2018-08-09
+Date=2018-08-10
 Name=Commander 2018
-Code2=C18
 Type=Commander
 ScryfallCode=C18
 
@@ -101,8 +100,8 @@ ScryfallCode=C18
 92 C Into the Roil @Kieran Yanner
 93 R Jeskai Infiltrator @Cynthia Sheppard
 94 U Mulldrifter @Eric Fortune
-95 C Ninja of the Deep Hours @Dan Scott
-96 C Ponder @Dan Scott
+95 C Ninja of the Deep Hours @Dan Murayama Scott
+96 C Ponder @Dan Murayama Scott
 97 C Portent @Christopher Burdett
 98 U Predict @Rebecca Guay
 99 U Reverse Engineer @Chase Stone
@@ -213,14 +212,14 @@ ScryfallCode=C18
 204 U Dreamstone Hedron @Eric Deschamps
 205 R Duplicant @Marco Nelor
 206 U Hedron Archive @Craig J Spearing
-207 U Izzet Signet @Raoul Vitale
-208 U Magnifying Glass @Dan Scott
+207 C Izzet Signet @Raoul Vitale
+208 U Magnifying Glass @Dan Murayama Scott
 209 R Mimic Vat @Matt Cavotta
 210 C Mind Stone @Adam Rex
 211 R Mirrorworks @John Avon
 212 R Myr Battlesphere @Franz Vohwinkel
 213 C Orzhov Signet @Martina Pilcerova
-214 C Pilgrim's Eye @Dan Scott
+214 C Pilgrim's Eye @Dan Murayama Scott
 215 U Prismatic Lens @Alan Pollack
 216 R Prototype Portal @Drew Baker
 217 R Psychosis Crawler @Stephan Martiniere
@@ -292,13 +291,13 @@ ScryfallCode=C18
 283 U Submerged Boneyard @Cliff Childs
 284 C Swiftwater Cliffs @Eytan Zana
 285 U Temple of the False God @James Zapata
-286 C Terramorphic Expanse @Dan Scott
+286 C Terramorphic Expanse @Dan Murayama Scott
 287 C Thornwood Falls @Eytan Zana
 288 C Tranquil Cove @John Avon
 289 U Tranquil Expanse @Cliff Childs
 290 C Tranquil Thicket @Heather Hudson
 291 C Warped Landscape @Cliff Childs
-292 C Woodland Stream @Efflam Mercier
+292 C Woodland Stream @Enora Mercier
 293 L Plains @John Avon
 294 L Plains @Steven Belledin
 295 L Plains @Adam Paquette
@@ -316,28 +315,31 @@ ScryfallCode=C18
 307 L Forest @Min Yum
 
 [tokens]
-mask
-c_1_1_shapeshifter_changeling
-w_4_4_angel_flying
-w_2_2_cat
-w_1_1_soldier
-u_2_1_a_phyrexian_myr
-u_1_1_a_thopter_flying
-b_2_2_zombie
-r_0_2_dragon_egg_defender_hatches_dragon
-r_2_2_dragon_flying_firebreathing
-r_1_1_survivor
-g_4_4_beast
-g_5_5_beast_trample
-g_2_2_cat_warrior_forestwalk
-g_x_x_elemental
-g_0_1_plant
-bg_1_1_worm
-c_a_clue_draw
-c_4_4_a_construct
-c_6_12_a_construct_trample
-c_x_x_a_phyrexian_horror
-c_1_1_a_myr
-c_1_1_a_servo
-c_1_1_a_thopter_flying
-c_1_1_a_thopter_flying
+2 c_1_1_shapeshifter_changeling @Franz Vohwinkel
+3 w_4_4_angel_flying @Magali Villeneuve
+4 mask @Johannes Voss
+5 w_2_2_cat @Jesper Ejsing
+6 w_1_1_soldier @Alan Pollack
+7 u_2_1_a_phyrexian_myr @Daarken
+8 u_1_1_a_thopter_flying @Andrew Murray
+9 b_2_2_zombie @Anna Steinbauer
+10 r_0_2_dragon_egg_defender_hatches_dragon @Jehan Choo
+11 r_2_2_dragon_flying_firebreathing @Lars Grant-West
+12 r_1_1_survivor @Johannes Voss
+13 g_4_4_beast @Steve Prescott
+14 g_5_5_beast_trample @Vincent Proce
+15 g_2_2_cat_warrior_forestwalk @Michael Sutfin
+16 g_x_x_elemental @Kev Walker
+17 g_0_1_plant @Daren Bader
+18 bg_1_1_worm @Chuck Lukacs
+19 c_a_clue_draw @Zezhou Chen
+20 c_4_4_a_construct @Craig J Spearing
+21 c_6_12_a_construct_trample @Jung Park
+22 c_x_x_a_phyrexian_horror @Scott Chou
+23 c_1_1_a_myr @Ryan Pancoast
+24 c_1_1_a_servo @Igor Kieryluk
+25 c_1_1_a_thopter_flying @Richard Wright
+26 c_1_1_a_thopter_flying @Richard Wright
+
+[other]
+1 manifest @Raymond Swanland

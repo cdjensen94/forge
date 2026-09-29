@@ -4,6 +4,7 @@ Date=2015-02-27
 Name=Duel Decks: Elspeth vs. Kiora
 Type=Duel_Deck
 ScryfallCode=DDO
+TokensCode=DDO
 
 [cards]
 1 M Elspeth, Sun's Champion @Tyler Jacobson
@@ -21,7 +22,7 @@ ScryfallCode=DDO
 13 U Gustcloak Skirmisher @Dan Frazier
 14 C Icatian Javelineers @Michael Phillippi
 15 C Kinsbaile Skirmisher @Thomas Denmark
-16 C Kor Skyfisher @Dan Scott
+16 C Kor Skyfisher @Dan Murayama Scott
 17 C Loxodon Partisan @Matt Stewart
 18 C Mighty Leap @rk post
 19 C Mortal's Ardor @Kev Walker
@@ -73,6 +74,5 @@ ScryfallCode=DDO
 65 L Forest @Raoul Vitale
 
 [tokens]
-w_4_4_angel_flying
-w_1_1_soldier
-u_9_9_kraken
+66 w_1_1_soldier @Svetlin Velinov
+67 u_9_9_kraken @Dan Murayama Scott

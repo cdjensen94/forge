@@ -17,9 +17,6 @@
  */
 package forge.screens.deckeditor.controllers;
 
-import com.google.common.base.Predicate;
-import com.google.common.base.Supplier;
-import com.google.common.collect.Iterables;
 import forge.deck.Deck;
 import forge.deck.DeckSection;
 import forge.game.GameType;
@@ -40,6 +37,8 @@ import forge.util.Localizer;
 import forge.util.storage.IStorage;
 
 import java.util.Map.Entry;
+import java.util.function.Predicate;
+import java.util.function.Supplier;
 
 /**
  * Child controller for constructed deck editor UI.
@@ -81,20 +80,10 @@ public final class CEditorVariant extends CDeckEditor<Deck> {
         this.setCatalogManager(catalogManager);
         this.setDeckManager(deckManager);
 
-        final Supplier<Deck> newCreator = new Supplier<Deck>() {
-            @Override
-            public Deck get() {
-                return new Deck();
-            }
-        };
+        final Supplier<Deck> newCreator = Deck::new;
         this.controller = new DeckController<>(folder, this, newCreator);
 
-        getBtnAddBasicLands().setCommand(new UiCommand() {
-            @Override
-            public void run() {
-                CEditorConstructed.addBasicLands(CEditorVariant.this);
-            }
-        });
+        getBtnAddBasicLands().setCommand((UiCommand) () -> CEditorConstructed.addBasicLands(CEditorVariant.this));
     }
 
     //=========== Overridden from ACEditorBase
@@ -151,10 +140,10 @@ public final class CEditorVariant extends CDeckEditor<Deck> {
      */
     @Override
     public void resetTables() {
-        Iterable<PaperCard> allNT = FModel.getMagicDb().getVariantCards().getAllCards();
-        allNT = Iterables.filter(allNT, cardPoolCondition);
+        ItemPool<PaperCard> allNT = FModel.getMagicDb().getVariantCards().streamAllCards()
+                .filter(cardPoolCondition).collect(ItemPool.collector(PaperCard.class));
 
-        this.getCatalogManager().setPool(ItemPool.createFrom(allNT, PaperCard.class), true);
+        this.getCatalogManager().setPool(allNT, true);
         this.getDeckManager().setPool(this.controller.getModel().getOrCreate(this.sectionMode));
     }
 

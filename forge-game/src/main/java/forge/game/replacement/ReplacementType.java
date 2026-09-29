@@ -12,10 +12,13 @@ import forge.game.card.Card;
  */
 public enum ReplacementType {
     AddCounter(ReplaceAddCounter.class),
+    AssembleContraption(ReplaceAssembleContraption.class),
     AssignDealDamage(ReplaceAssignDealDamage.class),
     Attached(ReplaceAttached.class),
     BeginPhase(ReplaceBeginPhase.class),
     BeginTurn(ReplaceBeginTurn.class),
+    Cascade(ReplaceCascade.class),
+    Connive(ReplaceConnive.class),
     Counter(ReplaceCounter.class),
     CopySpell(ReplaceCopySpell.class),
     CreateToken(ReplaceToken.class),
@@ -28,6 +31,7 @@ public enum ReplacementType {
     Explore(ReplaceExplore.class),
     GainLife(ReplaceGainLife.class),
     GameLoss(ReplaceGameLoss.class),
+    GameWin(ReplaceGameWin.class),
     Learn(ReplaceLearn.class),
     LifeReduced(ReplaceLifeReduced.class),
     LoseMana(ReplaceLoseMana.class),
@@ -43,7 +47,6 @@ public enum ReplacementType {
     RollPlanarDice(ReplaceRollPlanarDice.class),
     Scry(ReplaceScry.class),
     SetInMotion(ReplaceSetInMotion.class),
-    Surveil(ReplaceSurveil.class),
     Tap(ReplaceTap.class),
     Transform(ReplaceTransform.class),
     TurnFaceUp(ReplaceTurnFaceUp.class),
@@ -81,16 +84,8 @@ public enum ReplacementType {
                     ReplacementEffect res = c.newInstance(mapParams, host, intrinsic);
                     res.setMode(this);
                     return res;
-                } catch (IllegalArgumentException e) {
-                    // TODO Auto-generated catch block ignores the exception, but sends it to System.err and probably forge.log.
-                    e.printStackTrace();
-                } catch (InstantiationException e) {
-                    // TODO Auto-generated catch block ignores the exception, but sends it to System.err and probably forge.log.
-                    e.printStackTrace();
-                } catch (IllegalAccessException e) {
-                    // TODO Auto-generated catch block ignores the exception, but sends it to System.err and probably forge.log.
-                    e.printStackTrace();
-                } catch (InvocationTargetException e) {
+                } catch (IllegalArgumentException | InstantiationException | IllegalAccessException |
+                         InvocationTargetException e) {
                     // TODO Auto-generated catch block ignores the exception, but sends it to System.err and probably forge.log.
                     e.printStackTrace();
                 }

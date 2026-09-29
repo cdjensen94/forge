@@ -2,16 +2,10 @@ package forge.view;
 
 import java.awt.BorderLayout;
 import java.awt.Color;
-import java.awt.Desktop;
 import java.awt.Dimension;
 import java.awt.Font;
 import java.awt.Graphics;
-import java.awt.GridBagConstraints;
-import java.awt.GridBagLayout;
-import java.awt.event.ActionEvent;
-import java.awt.event.ActionListener;
 import java.io.File;
-import java.net.URI;
 import java.util.ArrayList;
 import java.util.Deque;
 import java.util.HashSet;
@@ -23,15 +17,10 @@ import javax.swing.JLayeredPane;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JTextArea;
-import javax.swing.JTextPane;
 import javax.swing.SwingUtilities;
 import javax.swing.WindowConstants;
 import javax.swing.border.EmptyBorder;
 import javax.swing.border.LineBorder;
-import javax.swing.text.BadLocationException;
-import javax.swing.text.Style;
-import javax.swing.text.StyleConstants;
-import javax.swing.text.StyledDocument;
 
 import org.apache.commons.lang3.StringUtils;
 
@@ -40,7 +29,8 @@ import com.google.common.collect.Lists;
 import forge.Singletons;
 import forge.gui.ImportDialog;
 import forge.gui.SOverlayUtils;
-import forge.gui.UiCommand;
+import forge.gui.download.CdnUuidCache;
+import forge.gui.util.SOptionPane;
 import forge.gui.framework.DragCell;
 import forge.gui.framework.EDocID;
 import forge.gui.framework.FScreen;
@@ -49,27 +39,25 @@ import forge.gui.framework.IVDoc;
 import forge.gui.framework.SLayoutConstants;
 import forge.gui.framework.SLayoutIO;
 import forge.localinstance.properties.ForgeConstants;
-import forge.localinstance.properties.ForgePreferences;
 import forge.localinstance.skin.FSkinProp;
-import forge.model.FModel;
 import forge.screens.bazaar.VBazaarUI;
 import forge.screens.deckeditor.VDeckEditorUI;
 import forge.screens.home.VHomeUI;
+import forge.screens.home.settings.DialogDownloadCardImages;
 import forge.sound.MusicPlaylist;
 import forge.sound.SoundSystem;
 import forge.toolbox.CardFaceSymbols;
 import forge.toolbox.FAbsolutePositioner;
 import forge.toolbox.FButton;
 import forge.toolbox.FLabel;
-import forge.toolbox.FOptionPane;
 import forge.toolbox.FOverlay;
 import forge.toolbox.FPanel;
 import forge.toolbox.FProgressBar;
 import forge.toolbox.FScrollPane;
 import forge.toolbox.FSkin;
 import forge.toolbox.FSkin.SkinnedLayeredPane;
+import forge.util.Localizer;
 import forge.util.BuildInfo;
-import forge.util.RuntimeVersion;
 import net.miginfocom.swing.MigLayout;
 
 public enum FView {
@@ -191,194 +179,76 @@ public enum FView {
 
 			// if we have any data to migrate, pop up the migration dialog
 			if (_addRemainingFiles(null, resDirs, profileDirs, doNotDeleteDirs)) {
-				new ImportDialog("res", new Runnable() {
-					@Override
-					public void run() {
-						// remove known cruft files, yes this is ugly, but it's also temporary
-						for (final String cruftFile : Lists.newArrayList("decks/SkieraCube-cards_not_supported_yet.txt", "decks/cube/ArabianExtended.dck", "decks/cube/GtcGuildBoros.dck", "decks/cube/GtcGuildDimir.dck", "decks/cube/GtcGuildGruul.dck", "decks/cube/GtcGuildOrzhov.dck", "decks/cube/GtcGuildSimic.dck", "decks/cube/GtcPromoBoros.dck", "decks/cube/GtcPromoDimir.dck", "decks/cube/GtcPromoGruul.dck", "decks/cube/GtcPromoOrzhov.dck", "decks/cube/GtcPromoSimic.dck", "decks/cube/JuzamjediCube.dck", "decks/cube/RtRGuildAzorius.dck", "decks/cube/RtRGuildGolgari.dck", "decks/cube/RtRGuildIzzet.dck", "decks/cube/RtRGuildRakdos.dck", "decks/cube/RtRGuildSelesnya.dck", "decks/cube/RtRPromoAzorius.dck", "decks/cube/RtRPromoGolgari.dck", "decks/cube/RtRPromoIzzet.dck", "decks/cube/RtRPromoRakdos.dck", "decks/cube/RtRPromoSelesnya.dck", "decks/cube/SkieraCube.dck", "gauntlet/LOCKED_DotP Preconstructed.dat", "gauntlet/LOCKED_Swimming With Sharks.dat", "layouts/editor_default.xml", "layouts/home_default.xml", "layouts/match_default.xml", "pics/snow_covered_forest1.jpg", "pics/snow_covered_forest2.jpg", "pics/snow_covered_forest3.jpg", "pics/snow_covered_island1.jpg", "pics/snow_covered_island2.jpg", "pics/snow_covered_island3.jpg", "pics/snow_covered_mountain1.jpg", "pics/snow_covered_mountain2.jpg", "pics/snow_covered_mountain3.jpg", "pics/snow_covered_plains1.jpg", "pics/snow_covered_plains2.jpg", "pics/snow_covered_plains3.jpg", "pics/snow_covered_swamp1.jpg", "pics/snow_covered_swamp2.jpg", "pics/snow_covered_swamp3.jpg", "pics/VAN/Birds of Paradise Avatar.full.jpg", "pics/VAN/Erhnam Djinn Avatar.full.jpg", "pics/VAN/Goblin Warchief Avatar.full.jpg", "pics/VAN/Grinning Demon Avatar.full.jpg", "pics/VAN/Platinum Angel Avatar.full.jpg", "pics/VAN/Prodigal Sorcerer Avatar.full.jpg", "pics/VAN/Rith, the Awakener Avatar.full.jpg", "pics/VAN/Royal Assassin Avatar.full.jpg", "pics/VAN/Serra Angel Avatar.full.jpg", "pics/VAN/Tradewind Rider Avatar.full.jpg", "pics_product/10E.jpg", "pics_product/2ED.jpg", "pics_product/3ED.jpg", "pics_product/4ED.jpg", "pics_product/5DN.jpg", "pics_product/5ED.jpg", "pics_product/6ED.jpg", "pics_product/7ED.jpg", "pics_product/8ED.jpg", "pics_product/9ED.jpg", "pics_product/ALA.jpg", "pics_product/ALL.jpg", "pics_product/APC.jpg", "pics_product/ARB.jpg", "pics_product/ARN.jpg", "pics_product/ATQ.jpg", "pics_product/BOK.jpg", "pics_product/CFX.jpg", "pics_product/CHK.jpg", "pics_product/CHR.jpg", "pics_product/CSP.jpg", "pics_product/DIS.jpg", "pics_product/DKA.jpg", "pics_product/DRK.jpg", "pics_product/DST.jpg", "pics_product/EVE.jpg", "pics_product/EXO.jpg", "pics_product/FEM.jpg", "pics_product/FUT.jpg", "pics_product/GPT.jpg", "pics_product/HML.jpg", "pics_product/ICE.jpg", "pics_product/INV.jpg", "pics_product/ISD.jpg", "pics_product/JUD.jpg", "pics_product/LEA.jpg", "pics_product/LEB.jpg", "pics_product/LEG.jpg", "pics_product/LGN.jpg", "pics_product/LRW.jpg", "pics_product/M10.jpg", "pics_product/M11.jpg", "pics_product/M12.jpg", "pics_product/MBS.jpg", "pics_product/MIR.jpg", "pics_product/MMQ.jpg", "pics_product/MOR.jpg", "pics_product/MRD.jpg", "pics_product/NMS.jpg", "pics_product/NPH.jpg", "pics_product/ODY.jpg", "pics_product/ONS.jpg", "pics_product/PCY.jpg", "pics_product/PLC.jpg", "pics_product/PLS.jpg", "pics_product/PO2.jpg", "pics_product/POR.jpg", "pics_product/PTK.jpg", "pics_product/RAV.jpg", "pics_product/ROE.jpg", "pics_product/S99.jpg", "pics_product/SCG.jpg", "pics_product/SHM.jpg", "pics_product/SOK.jpg", "pics_product/SOM.jpg", "pics_product/STH.jpg", "pics_product/TMP.jpg", "pics_product/TOR.jpg", "pics_product/TSP.jpg", "pics_product/UDS.jpg", "pics_product/ULG.jpg", "pics_product/USG.jpg", "pics_product/VIS.jpg", "pics_product/WTH.jpg", "pics_product/WWK.jpg", "pics_product/ZEN.jpg", "pics_product/booster/7E.png", "pics_product/booster/AP.png", "pics_product/booster/DPA.png", "pics_product/booster/EX.png", "pics_product/booster/IN.png", "pics_product/booster/MI.png", "pics_product/booster/OD.png", "pics_product/booster/PS.png", "pics_product/booster/ST.png", "pics_product/booster/TE.png", "pics_product/booster/UD.png", "pics_product/booster/UL.png", "pics_product/booster/UZ.png", "pics_product/booster/VI.png", "pics_product/booster/WL.png", "preferences/.project", "preferences/editor.default.preferences", "preferences/main.properties", "quest/quest.preferences", "quest/quest.properties")) {
-							new File("res", cruftFile).delete();
-						}
+				new ImportDialog("res", () -> {
+                    // remove known cruft files, yes this is ugly, but it's also temporary
+                    for (final String cruftFile : Lists.newArrayList("decks/SkieraCube-cards_not_supported_yet.txt", "decks/cube/ArabianExtended.dck", "decks/cube/GtcGuildBoros.dck", "decks/cube/GtcGuildDimir.dck", "decks/cube/GtcGuildGruul.dck", "decks/cube/GtcGuildOrzhov.dck", "decks/cube/GtcGuildSimic.dck", "decks/cube/GtcPromoBoros.dck", "decks/cube/GtcPromoDimir.dck", "decks/cube/GtcPromoGruul.dck", "decks/cube/GtcPromoOrzhov.dck", "decks/cube/GtcPromoSimic.dck", "decks/cube/JuzamjediCube.dck", "decks/cube/RtRGuildAzorius.dck", "decks/cube/RtRGuildGolgari.dck", "decks/cube/RtRGuildIzzet.dck", "decks/cube/RtRGuildRakdos.dck", "decks/cube/RtRGuildSelesnya.dck", "decks/cube/RtRPromoAzorius.dck", "decks/cube/RtRPromoGolgari.dck", "decks/cube/RtRPromoIzzet.dck", "decks/cube/RtRPromoRakdos.dck", "decks/cube/RtRPromoSelesnya.dck", "decks/cube/SkieraCube.dck", "gauntlet/LOCKED_DotP Preconstructed.dat", "gauntlet/LOCKED_Swimming With Sharks.dat", "layouts/editor_default.xml", "layouts/home_default.xml", "layouts/match_default.xml", "pics/snow_covered_forest1.jpg", "pics/snow_covered_forest2.jpg", "pics/snow_covered_forest3.jpg", "pics/snow_covered_island1.jpg", "pics/snow_covered_island2.jpg", "pics/snow_covered_island3.jpg", "pics/snow_covered_mountain1.jpg", "pics/snow_covered_mountain2.jpg", "pics/snow_covered_mountain3.jpg", "pics/snow_covered_plains1.jpg", "pics/snow_covered_plains2.jpg", "pics/snow_covered_plains3.jpg", "pics/snow_covered_swamp1.jpg", "pics/snow_covered_swamp2.jpg", "pics/snow_covered_swamp3.jpg", "pics/VAN/Birds of Paradise Avatar.full.jpg", "pics/VAN/Erhnam Djinn Avatar.full.jpg", "pics/VAN/Goblin Warchief Avatar.full.jpg", "pics/VAN/Grinning Demon Avatar.full.jpg", "pics/VAN/Platinum Angel Avatar.full.jpg", "pics/VAN/Prodigal Sorcerer Avatar.full.jpg", "pics/VAN/Rith, the Awakener Avatar.full.jpg", "pics/VAN/Royal Assassin Avatar.full.jpg", "pics/VAN/Serra Angel Avatar.full.jpg", "pics/VAN/Tradewind Rider Avatar.full.jpg", "pics_product/10E.jpg", "pics_product/2ED.jpg", "pics_product/3ED.jpg", "pics_product/4ED.jpg", "pics_product/5DN.jpg", "pics_product/5ED.jpg", "pics_product/6ED.jpg", "pics_product/7ED.jpg", "pics_product/8ED.jpg", "pics_product/9ED.jpg", "pics_product/ALA.jpg", "pics_product/ALL.jpg", "pics_product/APC.jpg", "pics_product/ARB.jpg", "pics_product/ARN.jpg", "pics_product/ATQ.jpg", "pics_product/BOK.jpg", "pics_product/CFX.jpg", "pics_product/CHK.jpg", "pics_product/CHR.jpg", "pics_product/CSP.jpg", "pics_product/DIS.jpg", "pics_product/DKA.jpg", "pics_product/DRK.jpg", "pics_product/DST.jpg", "pics_product/EVE.jpg", "pics_product/EXO.jpg", "pics_product/FEM.jpg", "pics_product/FUT.jpg", "pics_product/GPT.jpg", "pics_product/HML.jpg", "pics_product/ICE.jpg", "pics_product/INV.jpg", "pics_product/ISD.jpg", "pics_product/JUD.jpg", "pics_product/LEA.jpg", "pics_product/LEB.jpg", "pics_product/LEG.jpg", "pics_product/LGN.jpg", "pics_product/LRW.jpg", "pics_product/M10.jpg", "pics_product/M11.jpg", "pics_product/M12.jpg", "pics_product/MBS.jpg", "pics_product/MIR.jpg", "pics_product/MMQ.jpg", "pics_product/MOR.jpg", "pics_product/MRD.jpg", "pics_product/NMS.jpg", "pics_product/NPH.jpg", "pics_product/ODY.jpg", "pics_product/ONS.jpg", "pics_product/PCY.jpg", "pics_product/PLC.jpg", "pics_product/PLS.jpg", "pics_product/PO2.jpg", "pics_product/POR.jpg", "pics_product/PTK.jpg", "pics_product/RAV.jpg", "pics_product/ROE.jpg", "pics_product/S99.jpg", "pics_product/SCG.jpg", "pics_product/SHM.jpg", "pics_product/SOK.jpg", "pics_product/SOM.jpg", "pics_product/STH.jpg", "pics_product/TMP.jpg", "pics_product/TOR.jpg", "pics_product/TSP.jpg", "pics_product/UDS.jpg", "pics_product/ULG.jpg", "pics_product/USG.jpg", "pics_product/VIS.jpg", "pics_product/WTH.jpg", "pics_product/WWK.jpg", "pics_product/ZEN.jpg", "pics_product/booster/7E.png", "pics_product/booster/AP.png", "pics_product/booster/DPA.png", "pics_product/booster/EX.png", "pics_product/booster/IN.png", "pics_product/booster/MI.png", "pics_product/booster/OD.png", "pics_product/booster/PS.png", "pics_product/booster/ST.png", "pics_product/booster/TE.png", "pics_product/booster/UD.png", "pics_product/booster/UL.png", "pics_product/booster/UZ.png", "pics_product/booster/VI.png", "pics_product/booster/WL.png", "preferences/.project", "preferences/editor.default.preferences", "preferences/main.properties", "quest/quest.preferences", "quest/quest.properties")) {
+                        new File("res", cruftFile).delete();
+                    }
 
-						// assemble a list of remaining files.
-						final List<File> remainingFiles = new LinkedList<>();
-						_addRemainingFiles(remainingFiles, resDirs, profileDirs, doNotDeleteDirs);
+                    // assemble a list of remaining files.
+                    final List<File> remainingFiles = new LinkedList<>();
+                    _addRemainingFiles(remainingFiles, resDirs, profileDirs, doNotDeleteDirs);
 
-						// if any files remain, display them and make clear that they should be moved or
-						// deleted manually or the user will continue to be prompted for migration
-						final FPanel p = new FPanel(new MigLayout("insets dialog, gap 10, center, wrap"));
-						p.setOpaque(false);
-						p.setBackgroundTexture(FSkin.getIcon(FSkinProp.BG_TEXTURE));
+                    // if any files remain, display them and make clear that they should be moved or
+                    // deleted manually or the user will continue to be prompted for migration
+                    final FPanel p = new FPanel(new MigLayout("insets dialog, gap 10, center, wrap"));
+                    p.setOpaque(false);
+                    p.setBackgroundTexture(FSkin.getIcon(FSkinProp.BG_TEXTURE));
 
-						if (remainingFiles.isEmpty()) {
-							p.add(new FLabel.Builder().text("<html>You're done!  It looks like everything went smoothly." +
-									"  Now just restart Forge to load the data from its new home!  Note that there is more data available" +
-									" from the downloaders now.  You might want to run through the content downloaders to check for new files.</html>").build());
-						} else {
-							p.add(new FLabel.Builder().text("<html>There seem to be a few files left over in your old data" +
-									" directories.  They should be deleted or moved somewhere else to avoid having the data" +
-									" migration prompt pop up again!</html>").build());
+                    if (remainingFiles.isEmpty()) {
+                        p.add(new FLabel.Builder().text("<html>You're done!  It looks like everything went smoothly." +
+                                "  Now just restart Forge to load the data from its new home!  Note that there is more data available" +
+                                " from the downloaders now.  You might want to run through the content downloaders to check for new files.</html>").build());
+                    } else {
+                        p.add(new FLabel.Builder().text("<html>There seem to be a few files left over in your old data" +
+                                " directories.  They should be deleted or moved somewhere else to avoid having the data" +
+                                " migration prompt pop up again!</html>").build());
 
-							final JTextArea files = new JTextArea(StringUtils.join(remainingFiles, '\n'));
-							files.setFont(new Font("Monospaced", Font.PLAIN, 10));
-							files.setOpaque(false);
-							files.setWrapStyleWord(true);
-							files.setLineWrap(true);
-							files.setEditable(false);
-							final FScrollPane scroller = new FScrollPane(files, true);
-							p.add(scroller, "w 600:100%:100%, h 100:100%:100%, gaptop 10");
+                        final JTextArea files = new JTextArea(StringUtils.join(remainingFiles, '\n'));
+                        files.setFont(new Font("Monospaced", Font.PLAIN, 10));
+                        files.setOpaque(false);
+                        files.setWrapStyleWord(true);
+                        files.setLineWrap(true);
+                        files.setEditable(false);
+                        final FScrollPane scroller = new FScrollPane(files, true);
+                        p.add(scroller, "w 600:100%:100%, h 100:100%:100%, gaptop 10");
 
-							SwingUtilities.invokeLater(new Runnable() {
-								@Override
-								public void run() {
-									// resize the panel properly for the new log contents
-									p.getParent().validate();
-									p.getParent().invalidate();
-								}
-							});
-						}
+                        SwingUtilities.invokeLater(() -> {
+                            // resize the panel properly for the new log contents
+                            p.getParent().validate();
+                            p.getParent().invalidate();
+                        });
+                    }
 
-						final FButton btnOk = new FButton(remainingFiles.isEmpty() ? "Restart Forge" : "Close Forge");
-						btnOk.addActionListener(new ActionListener() {
-							@Override
-							public void actionPerformed(final ActionEvent e) {
-								if (remainingFiles.isEmpty()) {
-									Singletons.getControl().restartForge();
-								} else {
-									Singletons.getControl().exitForge();
-								}
-							}
-						});
-						p.add(btnOk, "center, w pref+64!, h pref+12!, gaptop 20");
+                    final FButton btnOk = new FButton(remainingFiles.isEmpty() ? "Restart Forge" : "Close Forge");
+                    btnOk.addActionListener(e -> {
+                        if (remainingFiles.isEmpty()) {
+                            Singletons.getControl().restartForge();
+                        } else {
+                            Singletons.getControl().exitForge();
+                        }
+                    });
+                    p.add(btnOk, "center, w pref+64!, h pref+12!, gaptop 20");
 
-						final JPanel overlay = FOverlay.SINGLETON_INSTANCE.getPanel();
-						overlay.setLayout(new MigLayout("insets 0, gap 0, wrap, ax center, ay center"));
-						overlay.add(p, "w 100::80%, h 50::90%");
-						SOverlayUtils.showOverlay();
+                    final JPanel overlay = FOverlay.SINGLETON_INSTANCE.getPanel();
+                    overlay.setLayout(new MigLayout("insets 0, gap 0, wrap, ax center, ay center"));
+                    overlay.add(p, "w 100::80%, h 50::90%");
+                    SOverlayUtils.showOverlay();
 
-						SwingUtilities.invokeLater(new Runnable() {
-							@Override
-							public void run() {
-								btnOk.requestFocusInWindow();
-							}
-						});
-					}
-				}).show();
+                    SwingUtilities.invokeLater(btnOk::requestFocusInWindow);
+                }).show();
+			} else if (CdnUuidCache.shouldPromptForBulkSync()) {
+				// First run (or cache cleared): offer the one-time bulk CDN sync so later card
+				// image downloads resolve instantly instead of one Scryfall set at a time. Skipped
+				// alongside the (rare) legacy-migration prompt above to avoid stacking dialogs.
+				final boolean startBulkSync = SOptionPane.showConfirmDialog(
+						Localizer.getInstance().getMessage("lblFirstRunBulkCdnPrompt"),
+						"Forge", "Download Now", "Not Now", true);
+				CdnUuidCache.markBulkSyncPromptAnswered();
+				if (startBulkSync) {
+					new DialogDownloadCardImages().showAndAutoStartBulkSync();
+				}
 			}
-		}
-
-		RuntimeVersion javaVersion = RuntimeVersion.of(System.getProperty("java.version"));
-
-		if (javaVersion.getMajor() < 9 && javaVersion.getMinor() < 8 && !FModel.getPreferences().getPrefBoolean(ForgePreferences.FPref.DISABLE_DISPLAY_JAVA_8_UPDATE_WARNING)) {
-
-			JPanel updateWarningOverlay = FOverlay.SINGLETON_INSTANCE.getPanel();
-			updateWarningOverlay.setLayout(new GridBagLayout());
-
-			FPanel updateWarningContentPanel = new FPanel(new MigLayout("insets 20, wrap 3"));
-
-			JTextPane textPane = new JTextPane();
-			StyledDocument text = textPane.getStyledDocument();
-
-			Style normalStyle = text.addStyle("normal", null);
-			Style boldStyle = text.addStyle("bold", null);
-
-			StyleConstants.setBold(normalStyle, false);
-			StyleConstants.setBold(boldStyle, true);
-
-			try {
-				text.insertString(text.getLength(), "The next version of Forge will require ", normalStyle);
-				text.insertString(text.getLength(), "Java 1.8", boldStyle);
-				text.insertString(text.getLength(), " and will ", normalStyle);
-				text.insertString(text.getLength(), "no longer run", boldStyle);
-				text.insertString(text.getLength(), " on Java 1.7. You appear to be running Forge with version ", normalStyle);
-				text.insertString(text.getLength(), javaVersion.toString(), boldStyle);
-				text.insertString(text.getLength(), ".\n\nPlease upgrade to the latest version of Java if you plan to update Forge in the future.", normalStyle);
-			} catch (BadLocationException e) {
-				e.printStackTrace();
-			}
-
-			textPane.setEditable(false);
-			textPane.setOpaque(false);
-			textPane.setForeground(FSkin.getColor(FSkin.Colors.CLR_TEXT).getColor());
-			textPane.setBorder(null);
-			textPane.setFont(FSkin.getRelativeFont(14).getBaseFont());
-
-			final FLabel btnRemindMeLater = new FLabel.Builder().text("Remind Me Later").hoverable().opaque().build();
-			final FLabel btnDoNotRemindMe = new FLabel.Builder().text("Don't Remind Me Again").hoverable().opaque().build();
-			final FLabel btnDownloadLatestJava = new FLabel.Builder().text("Download Latest Java").hoverable().opaque().build();
-
-			String buttonConstraints = "w 200px!, h 30px!";
-			updateWarningContentPanel.add(textPane, "w 600px!, h 100px!, span 3 1");
-			updateWarningContentPanel.add(btnRemindMeLater, buttonConstraints);
-			updateWarningContentPanel.add(btnDoNotRemindMe, buttonConstraints + ", gap 10px 10px 0 0");
-
-			final Desktop desktop = Desktop.isDesktopSupported() ? Desktop.getDesktop() : null;
-			if (desktop != null && desktop.isSupported(Desktop.Action.BROWSE)) {
-				updateWarningContentPanel.add(btnDownloadLatestJava, buttonConstraints);
-			}
-
-			GridBagConstraints constraints = new GridBagConstraints();
-			constraints.weightx = constraints.weighty = 1;
-
-			updateWarningOverlay.add(updateWarningContentPanel, constraints);
-
-			btnRemindMeLater.setCommand(new UiCommand() {
-				/**
-			     * 
-			     */
-			    private static final long serialVersionUID = 1L;
-
-				@Override
-				public void run() {
-					SOverlayUtils.hideOverlay();
-				}
-			});
-
-			btnDoNotRemindMe.setCommand(new UiCommand() {
-				/**
-			     * 
-			     */
-			    private static final long serialVersionUID = 1L;
-
-				@Override
-				public void run() {
-					if (FOptionPane.showConfirmDialog("Are you sure? You can re-enable this warning in Forge's general preferences.")) {
-						FModel.getPreferences().setPref(ForgePreferences.FPref.DISABLE_DISPLAY_JAVA_8_UPDATE_WARNING, true);
-						FModel.getPreferences().save();
-						SOverlayUtils.hideOverlay();
-					}
-				}
-			});
-
-			btnDownloadLatestJava.setCommand(new UiCommand() {
-				/**
-			     * 
-			     */
-			    private static final long serialVersionUID = 1L;
-
-				@Override
-				public void run() {
-					try {
-						assert desktop != null;
-						desktop.browse(new URI("http://www.oracle.com/technetwork/java/javase/downloads/jre8-downloads-2133155.html"));
-					} catch (Exception e) {
-						e.printStackTrace();
-					}
-				}
-			});
-
-			SwingUtilities.invokeLater(new Runnable() {
-				@Override
-				public void run() {
-					SOverlayUtils.showOverlay();
-					SwingUtilities.invokeLater(new Runnable() {
-						@Override
-						public void run() {
-							btnRemindMeLater.requestFocusInWindow();
-						}
-					});
-				}
-			});
-
 		}
 
 		//start background music
@@ -570,18 +440,15 @@ public enum FView {
 		}
 
 		final FProgressBar progressBar = this.frmSplash.getProgressBar(); //must cache for sake of runnable below
-		SwingUtilities.invokeLater(new Runnable() {
-			@Override
-			public void run() {
-				if (cnt > 0) {
-					progressBar.reset();
-					progressBar.setMaximum(cnt);
-				}
-				progressBar.setShowETA(false);
-				progressBar.setShowCount(cnt > 0);
-				progressBar.setDescription(message);
-			}
-		});
+		SwingUtilities.invokeLater(() -> {
+            if (cnt > 0) {
+                progressBar.reset();
+                progressBar.setMaximum(cnt);
+            }
+            progressBar.setShowETA(false);
+            progressBar.setShowCount(cnt > 0);
+            progressBar.setDescription(message);
+        });
 	}
 
 	public void refreshAllCellLayouts(final boolean showTabs) {

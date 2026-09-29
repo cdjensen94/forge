@@ -1,22 +1,22 @@
 package forge.ai.ability;
 
-import com.google.common.base.Predicates;
-import com.google.common.collect.Iterables;
-import forge.ai.ComputerUtil;
-import forge.ai.ComputerUtilCost;
-import forge.ai.ComputerUtilMana;
-import forge.ai.SpellAbilityAi;
+import forge.ai.*;
 import forge.card.CardStateName;
 import forge.card.CardType.Supertype;
 import forge.card.mana.ManaCost;
+import forge.game.ability.AbilityUtils;
+import forge.game.ability.ApiType;
 import forge.game.card.*;
 import forge.game.cost.Cost;
+import forge.game.keyword.Keyword;
 import forge.game.keyword.KeywordInterface;
 import forge.game.mana.ManaCostBeingPaid;
 import forge.game.phase.PhaseHandler;
 import forge.game.phase.PhaseType;
 import forge.game.player.Player;
 import forge.game.spellability.SpellAbility;
+import forge.game.trigger.Trigger;
+import forge.game.trigger.TriggerType;
 import forge.game.zone.ZoneType;
 import org.apache.commons.lang3.StringUtils;
 
@@ -43,27 +43,27 @@ public class PermanentAi extends SpellAbilityAi {
      * here
      */
     @Override
-    protected boolean checkApiLogic(final Player ai, final SpellAbility sa) {
+    protected AiAbilityDecision checkApiLogic(final Player ai, final SpellAbility sa) {
         final Card source = sa.getHostCard();
 
         // check on legendary
         if (!source.ignoreLegendRule() && ai.isCardInPlay(source.getName())) {
             // TODO check the risk we'd lose the effect with bad timing
+            // TODO Technically we're not checking if same card in play is also legendary, but this is a good enough approximation
             if (!source.hasSVar("AILegendaryException")) {
-                // AiPlayDecision.WouldDestroyLegend
-                return false;
+                return new AiAbilityDecision(0, AiPlayDecision.WouldDestroyLegend);
             } else {
                 String specialRule = source.getSVar("AILegendaryException");
                 if ("TwoCopiesAllowed".equals(specialRule)) {
                     // One extra copy allowed on the battlefield, e.g. Brothers Yamazaki
                     if (CardLists.count(ai.getCardsIn(ZoneType.Battlefield), CardPredicates.nameEquals(source.getName())) > 1) {
-                        return false;
+                        return new AiAbilityDecision(0, AiPlayDecision.WouldDestroyLegend);
                     }
                 } else if ("AlwaysAllowed".equals(specialRule)) {
                     // Nothing to do here, check for Legendary is disabled
                 } else {
                     // Unknown hint, assume two copies not allowed
-                    return false;
+                    return new AiAbilityDecision(0, AiPlayDecision.WouldDestroyLegend);
                 }
             }
         }
@@ -71,18 +71,16 @@ public class PermanentAi extends SpellAbilityAi {
         if (source.getType().hasSupertype(Supertype.World)) {
             CardCollection list = CardLists.getType(ai.getCardsIn(ZoneType.Battlefield), "World");
             if (!list.isEmpty()) {
-                // AiPlayDecision.WouldDestroyWorldEnchantment
-                return false;
+                return new AiAbilityDecision(0, AiPlayDecision.WouldDestroyWorldEnchantment);
             }
         }
 
         ManaCost mana = sa.getPayCosts().getTotalMana();
         if (mana.countX() > 0) {
-            // Set PayX here to maximum value.
-            final int xPay = ComputerUtilCost.getMaxXValue(sa, ai, false);
+            final int xPay = ComputerUtilCost.setMaxXValue(sa, ai, false);
             if (source.hasConverge()) {
-                int nColors = ComputerUtilMana.getConvergeCount(sa, ai);
-                for (int i = 1; i <= xPay; i++) {
+                int nColors = -1;
+                for (int i = 0; i <= xPay; i++) {
                     sa.setXManaCostPaid(i);
                     int newColors = ComputerUtilMana.getConvergeCount(sa, ai);
                     if (newColors > nColors) {
@@ -92,30 +90,25 @@ public class PermanentAi extends SpellAbilityAi {
                         break;
                     }
                 }
-            } else {
-                // AiPlayDecision.CantAffordX
-                if (xPay <= 0) {
-                    return false;
-                }
-                sa.setXManaCostPaid(xPay);
+            } else if (xPay <= 0) {
+                return new AiAbilityDecision(0, AiPlayDecision.CantAffordX);
             }
         } else if (mana.isZero()) {
             // if mana is zero, but card mana cost does have X, then something is wrong
             ManaCost cardCost = source.getManaCost();
             if (cardCost != null && cardCost.countX() > 0) {
-                // AiPlayDecision.CantPlayAi
-                return false;
+                return new AiAbilityDecision(0, AiPlayDecision.CostNotAcceptable);
             }
         }
 
         if ("SacToReduceCost".equals(sa.getParam("AILogic"))) {
             // reset X to better calculate
             sa.setXManaCostPaid(0);
-            ManaCostBeingPaid paidCost = ComputerUtilMana.calculateManaCost(sa, true, 0);
+            ManaCostBeingPaid paidCost = ComputerUtilMana.calculateManaCost(sa.getPayCosts(), sa, ai, true, 0, false);
 
             int generic = paidCost.getGenericManaAmount();
             // Set PayX here to maximum value.
-            int xPay = ComputerUtilCost.getMaxXValue(sa, ai, false);
+            int xPay = ComputerUtilCost.setMaxXValue(sa, ai, false);
             // currently cards with SacToReduceCost reduce by 2 generic
             xPay = Math.min(xPay, generic / 2);
             sa.setXManaCostPaid(xPay);
@@ -140,58 +133,94 @@ public class PermanentAi extends SpellAbilityAi {
                         && card.getState(CardStateName.Original).getManaCost() != null
                         && card.getState(CardStateName.Original).getManaCost().getCMC() == manaValue);
                 if (manaValue == 0) {
-                    aiCards = CardLists.filter(aiCards, Predicates.not(CardPredicates.isType("Land")));
-                    oppCards = CardLists.filter(oppCards, Predicates.not(CardPredicates.isType("Land")));
+                    aiCards = CardLists.filter(aiCards, CardPredicates.NON_LANDS);
+                    oppCards = CardLists.filter(oppCards, CardPredicates.NON_LANDS);
                     // also filter out other Chalices in our own deck
-                    aiCards = CardLists.filter(aiCards, Predicates.not(CardPredicates.nameEquals("Chalice of the Void")));
+                    aiCards = CardLists.filter(aiCards, CardPredicates.nameNotEquals("Chalice of the Void"));
                 }
                 if (oppCards.size() > 3 && oppCards.size() >= aiCards.size() * 2) {
                     sa.setXManaCostPaid(manaValue);
-                    return true;
+                    return new AiAbilityDecision(100, AiPlayDecision.WillPlay);
                 }
             }
-            return false;
+            return new AiAbilityDecision(0, AiPlayDecision.CantPlayAi);
         }
 
-        if (sa.isAnnouncing("Multikicker")) {
-            ManaCost mkCost = sa.getMultiKickerManaCost();
+        for (KeywordInterface ki : source.getKeywords(Keyword.MULTIKICKER)) {
+            String o = ki.getOriginal();
+            String costStr = o.split(":")[1];
+            final Cost cost = new Cost(costStr, false);
+            if (!cost.hasManaCost()) {
+                continue;
+            }
+            final ManaCost mkCost = cost.getTotalMana();
+
             ManaCost mCost = sa.getPayCosts().getTotalMana();
             boolean isZeroCost = mCost.isZero();
             for (int i = 0; i < 10; i++) {
                 mCost = ManaCost.combine(mCost, mkCost);
                 ManaCostBeingPaid mcbp = new ManaCostBeingPaid(mCost);
                 if (!ComputerUtilMana.canPayManaCost(mcbp, sa, ai, false)) {
-                    source.setKickerMagnitude(i);
-                    sa.setSVar("Multikicker", String.valueOf(i));
+                    sa.setOptionalKeywordAmount(ki, i);
                     break;
                 }
-                source.setKickerMagnitude(i + 1);
+                sa.setOptionalKeywordAmount(ki, i + 1);
             }
-            if (isZeroCost && source.getKickerMagnitude() == 0) {
+            if (isZeroCost && sa.getOptionalKeywordAmount(ki) == 0) {
+                sa.clearOptionalKeywordAmount();
                 // Bail if the card cost was {0} and no multikicker was paid (e.g. Everflowing Chalice).
                 // TODO: update this if there's ever a card where it makes sense to play it for {0} with no multikicker
-                return false;
+                return new AiAbilityDecision(0, AiPlayDecision.CostNotAcceptable);
             }
         }
 
         // don't play cards without being able to pay the upkeep for
-        for (KeywordInterface inst : source.getKeywords()) {
-            String ability = inst.getOriginal();
-            if (ability.startsWith("UpkeepCost")) {
-                final String[] k = ability.split(":");
-                final String costs = k[1];
+        boolean hasUpkeepCost = false;
+        int upkeepLifeLoss = 0;
+        Cost upkeepCost = new Cost("0", true);
+        for (Trigger t : source.getTriggers()) {
+            if (!TriggerType.Phase.equals(t.getMode())) {
+                continue;
+            }
+            if (!"Upkeep".equals(t.getParam("Phase"))) {
+                continue;
+            }
+            if (!t.matchesValidParam("ValidPlayer", ai)) {
+                continue;
+            }
+            SpellAbility ab = t.ensureAbility();
+            if (ab == null) {
+                continue;
+            }
 
-                final SpellAbility emptyAbility = new SpellAbility.EmptySa(source, ai);
-                emptyAbility.setPayCosts(new Cost(costs, true));
-                emptyAbility.setTargetRestrictions(sa.getTargetRestrictions());
-                emptyAbility.setCardState(sa.getCardState());
-                emptyAbility.setActivatingPlayer(ai, true);
-
-                if (!ComputerUtilCost.canPayCost(emptyAbility, ai, true)) {
-                    // AiPlayDecision.AnotherTime
-                    return false;
+            if (ApiType.Sacrifice.equals(ab.getApi())) {
+                if (!ab.hasParam("UnlessCost")) {
+                    continue;
+                }
+                hasUpkeepCost = true;
+                upkeepCost.add(AbilityUtils.calculateUnlessCost(ab, ab.getParam("UnlessCost"), true));
+            } else if (ApiType.LoseLife.equals(ab.getApi()) && !ab.usesTargeting()) {
+                ab.setActivatingPlayer(ai);
+                if (AbilityUtils.getDefinedPlayers(source, ab.getParam("Defined"), ab).contains(ai)) {
+                    upkeepLifeLoss += AbilityUtils.calculateAmount(source, ab.getParam("LifeAmount"), ab);
                 }
             }
+        }
+
+        if (hasUpkeepCost) {
+            final SpellAbility emptyAbility = new SpellAbility.EmptySa(source, ai);
+            emptyAbility.setPayCosts(upkeepCost);
+            emptyAbility.setTargetRestrictions(sa.getTargetRestrictions());
+            emptyAbility.setCardState(sa.getCardState());
+            emptyAbility.setActivatingPlayer(ai);
+
+            if (!ComputerUtilCost.canPayCost(emptyAbility, ai, true)) {
+                return new AiAbilityDecision(0, AiPlayDecision.CantAfford);
+            }
+        }
+        if (upkeepLifeLoss > 0 && (ai.getLife() <= upkeepLifeLoss
+                || ComputerUtil.aiLifeInDanger(ai, true, upkeepLifeLoss))) {
+            return new AiAbilityDecision(0, AiPlayDecision.CantPlayAi);
         }
 
         // check for specific AI preferences
@@ -206,7 +235,7 @@ public class PermanentAi extends SpellAbilityAi {
 
                 if (param.equals("MustHaveInHand")) {
                     // Only cast if another card is present in hand (e.g. Illusions of Grandeur followed by Donate)
-                    boolean hasCard = Iterables.any(ai.getCardsIn(ZoneType.Hand), CardPredicates.nameEquals(value));
+                    boolean hasCard = ai.getCardsIn(ZoneType.Hand).anyMatch(CardPredicates.nameEquals(value));
                     if (!hasCard) {
                         dontCast = true;
                     }
@@ -250,10 +279,10 @@ public class PermanentAi extends SpellAbilityAi {
                     // Only cast if there are X or more mana sources controlled by the AI *or*
                     // if there are X-1 mana sources in play but the AI has an extra land in hand
                     CardCollection m = ComputerUtilMana.getAvailableManaSources(ai, true);
-                    int extraMana = CardLists.count(ai.getCardsIn(ZoneType.Hand), CardPredicates.Presets.LANDS) > 0 ? 1 : 0;
+                    int extraMana = CardLists.count(ai.getCardsIn(ZoneType.Hand), CardPredicates.LANDS) > 0 ? 1 : 0;
                     if (source.getName().equals("Illusions of Grandeur")) {
                         // TODO: this is currently hardcoded for specific Illusions-Donate cost reduction spells, need to make this generic.
-                       extraMana += Math.min(3, CardLists.filter(ai.getCardsIn(ZoneType.Battlefield), Predicates.or(CardPredicates.nameEquals("Sapphire Medallion"), CardPredicates.nameEquals("Helm of Awakening"))).size()) * 2; // each cost-reduction spell accounts for {1} in both Illusions and Donate
+                        extraMana += Math.min(3, CardLists.filter(ai.getCardsIn(ZoneType.Battlefield), CardPredicates.nameEquals("Sapphire Medallion").or(CardPredicates.nameEquals("Helm of Awakening"))).size()) * 2; // each cost-reduction spell accounts for {1} in both Illusions and Donate
                     }
                     if (m.size() + extraMana < Integer.parseInt(value)) {
                         dontCast = true;
@@ -286,31 +315,33 @@ public class PermanentAi extends SpellAbilityAi {
                 }
             }
 
-            return !dontCast;
+            if (dontCast) {
+                return new AiAbilityDecision(0, AiPlayDecision.CantPlayAi);
+            }
         }
 
-        return true;
+        return new AiAbilityDecision(100, AiPlayDecision.WillPlay);
     }
 
     @Override
-    protected boolean doTriggerAINoCost(Player ai, SpellAbility sa, boolean mandatory) {
-        final Card source = sa.getHostCard();
-        final Cost cost = sa.getPayCosts();
-
+    protected AiAbilityDecision doTriggerNoCost(Player ai, SpellAbility sa, boolean mandatory) {
+        if (mandatory) {
+            return new AiAbilityDecision(50, AiPlayDecision.MandatoryPlay);
+        }
         if (!sa.metConditions()) {
-            return false;
+            return new AiAbilityDecision(0, AiPlayDecision.CantPlayAi);
         }
 
         if (sa.hasParam("AILogic") && !checkAiLogic(ai, sa, sa.getParam("AILogic"))) {
-            return false;
+            return new AiAbilityDecision(0, AiPlayDecision.CantPlayAi);
         }
-        if (cost != null && !willPayCosts(ai, sa, cost, source)) {
-            return false;
+        final Cost cost = sa.getPayCosts();
+        if (cost != null && !willPayCosts(ai, sa, cost, sa.getHostCard())) {
+            return new AiAbilityDecision(0, AiPlayDecision.CantPlayAi);
         }
         if (!checkPhaseRestrictions(ai, sa, ai.getGame().getPhaseHandler())) {
-            return false;
+            return new AiAbilityDecision(0, AiPlayDecision.CantPlayAi);
         }
-        return checkApiLogic(ai, sa) || mandatory;
-    }
-
+        return checkApiLogic(ai, sa);
+     }
 }

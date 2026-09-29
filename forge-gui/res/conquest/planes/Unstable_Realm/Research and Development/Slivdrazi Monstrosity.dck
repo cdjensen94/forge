@@ -1,7 +1,7 @@
 [metadata]
 Name=Slivdrazi Monstrosity
 [Avatar]
-1 Birds of Paradise Avatar|VAN|2
+1 Birds of Paradise Avatar|PMOA|2
 [Main]
 1 B.O.B. (Bevy of Beebles)|UND
 1 Banding Sliver|CMB1
@@ -9,7 +9,7 @@ Name=Slivdrazi Monstrosity
 1 Buzzing Whack-a-Doodle|UST
 1 Crow Storm|UST
 1 Enchantmentize|CMB1
-1 Eldrazi Devastator|MB1
+1 Eldrazi Devastator|PLST
 1 Eldrazi Temple|DDP
 1 Evil Boros Charm|CMB1
 1 Fowl Play|UGL
@@ -31,4 +31,3 @@ Name=Slivdrazi Monstrosity
 1 Waste Land|CMB1
 8 Wastes|OGW|2
 6 Wastes|OGW|4
-[Sideboard]

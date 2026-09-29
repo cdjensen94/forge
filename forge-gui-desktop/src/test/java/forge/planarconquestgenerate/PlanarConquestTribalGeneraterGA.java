@@ -3,11 +3,7 @@ package forge.planarconquestgenerate;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
-
-import com.google.common.base.Function;
-import com.google.common.base.Predicates;
-import com.google.common.collect.Iterables;
-import com.google.common.collect.Lists;
+import java.util.stream.Collectors;
 
 import forge.GuiDesktop;
 import forge.StaticData;
@@ -22,6 +18,7 @@ import forge.game.GameType;
 import forge.gamemodes.limited.CardRanker;
 import forge.gui.GuiBase;
 import forge.item.PaperCard;
+import forge.item.PaperCardPredicates;
 import forge.localinstance.properties.ForgeConstants;
 import forge.localinstance.properties.ForgePreferences;
 import forge.model.FModel;
@@ -36,12 +33,9 @@ public class PlanarConquestTribalGeneraterGA extends PlanarConquestGeneraterGA {
     public static void test(){
 
         GuiBase.setInterface(new GuiDesktop());
-        FModel.initialize(null, new Function<ForgePreferences, Void>()  {
-            @Override
-            public Void apply(ForgePreferences preferences) {
-                preferences.setPref(ForgePreferences.FPref.LOAD_CARD_SCRIPTS_LAZILY, false);
-                return null;
-            }
+        FModel.initialize(null, preferences -> {
+            preferences.setPref(ForgePreferences.FPref.LOAD_CARD_SCRIPTS_LAZILY, false);
+            return null;
         });
         List<String> sets = new ArrayList<>();
         sets.add("XLN");
@@ -81,13 +75,13 @@ public class PlanarConquestTribalGeneraterGA extends PlanarConquestGeneraterGA {
             cards.add(StaticData.instance().getCommonCards().getUniqueByName(cardName));
         }
 
-        Iterable<PaperCard> filteredTribe= Iterables.filter(cards, Predicates.and(
-                Predicates.compose(CardRulesPredicates.IS_KEPT_IN_AI_DECKS, PaperCard.FN_GET_RULES),
-                Predicates.compose(CardRulesPredicates.hasCreatureType("Pirate"), PaperCard.FN_GET_RULES),
-                Predicates.compose(CardRulesPredicates.Presets.IS_CREATURE, PaperCard.FN_GET_RULES),
-                gameFormat.getFilterPrinted()));
+        List<PaperCard> filteredListTribe = cards.stream()
+                .filter(PaperCardPredicates.fromRules(CardRulesPredicates.IS_KEPT_IN_AI_DECKS
+                                .and(CardRulesPredicates.hasCreatureType("Pirate"))
+                                .and(CardRulesPredicates.IS_CREATURE)))
+                .filter(gameFormat.getFilterPrinted())
+                .collect(Collectors.toList());
 
-        List<PaperCard> filteredListTribe = Lists.newArrayList(filteredTribe);
         rankedList = CardRanker.rankCardsInDeck(filteredListTribe);
         List<Deck> decks = new ArrayList<>();
         for(PaperCard card: rankedList.subList(0,cardsToUse)){

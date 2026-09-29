@@ -17,16 +17,15 @@
  */
 package forge.game.zone;
 
-import com.google.common.base.Predicate;
 import com.google.common.collect.Iterables;
-
-import forge.card.CardStateName;
 import forge.game.card.Card;
 import forge.game.card.CardLists;
 import forge.game.keyword.Keyword;
 import forge.game.player.Player;
 import forge.game.spellability.SpellAbility;
 import forge.util.Lang;
+
+import java.util.function.Predicate;
 
 /**
  * <p>
@@ -41,65 +40,38 @@ public class PlayerZone extends Zone {
 
     // the this is not the owner of the card
     private static Predicate<Card> alienCardsActivationFilter(final Player who) {
-        return new Predicate<Card>() {
-            @Override
-            public boolean apply(final Card c) {
-                return !c.mayPlay(who).isEmpty() || c.mayPlayerLook(who);
-            }
-        };
+        return c -> !c.mayPlay(who).isEmpty() || c.mayPlayerLook(who);
     }
 
     private final class OwnCardsActivationFilter implements Predicate<Card> {
         @Override
-        public boolean apply(final Card c) {
+        public boolean test(final Card c) {
             if (c.mayPlayerLook(c.getController())) {
                 return true;
             }
 
-            if (c.isLand() && !c.mayPlay(c.getController()).isEmpty()) {
+            if (!c.mayPlay(c.getController()).isEmpty()) {
                 return true;
             }
 
-            boolean graveyardCastable = c.hasKeyword(Keyword.FLASHBACK) ||
-                    c.hasKeyword(Keyword.RETRACE) || c.hasKeyword(Keyword.JUMP_START) || c.hasKeyword(Keyword.ESCAPE) ||
-                    c.hasKeyword(Keyword.DISTURB);
-            boolean exileCastable = c.isForetold() || isOnAdventure(c);
+            // Keywords like Flashback/Escape create alternative SAs at play time,
+            // not stored on the card or in the mayPlay map. Check directly.
+            if (PlayerZone.this.is(ZoneType.Graveyard) && (c.hasKeyword(Keyword.FLASHBACK)
+                    || c.hasKeyword(Keyword.RETRACE) || c.hasKeyword(Keyword.JUMP_START)
+                    || c.hasKeyword(Keyword.ESCAPE) || c.hasKeyword(Keyword.DISTURB))) {
+                return true;
+            }
+            if (PlayerZone.this.is(ZoneType.Exile) && (c.isForetold() || c.isOnAdventure())) {
+                return true;
+            }
+
             for (final SpellAbility sa : c.getSpellAbilities()) {
-                final ZoneType restrictZone = sa.getRestrictions().getZone();
-
-                // for mayPlay the restrictZone is null for reasons
-                if (sa.isSpell() && c.mayPlay(sa.getMayPlay()) != null) {
-                    return true;
-                }
-
-                if (PlayerZone.this.is(restrictZone)) {
-                    return true;
-                }
-
-                //todo add brokkos??
-                if (sa.isSpell()
-                        && (graveyardCastable && PlayerZone.this.is(ZoneType.Graveyard))
-                        && restrictZone.equals(ZoneType.Hand)) {
-                    return true;
-                }
-
-                if (sa.isSpell()
-                        && (exileCastable && PlayerZone.this.is(ZoneType.Exile))
-                        && restrictZone.equals(ZoneType.Hand)) {
+                if (PlayerZone.this.is(sa.getRestrictions().getZone())) {
                     return true;
                 }
             }
             return false;
         }
-    }
-    private boolean isOnAdventure(Card c) {
-        if (!c.isAdventureCard())
-            return false;
-        if (c.getExiledWith() == null)
-            return false;
-        if (!CardStateName.Adventure.equals(c.getExiledWith().getCurrentStateName()))
-            return false;
-        return true;
     }
 
     private final Player player;
@@ -111,6 +83,9 @@ public class PlayerZone extends Zone {
 
     @Override
     protected void onChanged() {
+        if (getZoneType() == ZoneType.Hand && player.getController().isOrderedZone()) {
+            sort();
+        }
         player.updateZoneForView(this);
     }
 

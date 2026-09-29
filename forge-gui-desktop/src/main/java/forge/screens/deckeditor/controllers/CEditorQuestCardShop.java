@@ -68,19 +68,14 @@ public final class CEditorQuestCardShop extends ACEditorBase<InventoryItem, Deck
             .build();
     @SuppressWarnings("serial")
     private final FLabel fullCatalogToggle = new FLabel.Builder().text("See full catalog")
-            .fontSize(14).hoverable(true).cmdClick(new UiCommand() {
-                @Override
-                public void run() {
-                    toggleFullCatalog();
-                }
-            })
+            .fontSize(14).hoverable(true).cmdClick((UiCommand) this::toggleFullCatalog)
             .build();
 
     private final QuestController questData;
 
     private ItemPool<InventoryItem> cardsForSale;
-    private final ItemPool<InventoryItem> fullCatalogCards =
-            ItemPool.createFrom(FModel.getMagicDb().getCommonCards().getAllCardsNoAlt(), InventoryItem.class);
+    private final ItemPool<InventoryItem> fullCatalogCards
+            = ItemPool.createFrom(FModel.getMagicDb().getCommonCards().getAllCards(), InventoryItem.class);
     private boolean showingFullCatalog = false;
     private DragCell allDecksParent = null;
     private DragCell deckGenParent = null;
@@ -263,12 +258,9 @@ public final class CEditorQuestCardShop extends ACEditorBase<InventoryItem, Deck
 
         this.getBtnRemove4().setText("Sell all extras");
         this.getBtnRemove4().setToolTipText("Sell unneeded extra copies of all cards");
-        this.getBtnRemove4().setCommand(new UiCommand() {
-            @Override
-            public void run() {
-                QuestSpellShop.sellExtras(getCatalogManager(), getDeckManager());
-                updateCreditsLabel();
-            }
+        this.getBtnRemove4().setCommand((UiCommand) () -> {
+            QuestSpellShop.sellExtras(getCatalogManager(), getDeckManager());
+            updateCreditsLabel();
         });
 
         this.getDeckManager().getPnlButtons().add(creditsLabel, "gap 5px");

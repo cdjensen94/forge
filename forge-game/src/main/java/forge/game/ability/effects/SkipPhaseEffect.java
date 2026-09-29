@@ -1,8 +1,5 @@
 package forge.game.ability.effects;
 
-import java.util.List;
-
-import forge.GameCommand;
 import forge.game.Game;
 import forge.game.ability.AbilityFactory;
 import forge.game.ability.SpellAbilityEffect;
@@ -22,8 +19,7 @@ public class SkipPhaseEffect extends SpellAbilityEffect {
         final String phase = sa.getParam("Phase");
         final String step = sa.getParam("Step");
 
-        List<Player> tgtPlayers = getTargetPlayers(sa);
-        for (final Player player : tgtPlayers) {
+        for (final Player player : getTargetPlayers(sa)) {
             sb.append(player).append(" ");
             sb.append("skips their ");
             if (duration == null) {
@@ -45,8 +41,7 @@ public class SkipPhaseEffect extends SpellAbilityEffect {
         final String phase = sa.getParam("Phase");
         final String step = sa.getParam("Step");
 
-        List<Player> tgtPlayers = getTargetPlayers(sa);
-        for (final Player player : tgtPlayers) {
+        for (final Player player : getTargetPlayers(sa)) {
             createSkipPhaseEffect(sa, player, duration, phase, step);
         }
     }
@@ -80,12 +75,10 @@ public class SkipPhaseEffect extends SpellAbilityEffect {
         }
         if (duration == null) {
             sb.append(".");
+        } else if (game.getPhaseHandler().getPlayerTurn().equals(player)) {
+            sb.append(" of this turn.");
         } else {
-            if (game.getPhaseHandler().getPlayerTurn().equals(player)) {
-                sb.append(" of this turn.");
-            } else {
-                sb.append(" of your next turn.");
-            }
+            sb.append(" of your next turn.");
         }
 
         final String repeffstr = sb.toString();
@@ -99,20 +92,12 @@ public class SkipPhaseEffect extends SpellAbilityEffect {
             re.setOverridingAbility(exile);
         }
         if (duration != null) {
-            addUntilCommand(sa, exileEffectCommand(game, eff));
+            addUntilCommand(sa, () -> game.getAction().exileEffect(eff));
         }
         eff.addReplacementEffect(re);
 
         if (sa.hasParam("Start")) {
-            final GameCommand startEffect = new GameCommand() {
-                private static final long serialVersionUID = -5861749814760561373L;
-
-                @Override
-                public void run() {
-                    game.getAction().moveToCommand(eff, sa);
-                }
-            };
-            game.getUpkeep().addUntil(player, startEffect);
+            game.getUpkeep().addUntil(player, () -> game.getAction().moveToCommand(eff, sa));
         } else {
             game.getAction().moveToCommand(eff, sa);
         }

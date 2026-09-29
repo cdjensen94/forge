@@ -20,21 +20,25 @@ package forge.screens.deckeditor.controllers;
 import java.awt.Toolkit;
 import java.awt.event.InputEvent;
 import java.awt.event.KeyEvent;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map.Entry;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 import javax.swing.JMenu;
 import javax.swing.JPopupMenu;
 import javax.swing.KeyStroke;
 import javax.swing.SwingUtilities;
 
-import com.google.common.base.Predicate;
-import com.google.common.collect.Iterables;
-
+import forge.card.ColorSet;
+import forge.card.MagicColor;
 import forge.deck.CardPool;
 import forge.deck.Deck;
 import forge.deck.DeckBase;
 import forge.deck.DeckFormat;
+import forge.deck.DeckRule;
+import forge.deck.DeckRuleColorIdentity;
 import forge.deck.DeckSection;
 import forge.game.GameType;
 import forge.gui.GuiBase;
@@ -64,9 +68,7 @@ import forge.toolbox.ContextMenuBuilder;
 import forge.toolbox.FComboBox;
 import forge.toolbox.FLabel;
 import forge.toolbox.FSkin;
-import forge.util.Aggregates;
-import forge.util.ItemPool;
-import forge.util.Localizer;
+import forge.util.*;
 import forge.view.FView;
 
 /**
@@ -220,7 +222,7 @@ public abstract class ACEditorBase<TItem extends InventoryItem, TModel extends D
 
         for (final Entry<TItem, Integer> itemEntry : itemsToAdd) {
             final TItem item = itemEntry.getKey();
-            final PaperCard card = item instanceof PaperCard ? (PaperCard)item : null;
+            final PaperCard card = item instanceof PaperCard pc ? pc : null;
             int qty = itemEntry.getValue();
 
             int max;
@@ -234,12 +236,8 @@ public abstract class ACEditorBase<TItem extends InventoryItem, TModel extends D
                     max = cardCopies;
                 }
 
-                Entry<String, Integer> cardAmountInfo = Iterables.find(cardsByName, new Predicate<Entry<String, Integer>>() {
-                    @Override
-                    public boolean apply(Entry<String, Integer> t) {
-                        return t.getKey().equals(card.getRules().getNormalizedName());
-                    }
-                }, null);
+                Entry<String, Integer> cardAmountInfo = IterableUtil.find(cardsByName,
+                        t -> t.getKey().equals(card.getRules().getNormalizedName()), null);
                 if (cardAmountInfo != null) {
                     max -= cardAmountInfo.getValue();
                 }
@@ -326,16 +324,8 @@ public abstract class ACEditorBase<TItem extends InventoryItem, TModel extends D
     public void setDeckManager(final ItemManager<TItem> itemManager) {
         this.deckManager = itemManager;
 
-        btnRemove.setCommand(new UiCommand() {
-            @Override public void run() {
-                CDeckEditorUI.SINGLETON_INSTANCE.removeSelectedCards(false, 1);
-            }
-        });
-        btnRemove4.setCommand(new UiCommand() {
-            @Override public void run() {
-                CDeckEditorUI.SINGLETON_INSTANCE.removeSelectedCards(false, 4);
-            }
-        });
+        btnRemove.setCommand((UiCommand) () -> CDeckEditorUI.SINGLETON_INSTANCE.removeSelectedCards(false, 1));
+        btnRemove4.setCommand((UiCommand) () -> CDeckEditorUI.SINGLETON_INSTANCE.removeSelectedCards(false, 4));
         itemManager.getPnlButtons().add(btnRemove, "w 30%!, h 30px!, gapx 5");
         itemManager.getPnlButtons().add(btnRemove4, "w 30%!, h 30px!, gapx 5");
         itemManager.getPnlButtons().add(btnAddBasicLands, "w 30%!, h 30px!, gapx 5");
@@ -359,16 +349,8 @@ public abstract class ACEditorBase<TItem extends InventoryItem, TModel extends D
     public void setCatalogManager(final ItemManager<TItem> itemManager) {
         this.catalogManager = itemManager;
 
-        btnAdd.setCommand(new UiCommand() {
-            @Override public void run() {
-                CDeckEditorUI.SINGLETON_INSTANCE.addSelectedCards(false, 1);
-            }
-        });
-        btnAdd4.setCommand(new UiCommand() {
-            @Override public void run() {
-                CDeckEditorUI.SINGLETON_INSTANCE.addSelectedCards(false, 4);
-            }
-        });
+        btnAdd.setCommand((UiCommand) () -> CDeckEditorUI.SINGLETON_INSTANCE.addSelectedCards(false, 1));
+        btnAdd4.setCommand((UiCommand) () -> CDeckEditorUI.SINGLETON_INSTANCE.addSelectedCards(false, 4));
         itemManager.getPnlButtons().add(btnAdd, "w 30%!, h 30px!, h 30px!, gapx 5");
         itemManager.getPnlButtons().add(btnAdd4, "w 30%!, h 30px!, h 30px!, gapx 5");
     }
@@ -390,12 +372,9 @@ public abstract class ACEditorBase<TItem extends InventoryItem, TModel extends D
                 parent.setSelected(parent.getDocs().get(0));
             } else {
                 // if the parent is now childless, fill in the resultant gap
-                SwingUtilities.invokeLater(new Runnable() {
-                    @Override
-                    public void run() {
-                        SRearrangingUtil.fillGap(parent);
-                        FView.SINGLETON_INSTANCE.removeDragCell(parent);
-                    }
+                SwingUtilities.invokeLater(() -> {
+                    SRearrangingUtil.fillGap(parent);
+                    FView.SINGLETON_INSTANCE.removeDragCell(parent);
                 });
             }
         }
@@ -475,28 +454,13 @@ public abstract class ACEditorBase<TItem extends InventoryItem, TModel extends D
 
             GuiUtils.addMenuItem(menu, localizer.getMessage("lblJumptoprevioustable"),
                     KeyStroke.getKeyStroke(KeyEvent.VK_LEFT, InputEvent.META_DOWN_MASK | InputEvent.CTRL_DOWN_MASK),
-                    new Runnable() {
-                @Override
-                public void run() {
-                    getNextItemManager().focus();
-                }
-            });
+                    () -> getNextItemManager().focus());
             GuiUtils.addMenuItem(menu, localizer.getMessage("lblJumptopnexttable"),
                     KeyStroke.getKeyStroke(KeyEvent.VK_RIGHT, InputEvent.META_DOWN_MASK | InputEvent.CTRL_DOWN_MASK),
-                    new Runnable() {
-                @Override
-                public void run() {
-                    getNextItemManager().focus();
-                }
-            });
+                    () -> getNextItemManager().focus());
             GuiUtils.addMenuItem(menu, localizer.getMessage("lblJumptotextfilter"),
                     KeyStroke.getKeyStroke(KeyEvent.VK_F, Toolkit.getDefaultToolkit().getMenuShortcutKeyMask()),
-                    new Runnable() {
-                @Override
-                public void run() {
-                    getItemManager().focusSearch();
-                }
-            });
+                    () -> getItemManager().focusSearch());
         }
 
         /**
@@ -528,24 +492,22 @@ public abstract class ACEditorBase<TItem extends InventoryItem, TModel extends D
         private void addMakeFoil(final int qty) {
             String label = localizer.getMessage("lblConvertToFoil") + " " + SItemManagerUtil.getItemDisplayString(getItemManager().getSelectedItems(), qty, false);
 
-            GuiUtils.addMenuItem(menu, label, null, new Runnable() {
-                        @Override public void run() {
-                            Integer quantity = qty;
-                            if (quantity < 0) {
-                                quantity = GuiChoose.getInteger(localizer.getMessage("lblChooseavalueforX"), 1, -quantity, 20);
-                                if (quantity == null) { return; }
-                            }
-                            // get the currently selected card from the editor
-                            CardManager cardManager = (CardManager) CDeckEditorUI.SINGLETON_INSTANCE.getCurrentEditorController().getDeckManager();
-                            PaperCard existingCard = cardManager.getSelectedItem();
-                            // make a foiled version based on the original
-                            PaperCard foiledCard = existingCard.isFoil() ? existingCard.getUnFoiled() : existingCard.getFoiled();
-                            // remove *quantity* instances of existing card
-                            CDeckEditorUI.SINGLETON_INSTANCE.removeSelectedCards(false, quantity);
-                            // add *quantity* into the deck and set them as selected
-                            cardManager.addItem(foiledCard, quantity);
-                            cardManager.setSelectedItem(foiledCard);
-                        }
+            GuiUtils.addMenuItem(menu, label, null, () -> {
+                Integer quantity = qty;
+                if (quantity < 0) {
+                    quantity = GuiChoose.getInteger(localizer.getMessage("lblChooseavalueforX"), 1, -quantity, 20);
+                    if (quantity == null) { return; }
+                }
+                // get the currently selected card from the editor
+                CardManager cardManager = (CardManager) CDeckEditorUI.SINGLETON_INSTANCE.getCurrentEditorController().getDeckManager();
+                PaperCard existingCard = cardManager.getSelectedItem();
+                // make a foiled version based on the original
+                PaperCard foiledCard = existingCard.isFoil() ? existingCard.getUnFoiled() : existingCard.getFoiled();
+                // remove *quantity* instances of existing card
+                CDeckEditorUI.SINGLETON_INSTANCE.removeSelectedCards(false, quantity);
+                // add *quantity* into the deck and set them as selected
+                cardManager.addItem(foiledCard, quantity);
+                cardManager.setSelectedItem(foiledCard);
             }, true, true);
         }
         //TODO: need to translate getItemDisplayString
@@ -554,21 +516,72 @@ public abstract class ACEditorBase<TItem extends InventoryItem, TModel extends D
             if (dest != null && !dest.isEmpty()) {
                 label += " " + dest;
             }
-            GuiUtils.addMenuItem(menu, label,
-                    KeyStroke.getKeyStroke(KeyEvent.VK_SPACE, shortcutModifiers), new Runnable() {
-                @Override public void run() {
-                    Integer quantity = qty;
-                    if (quantity < 0) {
-                        quantity = GuiChoose.getInteger(localizer.getMessage("lblChooseavalueforX"), 1, -quantity, 20);
-                        if (quantity == null) { return; }
-                    }
-                    if (isAddContextMenu) {
-                        CDeckEditorUI.SINGLETON_INSTANCE.addSelectedCards(toAlternate, quantity);
-                    } else {
-                        CDeckEditorUI.SINGLETON_INSTANCE.removeSelectedCards(toAlternate, quantity);
-                    }
+            GuiUtils.addMenuItem(menu, label, KeyStroke.getKeyStroke(KeyEvent.VK_SPACE, shortcutModifiers), () -> {
+                Integer quantity = qty;
+                if (quantity < 0) {
+                    quantity = GuiChoose.getInteger(localizer.getMessage("lblChooseavalueforX"), 1, -quantity, 20);
+                    if (quantity == null) { return; }
+                }
+                if (isAddContextMenu) {
+                    CDeckEditorUI.SINGLETON_INSTANCE.addSelectedCards(toAlternate, quantity);
+                } else {
+                    CDeckEditorUI.SINGLETON_INSTANCE.removeSelectedCards(toAlternate, quantity);
                 }
             }, true, shortcutModifiers == 0);
+        }
+
+        /**
+         * Add context menu entry for marking/unmarking cards as key cards
+         */
+        public void addKeyCardToggle() {
+            final ItemManager im = getItemManager();
+            if (im == null || im.getSelectedItems().isEmpty()) { return; }
+            
+            CardManager cardManager = (CardManager) im;
+            PaperCard selectedCard = cardManager.getSelectedItem();
+            if (selectedCard == null) { return; }
+            
+            final Deck currentDeck = (Deck) CDeckEditorUI.SINGLETON_INSTANCE.getCurrentEditorController().getDeckController().getModel();
+            if (currentDeck == null) { return; }
+            
+            boolean isKeyCard = isCardKeyCard(currentDeck, selectedCard);
+            String label = isKeyCard ? localizer.getMessage("lblRemoveKeyCard") : localizer.getMessage("lblAddKeyCard");
+            
+            GuiUtils.addMenuItem(menu, label, null, () -> {
+                toggleCardKeyStatus(currentDeck, selectedCard);
+            }, true, true);
+        }
+        
+        private boolean isCardKeyCard(final Deck deck, final PaperCard card) {
+            return deck.isKeyCard(card.getName());
+        }
+        
+        private void toggleCardKeyStatus(final Deck deck, final PaperCard card) {
+            String cardName = card.getName();
+            
+            if (deck.isKeyCard(cardName)) {
+                deck.removeKeyCard(cardName);
+            } else {
+                deck.addKeyCard(cardName);
+            }
+            
+            // Mark deck as modified so it will be saved
+            CDeckEditorUI.SINGLETON_INSTANCE.getCurrentEditorController().getDeckController().notifyModelChanged();
+            
+            // Refresh all cards with this name in both deck and catalog managers
+            refreshCardsByName(cardName);
+        }
+        
+        private void refreshCardsByName(final String cardName) {
+            // Refresh deck manager to show updated key card status
+            if (deckManager != null) {
+                deckManager.refresh();
+            }
+            
+            // Refresh catalog manager to show updated key card status
+            if (catalogManager != null) {
+                catalogManager.refresh();
+            }
         }
 
         private int getMaxMoveQuantity() {
@@ -619,6 +632,87 @@ public abstract class ACEditorBase<TItem extends InventoryItem, TModel extends D
                     //getMenuShortcutKeyMask() instead of CTRL_DOWN_MASK since on OSX, ctrl-shift-space brings up the window manager
                     InputEvent.SHIFT_DOWN_MASK | Toolkit.getDefaultToolkit().getMenuShortcutKeyMask(),
                     InputEvent.ALT_DOWN_MASK | Toolkit.getDefaultToolkit().getMenuShortcutKeyMask());
+        }
+        public void addSetColorID() {
+            String label = localizer.getMessage("lblColorIdentity");
+            CardManager cardManager = (CardManager) CDeckEditorUI.SINGLETON_INSTANCE.getCurrentEditorController().getDeckManager();
+            PaperCard existingCard = cardManager.getSelectedItem();
+            int val;
+            if ((val = existingCard.getRules().getSetColorID()) > 0) {
+                GuiUtils.addMenuItem(menu, label, null, () -> {
+                    List<String> colors = GuiChoose.getChoices(localizer.getMessage("lblChooseNColors", Lang.getNumeral(val)), val, val, MagicColor.Constant.ONLY_COLORS);
+                    // make an updated version
+                    PaperCard updated = existingCard.copyWithMarkedColors(ColorSet.fromNames(colors));
+                    // remove *quantity* instances of existing card
+                    CDeckEditorUI.SINGLETON_INSTANCE.removeSelectedCards(false, 1);
+                    // add *quantity* into the deck and set them as selected
+                    cardManager.addItem(updated, 1);
+                    cardManager.setSelectedItem(updated);
+                }, true, true);
+            }
+        }
+
+        /**
+         * Commander-only counterpart to {@link #addSetColorID()}. For a commander whose card
+         * grants a DeckRule:ColorIdentity AllowedAdditionalColor$ budget, lets the player choose
+         * (up to that budget's count) which colors outside the commander's own color identity
+         * their matching off-color cards may use. It's the same upfront, Cryptic Spires-style
+         * choice {@link #addSetColorID()} offers for SETCOLORID, stored the same way - as the
+         * commander's own marked colors - and read directly by
+         * {@link DeckRuleColorIdentity#approvesAdditionalColor(forge.card.CardRules, byte)}.
+         */
+        public void addAllowedAdditionalColors() {
+            final ItemManager im = getItemManager();
+            if (im == null || im.getSelectedItems().isEmpty()) { return; }
+
+            final CardManager cardManager = (CardManager) im;
+            final PaperCard existingCard = cardManager.getSelectedItem();
+            if (existingCard == null) { return; }
+
+            final Deck currentDeck = (Deck) CDeckEditorUI.SINGLETON_INSTANCE.getCurrentEditorController().getDeckController().getModel();
+            if (currentDeck == null) { return; }
+
+            for (final DeckRule rule : DeckRule.parseAll(existingCard)) {
+                if (!(rule instanceof DeckRuleColorIdentity) || !rule.isActiveFor(DeckSection.Commander)) {
+                    continue;
+                }
+                final DeckRuleColorIdentity ciRule = (DeckRuleColorIdentity) rule;
+                if (!ciRule.hasAllowedAdditionalColorBudget()) {
+                    continue;
+                }
+
+                final int additionalColorCount = ciRule.getAdditionalColorCount();
+                // Union across all commanders (partners included) so an already-covered color isn't offered again.
+                byte commanderCI = 0;
+                for (final PaperCard cmd : currentDeck.getCommanders()) {
+                    commanderCI |= cmd.getRules().getColorIdentity().getColor();
+                }
+                final byte finalCommanderCI = commanderCI;
+                final List<String> colorChoices = new ArrayList<>();
+                for (int i = 0; i < MagicColor.WUBRG.length; i++) {
+                    if ((finalCommanderCI & MagicColor.WUBRG[i]) == 0) {
+                        colorChoices.add(MagicColor.Constant.ONLY_COLORS.get(i));
+                    }
+                }
+
+                final String label = localizer.getMessage("lblAllowedAdditionalColors");
+                GuiUtils.addMenuItem(menu, label, null, () -> {
+                    final Set<String> currentColors = existingCard.getMarkedColors() != null
+                            ? existingCard.getMarkedColors().stream().map(MagicColor.Color::getName).collect(Collectors.toSet())
+                            : null;
+                    List<String> colors = GuiChoose.getChoices(label, 0, additionalColorCount, colorChoices, currentColors, null);
+                    // make an updated version
+                    PaperCard updated = existingCard.copyWithMarkedColors(ColorSet.fromNames(colors));
+                    // remove *quantity* instances of existing card
+                    CDeckEditorUI.SINGLETON_INSTANCE.removeSelectedCards(false, 1);
+                    // add *quantity* into the deck and set them as selected
+                    cardManager.addItem(updated, 1);
+                    cardManager.setSelectedItem(updated);
+                    if (catalogManager != null) {
+                        catalogManager.refresh(); //refresh so cards shown match the new allowed additional colors
+                    }
+                }, true, true);
+            }
         }
     }
 }

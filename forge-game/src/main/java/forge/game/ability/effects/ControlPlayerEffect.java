@@ -2,7 +2,6 @@ package forge.game.ability.effects;
 
 import java.util.List;
 
-import forge.GameCommand;
 import forge.game.Game;
 import forge.game.ability.AbilityUtils;
 import forge.game.ability.SpellAbilityEffect;
@@ -26,32 +25,23 @@ public class ControlPlayerEffect extends SpellAbilityEffect {
     @SuppressWarnings("serial")
     @Override
     public void resolve(SpellAbility sa) {
-        final Player activator = sa.getActivatingPlayer();
-        final Game game = activator.getGame();
-        final Player controller = sa.hasParam("Controller") ? AbilityUtils.getDefinedPlayers(
-                sa.getHostCard(), sa.getParam("Controller"), sa).get(0) : activator;
+        final Player controller = AbilityUtils.getDefinedPlayers(sa.getHostCard(), sa.getParam("Controller"), sa).get(0);
+        final Game game = controller.getGame();
+        final boolean combat = sa.hasParam("Combat");
 
         for (final Player pTarget: getTargetPlayers(sa)) {
             // before next untap gain control
-            game.getCleanup().addUntil(pTarget, new GameCommand() {
-                @Override
-                public void run() {
-                    // CR 800.4b
-                    if (!controller.isInGame()) {
-                        return;
-                    }
-
-                    long ts = game.getNextTimestamp();
-                    pTarget.addController(ts, controller);
-
-                    // after following cleanup release control
-                    game.getCleanup().addUntil(new GameCommand() {
-                        @Override
-                        public void run() {
-                            pTarget.removeController(ts);
-                        }
-                    });
+            (combat ? game.getBeginOfCombat() : game.getCleanup()).addUntil(pTarget, () -> {
+                // CR 800.4b
+                if (!controller.isInGame()) {
+                    return;
                 }
+
+                long ts = game.getNextTimestamp();
+                pTarget.addController(ts, controller);
+
+                // after following cleanup release control
+                (combat ? game.getEndOfCombat() : game.getCleanup()).addUntil(() -> pTarget.removeController(ts));
             });
         }
     }

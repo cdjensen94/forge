@@ -1,7 +1,5 @@
 package forge.ai.ability;
 
-import com.google.common.base.Predicate;
-import com.google.common.collect.Iterables;
 import forge.ai.*;
 import forge.card.CardStateName;
 import forge.card.CardTypeView;
@@ -13,18 +11,23 @@ import forge.game.cost.Cost;
 import forge.game.keyword.Keyword;
 import forge.game.player.Player;
 import forge.game.player.PlayerActionConfirmMode;
-import forge.game.spellability.*;
+import forge.game.spellability.Spell;
+import forge.game.spellability.SpellAbility;
+import forge.game.spellability.SpellAbilityPredicates;
+import forge.game.spellability.SpellPermanent;
 import forge.game.zone.ZoneType;
+import forge.util.IterableUtil;
 import forge.util.MyRandom;
 
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Predicate;
+import java.util.stream.Collectors;
 
 public class PlayAi extends SpellAbilityAi {
 
     @Override
-    protected boolean checkApiLogic(final Player ai, final SpellAbility sa) {
+    protected AiAbilityDecision checkApiLogic(final Player ai, final SpellAbility sa) {
         final String logic = sa.getParamOrDefault("AILogic", "");
 
         final Game game = ai.getGame();
@@ -32,11 +35,7 @@ public class PlayAi extends SpellAbilityAi {
         // don't use this as a response (ReplaySpell logic is an exception, might be called from a subability
         // while the trigger is on stack)
         if (!game.getStack().isEmpty() && !"ReplaySpell".equals(logic)) {
-            return false;
-        }
-
-        if (ComputerUtil.preventRunAwayActivations(sa)) {
-            return false; // prevent infinite loop
+            return new AiAbilityDecision(0, AiPlayDecision.CantPlayAi);
         }
 
         if (game.getRules().hasAppliedVariant(GameType.MoJhoSto) && source.getName().equals("Jhoira of the Ghitu Avatar")) {
@@ -46,38 +45,44 @@ public class PlayAi extends SpellAbilityAi {
             int numLandsForJhoira = aic.getIntProperty(AiProps.MOJHOSTO_NUM_LANDS_TO_ACTIVATE_JHOIRA);
             int chanceToActivateInst = 100 - aic.getIntProperty(AiProps.MOJHOSTO_CHANCE_TO_USE_JHOIRA_COPY_INSTANT);
             if (ai.getLandsInPlay().size() < numLandsForJhoira) {
-                return false;
+                return new AiAbilityDecision(0, AiPlayDecision.CantPlayAi);
             }
             // Don't spam activate the Instant copying ability all the time to give the AI a chance to use other abilities
             // Can probably be improved, but as random as MoJhoSto already is, probably not a huge deal for now
             if ("Instant".equals(sa.getParam("AnySupportedCard")) && MyRandom.percentTrue(chanceToActivateInst)) {
-                return false;
+                return new AiAbilityDecision(0, AiPlayDecision.CantPlayAi);
             }
-            return true;
+            return new AiAbilityDecision(100, AiPlayDecision.WillPlay);
         }
 
         List<Card> cards = getPlayableCards(sa, ai);
         if (cards.isEmpty()) {
-            return false;
+            return new AiAbilityDecision(0, AiPlayDecision.MissingNeededCards);
         }
 
         if ("ReplaySpell".equals(logic)) {
-            return ComputerUtil.targetPlayableSpellCard(ai, cards, sa, sa.hasParam("WithoutManaCost"), false);
+            if (ComputerUtil.targetPlayableSpellCard(ai, cards, sa, sa.hasParam("WithoutManaCost"), false)) {
+                return new AiAbilityDecision(100, AiPlayDecision.WillPlay);
+            }
+            return new AiAbilityDecision(0, AiPlayDecision.TargetingFailed);
         } else if (logic.startsWith("NeedsChosenCard")) {
             int minCMC = 0;
             if (sa.getPayCosts().getCostMana() != null) {
                 minCMC = sa.getPayCosts().getTotalMana().getCMC();
             }
             cards = CardLists.filter(cards, CardPredicates.greaterCMC(minCMC));
-            return chooseSingleCard(ai, sa, cards, sa.hasParam("Optional"), null, null) != null;
+            if (chooseSingleCard(ai, sa, cards, sa.hasParam("Optional"), null, null) != null) {
+                return new AiAbilityDecision(100, AiPlayDecision.WillPlay);
+            }
+            return new AiAbilityDecision(0, AiPlayDecision.MissingNeededCards);
         } else if ("WithTotalCMC".equals(logic)) {
             // Try to play only when there are more than three playable cards.
             if (cards.size() < 3)
-                return false;
+                return new AiAbilityDecision(0, AiPlayDecision.CantPlayAi);
             if (sa.costHasManaX()) {
-                int amount = ComputerUtilCost.getMaxXValue(sa, ai, sa.isTrigger());
+                int amount = ComputerUtilCost.setMaxXValue(sa, ai, sa.isTrigger());
                 if (amount < ComputerUtilCard.getBestAI(cards).getCMC())
-                    return false;
+                    return new AiAbilityDecision(0, AiPlayDecision.CantPlayAi);
                 int totalCMC = 0;
                 for (Card c : cards) {
                     totalCMC += c.getCMC();
@@ -95,10 +100,13 @@ public class PlayAi extends SpellAbilityAi {
             Card rem = source.getExiledCards().getFirst();
             CardTypeView t = rem.getState(CardStateName.Original).getType();
 
-            return t.isPermanent() && !t.isLand();
+            if (t.isPermanent() && !t.isLand()) {
+                return new AiAbilityDecision(100, AiPlayDecision.WillPlay);
+            }
+            return new AiAbilityDecision(0, AiPlayDecision.CantPlayAi);
         }
 
-        return true;
+        return new AiAbilityDecision(100, AiPlayDecision.WillPlay);
     }
 
     /**
@@ -113,20 +121,21 @@ public class PlayAi extends SpellAbilityAi {
      * @return a boolean.
      */
     @Override
-    protected boolean doTriggerAINoCost(final Player ai, final SpellAbility sa, final boolean mandatory) {
+    protected AiAbilityDecision doTriggerNoCost(final Player ai, final SpellAbility sa, final boolean mandatory) {
         if (sa.usesTargeting()) {
             if (!sa.hasParam("AILogic")) {
-                return false;
+                return new AiAbilityDecision(0, AiPlayDecision.CantPlayAi);
             }
 
             if ("ReplaySpell".equals(sa.getParam("AILogic"))) {
-                return ComputerUtil.targetPlayableSpellCard(ai, getPlayableCards(sa, ai), sa, sa.hasParam("WithoutManaCost"), mandatory);
+                boolean result = ComputerUtil.targetPlayableSpellCard(ai, getPlayableCards(sa, ai), sa, sa.hasParam("WithoutManaCost"), mandatory);
+                return result ? new AiAbilityDecision(100, AiPlayDecision.WillPlay) : new AiAbilityDecision(0, AiPlayDecision.CantPlayAi);
             }
 
             return checkApiLogic(ai, sa);
         }
 
-        return true;
+        return new AiAbilityDecision(100, AiPlayDecision.WillPlay);
     }
 
     @Override
@@ -142,63 +151,63 @@ public class PlayAi extends SpellAbilityAi {
             final boolean isOptional, Player targetedPlayer, Map<String, Object> params) {
         final CardStateName state;
         if (sa.hasParam("CastTransformed")) {
-            state = CardStateName.Transformed;
-            options.forEach(c -> c.changeToState(CardStateName.Transformed));
+            state = CardStateName.Backside;
+            options.forEach(c -> c.changeToState(CardStateName.Backside));
         } else {
             state = CardStateName.Original; 
         }
 
-        List<Card> tgtCards = CardLists.filter(options, new Predicate<Card>() {
-            @Override
-            public boolean apply(final Card c) {
-                // TODO needs to be aligned for MDFC along with getAbilityToPlay so the knowledge
-                // of which spell was the reason for the choice can be used there
-                for (SpellAbility s : AbilityUtils.getSpellsFromPlayEffect(c, ai, state, false)) {
-                    if (!sa.matchesValidParam("ValidSA", s)) {
-                        continue;
-                    }
-                    if (s instanceof LandAbility) {
-                        // might want to run some checks here but it's rare anyway
-                        return true;
-                    }
-                    Spell spell = (Spell) s;
-                    if (params != null && params.containsKey("CMCLimit")) {
-                        Integer cmcLimit = (Integer) params.get("CMCLimit");
-                        if (spell.getPayCosts().getTotalMana().getCMC() > cmcLimit)
-                            continue;
-                    }
-                    if (sa.hasParam("WithoutManaCost")) {
-                        // Try to avoid casting instants and sorceries with X in their cost, since X will be assumed to be 0.
-                        if (!(spell instanceof SpellPermanent)) {
-                            if (spell.costHasManaX()) {
-                                continue;
-                            }
-                        }
-
-                        spell = (Spell) spell.copyWithNoManaCost();
-                    } else if (sa.hasParam("PlayCost")) {
-                        Cost abCost;
-                        if ("ManaCost".equals(sa.getParam("PlayCost"))) {
-                            abCost = new Cost(c.getManaCost(), false);
-                        } else {
-                            abCost = new Cost(sa.getParam("PlayCost"), false);
-                        }
-
-                        spell = (Spell) spell.copyWithManaCostReplaced(spell.getActivatingPlayer(), abCost);
-                    }
-                    if (AiPlayDecision.WillPlay == ((PlayerControllerAi)ai.getController()).getAi().canPlayFromEffectAI(spell, !(isOptional || sa.hasParam("Optional")), true)) {
-                        // Before accepting, see if the spell has a valid number of targets (it should at this point).
-                        // Proceeding past this point if the spell is not correctly targeted will result
-                        // in "Failed to add to stack" error and the card disappearing from the game completely.
-                        if (!spell.isTargetNumberValid() || !ComputerUtilCost.canPayCost(spell, ai, true)) {
-                            // if we won't be able to pay the cost, don't choose the card
-                            return false;
-                        }
-                        return true;
-                    }
+        Predicate<SpellAbility> validSA;
+        if (sa.hasParam("ValidSA")) {
+            validSA = SpellAbilityPredicates.isValid(sa.getParam("ValidSA").split(","), ai, sa.getHostCard(), sa);
+        } else {
+            validSA = null;
+        }
+        List<Card> tgtCards = CardLists.filter(options, c -> {
+            // TODO needs to be aligned for MDFC along with getAbilityToPlay so the knowledge
+            // of which spell was the reason for the choice can be used there
+            for (SpellAbility s : AbilityUtils.getSpellsFromPlayEffect(c, ai, state, false, validSA)) {
+                if (s.isLandAbility()) {
+                    // might want to run some checks here but it's rare anyway
+                    return true;
                 }
-                return false;
+                Spell spell = (Spell) s;
+                if (params != null && params.containsKey("CMCLimit")) {
+                    Integer cmcLimit = (Integer) params.get("CMCLimit");
+                    if (spell.getPayCosts().getTotalMana().getCMC() > cmcLimit)
+                        continue;
+                }
+                if (sa.hasParam("WithoutManaCost")) {
+                    // Try to avoid casting instants and sorceries with X in their cost, since X will be assumed to be 0.
+                    if (!(spell instanceof SpellPermanent)) {
+                        if (spell.costHasManaX()) {
+                            continue;
+                        }
+                    }
+
+                    spell = (Spell) spell.copyWithNoManaCost();
+                } else if (sa.hasParam("PlayCost")) {
+                    Cost abCost;
+                    if ("ManaCost".equals(sa.getParam("PlayCost"))) {
+                        abCost = new Cost(c.getManaCost(), false);
+                    } else {
+                        abCost = new Cost(sa.getParam("PlayCost"), false);
+                    }
+
+                    spell = (Spell) spell.copyWithManaCostReplaced(spell.getActivatingPlayer(), abCost);
+                }
+                if (AiPlayDecision.WillPlay == ((PlayerControllerAi)ai.getController()).getAi().canPlayFromEffectAI(spell, !(isOptional || sa.hasParam("Optional")), true)) {
+                    // Before accepting, see if the spell has a valid number of targets (it should at this point).
+                    // Proceeding past this point if the spell is not correctly targeted will result
+                    // in "Failed to add to stack" error and the card disappearing from the game completely.
+                    if (!spell.isTargetNumberValid() || !ComputerUtilCost.canPayCost(spell, ai, true)) {
+                        // if we won't be able to pay the cost, don't choose the card
+                        return false;
+                    }
+                    return true;
+                }
             }
+            return false;
         });
 
         if (sa.hasParam("CastTransformed")) {
@@ -224,13 +233,9 @@ public class PlayAi extends SpellAbilityAi {
 
         if (cards != null & sa.hasParam("ValidSA")) {
             final String valid[] = sa.getParam("ValidSA").split(",");
-            final Iterator<Card> itr = cards.iterator();
-            while (itr.hasNext()) {
-                final Card c = itr.next();
-                if (!Iterables.any(AbilityUtils.getBasicSpellsFromPlayEffect(c, ai), SpellAbilityPredicates.isValid(valid, ai , source, sa))) {
-                    itr.remove();
-                }
-            }
+            final List<Card> invalid = cards.stream().filter(c -> !IterableUtil.any(AbilityUtils.getBasicSpellsFromPlayEffect(c, ai), SpellAbilityPredicates.isValid(valid, ai, source, sa))).collect(Collectors.toList());
+            if (!invalid.isEmpty())
+                cards.removeAll(invalid);
         }
 
         // Ensure that if a ValidZone is specified, there's at least something to choose from in that zone.

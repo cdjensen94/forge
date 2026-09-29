@@ -1,10 +1,13 @@
 package forge.ai.ability;
 
-
 import com.google.common.collect.Iterables;
+import forge.ai.AiAbilityDecision;
+import forge.ai.AiPlayDecision;
 import forge.ai.ComputerUtil;
 import forge.ai.SpellAbilityAi;
-import forge.game.card.*;
+import forge.game.card.Card;
+import forge.game.card.CardPredicates;
+import forge.game.card.CounterEnumType;
 import forge.game.player.Player;
 import forge.game.player.PlayerActionConfirmMode;
 import forge.game.player.PlayerController;
@@ -15,12 +18,17 @@ import java.util.Map;
 
 public class TimeTravelAi extends SpellAbilityAi {
     @Override
-    protected boolean canPlayAI(Player aiPlayer, SpellAbility sa) {
-        boolean hasSuspendedCards = Iterables.any(aiPlayer.getCardsIn(ZoneType.Exile), CardPredicates.hasSuspend());
-        boolean hasRelevantCardsOTB = Iterables.any(aiPlayer.getCardsIn(ZoneType.Battlefield), CardPredicates.hasCounter(CounterEnumType.TIME));
+    protected AiAbilityDecision canPlay(Player aiPlayer, SpellAbility sa) {
+        boolean hasSuspendedCards = aiPlayer.getCardsIn(ZoneType.Exile).anyMatch(Card::hasSuspend);
+        boolean hasRelevantCardsOTB = aiPlayer.getCardsIn(ZoneType.Battlefield).anyMatch(CardPredicates.hasCounter(CounterEnumType.TIME));
 
-        // TODO: add more logic for cards which may need it
-        return hasSuspendedCards || hasRelevantCardsOTB;
+        if (hasSuspendedCards || hasRelevantCardsOTB) {
+            // If there are cards with Time counters, we can play this ability
+            return new AiAbilityDecision(100, AiPlayDecision.WillPlay);
+        } else {
+            // No cards to add/remove Time counters from, so don't play this ability
+            return new AiAbilityDecision(0, AiPlayDecision.CantPlayAi);
+        }
     }
 
     @Override
@@ -31,7 +39,7 @@ public class TimeTravelAi extends SpellAbilityAi {
         // so removing them is good; stuff on the battlefield is usually stuff like Vanishing or As Foretold, which favors adding Time
         // counters for better effect, but exceptions should be added here).
         Card target = (Card)params.get("Target");
-        return !ComputerUtil.isNegativeCounter(CounterType.get(CounterEnumType.TIME), target);
+        return !ComputerUtil.isNegativeCounter(CounterEnumType.TIME, target);
     }
 
     @Override

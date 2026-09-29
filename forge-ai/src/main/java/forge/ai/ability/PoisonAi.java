@@ -1,14 +1,14 @@
 package forge.ai.ability;
 
-import com.google.common.base.Predicate;
-
+import forge.ai.AiAbilityDecision;
+import forge.ai.AiPlayDecision;
 import forge.ai.ComputerUtil;
 import forge.ai.SpellAbilityAi;
 import forge.game.ability.AbilityUtils;
 import forge.game.card.CounterEnumType;
-import forge.game.card.CounterType;
 import forge.game.phase.PhaseHandler;
 import forge.game.phase.PhaseType;
+import forge.game.player.GameLossReason;
 import forge.game.player.Player;
 import forge.game.player.PlayerCollection;
 import forge.game.player.PlayerPredicates;
@@ -35,18 +35,22 @@ public class PoisonAi extends SpellAbilityAi {
      * forge.game.spellability.SpellAbility)
      */
     @Override
-    protected boolean checkApiLogic(Player ai, SpellAbility sa) {
+    protected AiAbilityDecision checkApiLogic(Player ai, SpellAbility sa) {
         // Don't tap creatures that may be able to block
         if (ComputerUtil.waitForBlocking(sa)) {
-            return false;
+            return new AiAbilityDecision(0, AiPlayDecision.WaitForCombat);
         }
 
         if (sa.usesTargeting()) {
             sa.resetTargets();
-            return tgtPlayer(ai, sa, true);
+            if (tgtPlayer(ai, sa, true)) {
+                return new AiAbilityDecision(100, AiPlayDecision.WillPlay);
+            } else {
+                return new AiAbilityDecision(0, AiPlayDecision.TargetingFailed);
+            }
         }
 
-        return true;
+        return new AiAbilityDecision(100, AiPlayDecision.WillPlay);
     }
 
     /*
@@ -56,47 +60,39 @@ public class PoisonAi extends SpellAbilityAi {
      * forge.game.spellability.SpellAbility, boolean)
      */
     @Override
-    protected boolean doTriggerAINoCost(Player ai, SpellAbility sa, boolean mandatory) {
+    protected AiAbilityDecision doTriggerNoCost(Player ai, SpellAbility sa, boolean mandatory) {
+        boolean result;
         if (sa.usesTargeting()) {
-            return tgtPlayer(ai, sa, mandatory);
-        } else if (mandatory || !ai.canReceiveCounters(CounterType.get(CounterEnumType.POISON))) {
+            result = tgtPlayer(ai, sa, mandatory);
+        } else if (mandatory || !ai.canReceiveCounters(CounterEnumType.POISON)) {
             // mandatory or ai is uneffected
-            return true;
+            result = true;
         } else {
             // currently there are no optional Trigger
             final PlayerCollection players = AbilityUtils.getDefinedPlayers(sa.getHostCard(), sa.getParam("Defined"), sa);
             if (players.isEmpty()) {
-                return false;
-            }
-            // not affected, don't care
-            if (!players.contains(ai)) {
-                return true;
-            }
-
-            Player max = players.max(PlayerPredicates.compareByPoison());
-            if (ai.getPoisonCounters() == max.getPoisonCounters()) {
-                // ai is one of the max
-                return false;
+                result = false;
+            } else if (!players.contains(ai)) {
+                result = true;
+            } else {
+                Player max = players.max(PlayerPredicates.compareByPoison());
+                result = ai.getPoisonCounters() != max.getPoisonCounters();
             }
         }
-        return true;
+        return result ? new AiAbilityDecision(100, AiPlayDecision.WillPlay) : new AiAbilityDecision(0, AiPlayDecision.CantPlayAi);
     }
 
     private boolean tgtPlayer(Player ai, SpellAbility sa, boolean mandatory) {
         PlayerCollection tgts = ai.getOpponents().filter(PlayerPredicates.isTargetableBy(sa));
         if (!tgts.isEmpty()) {
             // try to select a opponent that can lose through poison counters
-            PlayerCollection betterTgts = tgts.filter(new Predicate<Player>() {
-                @Override
-                public boolean apply(Player input) {
-                    if (input.cantLose()) {
-                        return false;
-                    } else if (!input.canReceiveCounters(CounterType.get(CounterEnumType.POISON))) {
-                        return false;
-                    }
-                    return true;
+            PlayerCollection betterTgts = tgts.filter(input -> {
+                if (input.cantLoseCheck(GameLossReason.Poisoned)) {
+                    return false;
+                } else if (!input.canReceiveCounters(CounterEnumType.POISON)) {
+                    return false;
                 }
-
+                return true;
             });
 
             if (!betterTgts.isEmpty()) {
@@ -112,7 +108,7 @@ public class PoisonAi extends SpellAbilityAi {
         if (tgts.isEmpty()) {
             if (mandatory) {
                 // AI is uneffected
-                if (ai.canBeTargetedBy(sa) && ai.canReceiveCounters(CounterType.get(CounterEnumType.POISON))) {
+                if (ai.canBeTargetedBy(sa) && !ai.canReceiveCounters(CounterEnumType.POISON)) {
                     sa.getTargets().add(ai);
                     return true;
                 }
@@ -120,15 +116,11 @@ public class PoisonAi extends SpellAbilityAi {
                 PlayerCollection allies = ai.getAllies().filter(PlayerPredicates.isTargetableBy(sa));
                 if (!allies.isEmpty()) {
                     // some ally would be unaffected
-                    PlayerCollection betterAllies = allies.filter(new Predicate<Player>() {
-                        @Override
-                        public boolean apply(Player input) {
-                            if (input.cantLose()) {
-                                return true;
-                            }
-                            return !input.canReceiveCounters(CounterType.get(CounterEnumType.POISON));
+                    PlayerCollection betterAllies = allies.filter(input -> {
+                        if (input.cantLoseCheck(GameLossReason.Poisoned)) {
+                            return true;
                         }
-
+                        return !input.canReceiveCounters(CounterEnumType.POISON);
                     });
                     if (!betterAllies.isEmpty()) {
                         allies = betterAllies;

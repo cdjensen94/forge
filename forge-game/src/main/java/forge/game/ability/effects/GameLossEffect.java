@@ -3,7 +3,6 @@ package forge.game.ability.effects;
 import java.util.List;
 
 import forge.game.ability.SpellAbilityEffect;
-import forge.game.card.Card;
 import forge.game.player.GameLossReason;
 import forge.game.player.Player;
 import forge.game.spellability.SpellAbility;
@@ -28,11 +27,12 @@ public class GameLossEffect extends SpellAbilityEffect {
 
     @Override
     public void resolve(SpellAbility sa) {
-        final Card card = sa.getHostCard();
-
         for (final Player p : getTargetPlayers(sa)) {
-            p.loseConditionMet(GameLossReason.SpellEffect, card.getName());
+            p.loseConditionMet(GameLossReason.SpellEffect, sa.getHostCard().getName());
         }
+
+        // CR 104.1. A game ends immediately when a player wins
+        sa.getHostCard().getGame().getAction().checkGameOverCondition();
     }
 
 }

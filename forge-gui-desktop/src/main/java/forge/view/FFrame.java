@@ -12,7 +12,6 @@ import java.awt.event.MouseEvent;
 import java.awt.event.MouseMotionAdapter;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
-import java.awt.event.WindowStateListener;
 
 import javax.swing.BorderFactory;
 import javax.swing.JRootPane;
@@ -60,6 +59,9 @@ public class FFrame extends SkinnedFrame implements ITitleBarOwner {
         this.addWindowListener(new WindowAdapter() {
             @Override
             public void windowActivated(final WindowEvent e) {
+                if (minimized) {
+                    setMinimized(false); //ensure window is restored when activated (fixes focus issues in some environments like WSL)
+                }
                 resume(); //resume music when main frame regains focus
             }
 
@@ -74,12 +76,7 @@ public class FFrame extends SkinnedFrame implements ITitleBarOwner {
                 }
             }
         });
-        this.addWindowStateListener(new WindowStateListener() {
-            @Override
-            public void windowStateChanged(final WindowEvent e) {
-                setState(e.getNewState());
-            }
-        });
+        this.addWindowStateListener(e -> setState(e.getNewState()));
 
         // Title bar
         this.titleBar = titleBar0;

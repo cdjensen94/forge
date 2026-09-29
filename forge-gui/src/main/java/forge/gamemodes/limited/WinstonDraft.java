@@ -4,14 +4,12 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Stack;
-
-import com.google.common.base.Predicates;
-import com.google.common.base.Supplier;
-import com.google.common.collect.Iterables;
+import java.util.function.Supplier;
 
 import forge.deck.CardPool;
 import forge.deck.Deck;
 import forge.item.PaperCard;
+import forge.item.PaperCardPredicates;
 import forge.util.MyRandom;
 
 public class WinstonDraft extends BoosterDraft {
@@ -39,13 +37,12 @@ public class WinstonDraft extends BoosterDraft {
 
     private void initializeWinstonDraft() {
         this.deck = new Stack<>();
-        for (int i = 0; i < this.product.size(); i++) {
-            final Supplier<List<PaperCard>> supply = this.product.get(i);
-            for(int j = 0; j < NUM_PLAYERS; j++) {
+        for (final Supplier<List<PaperCard>> supply : this.product) {
+            for (int j = 0; j < NUM_PLAYERS; j++) {
                 // Remove Basic Lands from draft for simplicity
-                for (final PaperCard paperCard : Iterables.filter(supply.get(), Predicates.not(PaperCard.Predicates.Presets.IS_BASIC_LAND))) {
-                    this.deck.add(paperCard);
-                }
+                supply.get().stream()
+                        .filter(PaperCardPredicates.IS_BASIC_LAND_RARITY.negate())
+                        .forEach(this.deck::add);
             }
         }
         Collections.shuffle(this.deck, MyRandom.getRandom());
@@ -174,7 +171,7 @@ public class WinstonDraft extends BoosterDraft {
     }
 
     @Override
-    public Deck[] getDecks() {
+    public Deck[] getComputerDecks() {
         this.determineAIDeckColors();
         return this.draftAI.getDecks();
     }

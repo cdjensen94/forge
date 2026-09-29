@@ -1,8 +1,8 @@
 package forge.card;
 
-import com.google.common.base.Predicate;
-
 import forge.card.mana.ManaCost;
+
+import java.util.function.Predicate;
 
 
 public final class CardFacePredicates {
@@ -12,7 +12,7 @@ public final class CardFacePredicates {
         private final boolean shouldBeEqual;
 
         @Override
-        public boolean apply(final ICardFace face) {
+        public boolean test(final ICardFace face) {
             if (null == face) {
                 return false;
             }
@@ -30,7 +30,7 @@ public final class CardFacePredicates {
         private final boolean shouldBeEqual;
 
         @Override
-        public boolean apply(final ICardFace face) {
+        public boolean test(final ICardFace face) {
             return this.shouldBeEqual == face.getType().hasSupertype(this.operand);
         }
 
@@ -67,12 +67,9 @@ public final class CardFacePredicates {
     }
 
     public static Predicate<ICardFace> cmc(final int value) {
-        return new Predicate<ICardFace>() {
-            @Override
-            public boolean apply(ICardFace input) {
-                ManaCost cost = input.getManaCost();
-                return cost != null && cost.getCMC() == value;
-            }
+        return input -> {
+            ManaCost cost = input.getManaCost();
+            return cost != null && cost.getCMC() == value;
         };
     }
 
@@ -84,7 +81,7 @@ public final class CardFacePredicates {
         }
 
         @Override
-        public boolean apply(ICardFace input) {
+        public boolean test(ICardFace input) {
             String[] k = valid.split("\\.", 2);
 
             if ("Card".equals(k[0])) {
@@ -136,31 +133,9 @@ public final class CardFacePredicates {
         return new ValidPredicate(val);
     }
 
-    public static class Presets {
-        /** The Constant isBasicLand. */
-        public static final Predicate<ICardFace> IS_BASIC_LAND = new Predicate<ICardFace>() {
-            @Override
-            public boolean apply(final ICardFace subject) {
-                return subject.getType().isBasicLand();
-            }
-        };
-
-        /** The Constant isNonBasicLand. */
-        public static final Predicate<ICardFace> IS_NONBASIC_LAND = new Predicate<ICardFace>() {
-            @Override
-            public boolean apply(final ICardFace subject) {
-                return subject.getType().isLand() && !subject.getType().isBasicLand();
-            }
-        };
-
-        /** The Constant isCreature. */
-        public static final Predicate<ICardFace> IS_CREATURE = CardFacePredicates
-                .coreType(true, CardType.CoreType.Creature);
-
-        public static final Predicate<ICardFace> IS_LEGENDARY = CardFacePredicates
-                .superType(true, CardType.Supertype.Legendary);
-        
-        public static final Predicate<ICardFace> IS_NON_LAND = CardFacePredicates
-        		.coreType(false, CardType.CoreType.Land);
-    }
+    public static final Predicate<ICardFace> IS_BASIC_LAND = subject -> subject.getType().isBasicLand();
+    public static final Predicate<ICardFace> IS_NONBASIC_LAND = subject -> subject.getType().isLand() && !subject.getType().isBasicLand();
+    public static final Predicate<ICardFace> IS_CREATURE = CardFacePredicates.coreType(true, CardType.CoreType.Creature);
+    public static final Predicate<ICardFace> IS_LEGENDARY = CardFacePredicates.superType(true, CardType.Supertype.Legendary);
+    public static final Predicate<ICardFace> IS_NON_LAND = CardFacePredicates.coreType(false, CardType.CoreType.Land);
 }

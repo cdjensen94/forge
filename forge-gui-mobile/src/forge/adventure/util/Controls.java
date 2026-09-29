@@ -6,6 +6,7 @@ import com.badlogic.gdx.graphics.g2d.*;
 import com.badlogic.gdx.math.Interpolation;
 import com.badlogic.gdx.math.Rectangle;
 import com.badlogic.gdx.math.Vector2;
+import com.badlogic.gdx.scenes.scene2d.Action;
 import com.badlogic.gdx.scenes.scene2d.Actor;
 import com.badlogic.gdx.scenes.scene2d.InputEvent;
 import com.badlogic.gdx.scenes.scene2d.actions.Actions;
@@ -18,23 +19,30 @@ import com.badlogic.gdx.utils.Align;
 import com.badlogic.gdx.utils.Array;
 import com.badlogic.gdx.utils.Null;
 import com.badlogic.gdx.utils.Timer;
-import com.github.tommyettinger.textra.Font;
-import com.github.tommyettinger.textra.TextraButton;
-import com.github.tommyettinger.textra.TextraLabel;
-import com.github.tommyettinger.textra.TypingButton;
-import com.github.tommyettinger.textra.TypingLabel;
+import com.github.tommyettinger.textra.*;
 import forge.Forge;
 import forge.adventure.player.AdventurePlayer;
 import forge.card.ColorSet;
 import forge.sound.SoundEffectType;
 import forge.sound.SoundSystem;
 
+import java.util.HashMap;
 import java.util.function.Function;
 
 /**
  * Class to create ui elements in the correct style
  */
 public class Controls {
+    private static final Rectangle boundingBox = new Rectangle();
+    private static final HashMap<String, String> currencyStringsMap = new HashMap<>(256);
+    static public Label.LabelStyle getLabelStyle(String name) {
+        return getSkin().get(name, Label.LabelStyle.class);
+    }
+
+    static public TextButton.TextButtonStyle getTextButtonStyle(String name) {
+        return getSkin().get(name, TextButton.TextButtonStyle.class);
+    }
+
     static class LabelFix extends TextraLabel {
         public LabelFix(String text, Font font) {
             super(text, getSkin(), font);
@@ -47,6 +55,12 @@ public class Controls {
             this.getFont().markup(text, this.layout.clear());
             this.setWidth(this.layout.getWidth() + (this.style != null && this.style.background != null ? this.style.background.getLeftWidth() + this.style.background.getRightWidth() : 0.0F));
             layout();
+        }
+
+        @Override
+        public void draw(Batch batch, float parentAlpha) {
+            batch.setColor(1f, 1f, 1f, 1f); // Set color before drawing each actor, per libGDX docs
+            super.draw(batch, parentAlpha);
         }
     }
 
@@ -120,6 +134,142 @@ public class Controls {
 
     }
 
+    public static class MarqueeButton extends TextButtonFix {
+
+        static protected float MAX_SCROLL_SPEED_DEFAULT = 15f;
+        static protected float MIN_SCROLL_DURATION_DEFAULT = 3f;
+        static protected float SCROLL_START_PAUSE_DEFAULT = 0.7f;
+        static protected float SCROLL_END_PAUSE_DEFAULT = 1f;
+
+        protected Action currentAction;
+        protected float scrollStartPause;
+        protected float scrollEndPause;
+        protected float maxScrollSpeed;
+        protected float minScrollDuration;
+
+        public MarqueeButton(@Null String text) {
+            super(text);
+            scrollStartPause = SCROLL_START_PAUSE_DEFAULT;
+            scrollEndPause = SCROLL_END_PAUSE_DEFAULT;
+            maxScrollSpeed = MAX_SCROLL_SPEED_DEFAULT;
+            minScrollDuration = MIN_SCROLL_DURATION_DEFAULT;
+            this.clip(true);
+            this.getTextraLabel().setWrap(false);
+            this.align(Align.left);
+            this.manageAnimation();
+        }
+
+        // Animation Handling
+        public void manageAnimation() {
+            Cell<TextraLabel> labelCell = this.getTextraLabelCell();
+            TextraLabel label = this.getTextraLabel();
+
+            label.removeAction(this.getCurrentAction());
+            if (this.getClippedLength() > 0) {
+                labelCell.align(Align.left);
+                this.setCurrentAction(this.generateMarqueeAction());
+                label.addAction(this.getCurrentAction());
+            }
+            else {
+                labelCell.align(Align.center);
+            }
+        }
+
+        public Action generateMarqueeAction() {
+            float clippedLength = this.getClippedLength();
+            float scrollDuration = Math.max(clippedLength / maxScrollSpeed, minScrollDuration);
+            return Actions.forever(Actions.sequence(
+                    Actions.delay(scrollStartPause),
+                    Actions.moveBy(-clippedLength, 0, scrollDuration, Interpolation.smooth),
+                    Actions.delay(scrollEndPause),
+                    Actions.moveBy(clippedLength, 0)
+            ));
+        }
+
+        public float getClippedLength() {
+            float cellWidth = this.getWidth() - this.getPadLeft() - this.getPadRight();
+            return Math.max(this.getTextraLabel().getWidth() - cellWidth, 0);
+        }
+
+        // Getters/Setters
+        public Action getCurrentAction(){
+            return this.currentAction;
+        }
+
+        public float getScrollStartPause(){
+            return this.scrollStartPause;
+        }
+
+        public float getScrollEndPause(){
+            return this.scrollEndPause;
+        }
+
+        public float getMaxScrollSpeed(){
+            return this.maxScrollSpeed;
+        }
+
+        public float getMinScrollDuration(){
+            return this.minScrollDuration;
+        }
+
+        public void setScrollStartPause(float pauseSecs) {
+            this.scrollStartPause = pauseSecs;
+            this.manageAnimation();
+        }
+
+        public void setScrollEndPausendPause(float pauseSecs) {
+            this.scrollEndPause = pauseSecs;
+            this.manageAnimation();
+        }
+
+        public void setMaxScrollSpeed(float speed) {
+            this.maxScrollSpeed = speed;
+            this.manageAnimation();
+        }
+
+        public void setMinScrollTime(float scrollSecs) {
+            this.minScrollDuration = scrollSecs;
+            this.manageAnimation();
+        }
+
+        public void setCurrentAction(Action newAction) {
+            if (newAction == null) throw new IllegalArgumentException("action cannot be null.");
+            if (currentAction == newAction) return;
+
+            TextraLabel label = this.getTextraLabel();
+            if (label.getActions().contains(currentAction, true)) {
+                label.removeAction(currentAction);
+                label.addAction(newAction);
+            }
+            currentAction = newAction;
+        }
+
+        // Wrap parent methods to ensure manageAnimation() is called each time the label or layout is changed
+        @Override
+        public void setTextraLabel(TextraLabel label) {
+            super.setTextraLabel(label);
+            this.invalidate();
+        }
+
+        @Override
+        public void setText(@Null String text) {
+            super.setText(text);
+            this.invalidate();
+        }
+
+        @Override
+        public void setStyle(Button.ButtonStyle style, boolean makeGridGlyphs) {
+            super.setStyle(style, makeGridGlyphs);
+            this.invalidate();
+        }
+
+        @Override
+        public void layout() {
+            super.layout();
+            this.manageAnimation();
+        }
+    }
+
     static public TextraButton newTextButton(String text) {
         TextraButton button = new TextButtonFix(text);
         button.getTextraLabel().setWrap(false);
@@ -132,33 +282,49 @@ public class Controls {
         return button;
     }
 
+    static public MarqueeButton newMarqueeButton(String text) {
+        return new MarqueeButton(text);
+    }
+
     static public Rectangle getBoundingRect(Actor actor) {
-        return new Rectangle(actor.getX(), actor.getY(), actor.getWidth(), actor.getHeight());
+        if (actor == null) {
+            boundingBox.set(0, 0, 0, 0);
+            return boundingBox;
+        }
+        boundingBox.set(actor.getX(), actor.getY(), actor.getWidth(), actor.getHeight());
+        return boundingBox;
+    }
+
+    static public boolean actorContainsVector(Actor actor, float stageX, float stageY) {
+        if (actor == null || !actor.isVisible()) {
+            return false;
+        }
+        return getBoundingRect(actor).contains(stageX, stageY);
     }
 
     static public boolean actorContainsVector(Actor actor, Vector2 point) {
-        if (actor == null)
+        if (actor == null || !actor.isVisible() || point == null) {
             return false;
-        if (!actor.isVisible())
-            return false;
+        }
         return getBoundingRect(actor).contains(point);
     }
 
     static public boolean actorContainsVector(Array<TextraButton> buttons, Vector2 point) {
-        boolean value = false;
-        if (buttons == null)
+        if (buttons == null || buttons.isEmpty() || point == null) {
             return false;
-        if (buttons.isEmpty())
-            return false;
-        for (Actor actor : buttons) {
-            if (actor == null)
-                return false;
-            if (!actor.isVisible())
-                return false;
-            if (getBoundingRect(actor).contains(point))
-                value = true;
         }
-        return value;
+
+        int buttonCount = buttons.size;
+        for (int i = 0; i < buttonCount; i++) {
+            Actor actor = buttons.get(i);
+            if (actor == null || !actor.isVisible()) {
+                continue;
+            }
+            if (getBoundingRect(actor).contains(point)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     static public SelectBox<String> newComboBox(String[] text, String item, Function<Object, Void> func) {
@@ -249,6 +415,27 @@ public class Controls {
         return ret;
     }
 
+    static public SelectBox<Integer> newComboBox(Integer[] text, int item, Function<Object, Void> func) {
+        SelectBox<Integer> ret = newComboBox();
+        ret.getStyle().listStyle.selection.setTopHeight(4);
+        ret.setItems(text);
+        ret.addListener(new ChangeListener() {
+            @Override
+            public void changed(ChangeEvent event, Actor actor) {
+                try {
+                    func.apply(((SelectBox) actor).getSelected());
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+            }
+        });
+        func.apply(item);
+        ret.getList().setAlignment(Align.center);
+        ret.setSelected(item);
+        ret.setAlignment(Align.right);
+        return ret;
+    }
+
     static public TextField newTextField(String text) {
         return new TextField(text, getSkin());
     }
@@ -270,6 +457,10 @@ public class Controls {
     }
 
     static public TextraButton newTextButton(String text, Runnable func) {
+        return newTextButton(text, func, "");
+    }
+
+    static public TextraButton newTextButton(String text, Runnable func, String styleName) {
         TextraButton ret = newTextButton(text);
         ret.addListener(new ClickListener() {
             @Override
@@ -282,7 +473,8 @@ public class Controls {
                 }
             }
         });
-
+        if (!styleName.isEmpty())
+            ret.setStyle(getTextButtonStyle(styleName));
         return ret;
     }
 
@@ -413,17 +605,17 @@ public class Controls {
         return Color.BLACK;
     }
 
-    public static TextraLabel newTextraLabel(String name, Font font) {
-        TextraLabel ret = new LabelFix(name, font);
+    public static TextraLabel newTextraLabel(String text, Font font) {
+        TextraLabel ret = new LabelFix(text, font);
         return ret;
     }
 
-    public static TextraLabel newTextraLabel(String name) {
-        return newTextraLabel(name, getTextraFont());
+    public static TextraLabel newTextraLabel(String text) {
+        return newTextraLabel(text, getTextraFont());
     }
 
-    public static TextraLabel newRewardLabel(String name) {
-        return newTextraLabel(name, getRewardHeaderFont());
+    public static TextraLabel newRewardLabel(String text) {
+        return newTextraLabel(text, getRewardHeaderFont());
     }
 
     public static String colorIdToTypingString(ColorSet color) {
@@ -432,26 +624,27 @@ public class Controls {
 
     public static String colorIdToTypingString(ColorSet color, boolean vertical) {
         String nextline = vertical ? "\n" : "";
-        //NOTE converting to uppercase will use pixelmana.atlas, higher quality pixel mana symbol.
         String colorId = "";
         if (color.hasWhite())
-            colorId += "[+w]"+nextline;
+            colorId += "[+W]"+nextline;
         if (color.hasBlue())
-            colorId += "[+u]"+nextline;
+            colorId += "[+U]"+nextline;
         if (color.hasBlack())
-            colorId += "[+b]"+nextline;
+            colorId += "[+B]"+nextline;
         if (color.hasRed())
-            colorId += "[+r]"+nextline;
+            colorId += "[+R]"+nextline;
         if (color.hasGreen())
-            colorId += "[+g]"+nextline;
+            colorId += "[+G]"+nextline;
         if (color.isColorless())
-            colorId += "[+c]"+nextline;
+            colorId += "[+C]"+nextline;
         return colorId;
     }
 
-    public static TypingLabel newTypingLabel(String name) {
-        TypingLabel ret = new TypingLabel(name == null ? "" : name, getSkin(), getTextraFont());
-        ret.setVariable("player_name", Current.player().getName());
+    public static TypingLabel newTypingLabel(String text) {
+        TypingLabel ret = new TypingLabel(text == null ? "" : text, getSkin(), getTextraFont());
+        String pn = Current.player().getName();
+        if (pn != null) // this variable is used for dialogs
+            ret.setVariable("player_name", pn);
         ret.setVariable("player_color_id", colorIdToTypingString(Current.player().getColorIdentity()));
         return ret;
     }
@@ -485,78 +678,101 @@ public class Controls {
         private String currencyIcon;
         private boolean isShards;
         private int currencyAmount;
-        private float animationDelay = 2f; //seconds to wait before replacing intermediate label
+        private float intermediateDuration = 2f; // Seconds to wait before replacing intermediate label
         private final String NEGDECOR = "[RED]-";
         private final String POSDECOR = "[GREEN]+";
         private final Timer t = new Timer();
+        private boolean isInitializing = true;
 
         public AccountingLabel(TextraLabel target, boolean isShards) {
             target.setVisible(false);
             placeholder = target;
-            label = Controls.newTextraLabel(target.getName() + "Replacement");
+            label = newTextraLabel(target.getName() + "Replacement");
             currencyAmount = isShards ? Current.player().getShards() : Current.player().getGold();
             this.isShards = isShards;
 
             if (isShards) {
                 currencyAmount = Current.player().getShards();
                 currencyIcon = "[+Shards]";
-                Current.player().onShardsChange(() -> update(AdventurePlayer.current().getShards(), true));
+                Current.player().onShardsChange(() -> {
+                    if (!isInitializing) { // Avoid unwanted call to update() during scene initialization, triggering animation
+                        update(AdventurePlayer.current().getShards(), true);
+                    }
+                });
             } else {
                 currencyAmount = Current.player().getGold();
                 currencyIcon = "[+Gold] "; //fix space since gold sprite is wider than a single glyph
-                Current.player().onGoldChange(() -> update(AdventurePlayer.current().getGold(), true));
+                Current.player().onGoldChange(() -> {
+                if (!isInitializing) { // Avoid unwanted call to update() during scene initialization, triggering animation
+                    update(AdventurePlayer.current().getGold(), true);
+                }
+            });
             }
             label.setText(getLabelText(currencyAmount));
             setName(label.getName());
             replaceLabel(label);
+
+            isInitializing = false; // Initialization complete
         }
 
-        public void setAnimationDelay(float animationDelay) {
-            this.animationDelay = animationDelay;
+        public void setIntermediateDuration(float intermediateDuration) {
+            this.intermediateDuration = intermediateDuration;
         }
 
-        public float getAnimationDelay() {
-            return animationDelay;
+        public float getIntermediateDuration() {
+            return intermediateDuration;
         }
 
         public void update(int newAmount) {
             update(newAmount, false);
         }
 
-        public void update(int newAmount, boolean animate) {
+        public void update(int newAmount, boolean animateIntermediate) {
 
-            if (animate) {
+            if (animateIntermediate) {
                 TextraLabel temporaryLabel = getUpdateLabel(newAmount);
                 currencyAmount = newAmount;
                 replaceLabel(temporaryLabel);
 
-                t.schedule(new AccountingLabelUpdater(temporaryLabel), animationDelay);
+                // Add a quick 'bump' animation to the temporary label
+                SequenceAction sequence = new SequenceAction();
+                sequence.addAction(Actions.alpha(0.25f));
+                sequence.addAction(Actions.parallel(
+                        Actions.alpha(1f, 0.05f, Interpolation.pow2Out),
+                        Actions.moveBy(0f, 2f, 0.05f, Interpolation.pow2Out)
+                ));
+                sequence.addAction(Actions.moveBy(0f, -2f, 0.05f, Interpolation.pow2Out));
+
+                temporaryLabel.addAction(sequence);
+
+                t.schedule(new AccountingLabelUpdater(temporaryLabel), intermediateDuration);
             } else {
                 currencyAmount = newAmount;
-                drawFinalLabel(false);
+                drawFinalLabel(true); // Draw final label with animation since the intermediate label was not used.
             }
         }
 
-        private void drawFinalLabel(boolean fadeIn) {
+        private void drawFinalLabel(boolean animateFinal) {
 
             TextraLabel finalLabel = getDefaultLabel();
-            if (fadeIn) {
+            if (animateFinal) {
+                // Add a quick fade-in animation to the final label
                 SequenceAction sequence = new SequenceAction();
-                sequence.addAction(Actions.alpha(0.5f));
-                sequence.addAction(Actions.alpha(1f, 2f, Interpolation.pow2Out));
+                sequence.addAction(Actions.alpha(0.25f));
+                sequence.addAction(Actions.alpha(1f, 0.1f, Interpolation.pow2Out));
                 finalLabel.addAction(sequence);
             }
             replaceLabel(finalLabel);
         }
 
         private TextraLabel getDefaultLabel() {
-            return Controls.newTextraLabel(getLabelText(currencyAmount));
+            return newTextraLabel(getLabelText(currencyAmount));
         }
 
         private TextraLabel getUpdateLabel(int newAmount) {
             int delta = newAmount - currencyAmount;
             String updateText = delta == 0 ? "" : (delta < 0 ? NEGDECOR + delta * -1 : POSDECOR + delta);
-            return Controls.newTextraLabel(getLabelText(currencyAmount, updateText));
+            return newTextraLabel(getLabelText(newAmount, updateText));
         }
 
         private String getLabelText(int amount) {
@@ -564,6 +780,16 @@ public class Controls {
         }
 
         private String getLabelText(int amount, String updateText) {
+            if (updateText == null || updateText.isEmpty()) {
+                String cachedBase = currencyStringsMap.get(amount + currencyIcon);
+                if (cachedBase == null) {
+                    cachedBase = amount + " " + currencyIcon;
+                    currencyStringsMap.put(amount + currencyIcon, cachedBase);
+                }
+                return cachedBase;
+            }
+
+            // This only executes for a brief second while the update or animation started
             return amount + " " + currencyIcon + updateText;
         }
 
@@ -579,13 +805,15 @@ public class Controls {
             label.remove();
             label = newLabel;
             placeholder.getStage().addActor(label);
+
+            label.setZIndex(placeholder.getZIndex() - 1); // Ensure the new label is behind any tooltips that were present
         }
 
         private class AccountingLabelUpdater extends Timer.Task {
             @Override
             public void run() {
                 if (label.equals(target)) {
-                    drawFinalLabel(true);
+                    drawFinalLabel(false); // Passing false to avoid final animation since the intermediate label was animated
                 }
             }
 

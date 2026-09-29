@@ -10,15 +10,12 @@ import java.util.concurrent.FutureTask;
 
 import javax.swing.JList;
 import javax.swing.WindowConstants;
-import javax.swing.event.ListSelectionEvent;
-import javax.swing.event.ListSelectionListener;
 
 import org.apache.commons.lang3.StringUtils;
 
-import com.google.common.base.Function;
-
 import forge.card.CardStateName;
 import forge.card.ICardFace;
+import forge.gui.interfaces.IGuiGame.OrderResult;
 import forge.game.card.Card;
 import forge.game.card.CardFaceView;
 import forge.game.card.CardView;
@@ -28,6 +25,8 @@ import forge.item.PaperCard;
 import forge.model.FModel;
 import forge.screens.match.CMatchUI;
 import forge.toolbox.FOptionPane;
+import forge.util.FSerializableFunction;
+import forge.util.IHasName;
 import forge.util.Localizer;
 import forge.view.arcane.ListCardArea;
 
@@ -78,7 +77,7 @@ public class GuiChoose {
 
         final Integer[] choices = new Integer[count];
         for (int i = 0; i < count; i++) {
-            choices[i] = Integer.valueOf(i + min);
+            choices[i] = i + min;
         }
         return GuiChoose.oneOrNone(message, choices);
     }
@@ -92,7 +91,7 @@ public class GuiChoose {
 
         final List<Object> choices = new ArrayList<>();
         for (int i = min; i <= cutoff; i++) {
-            choices.add(Integer.valueOf(i));
+            choices.add(i);
         }
         choices.add(Localizer.getInstance().getMessage("lblOtherInteger"));
 
@@ -120,7 +119,7 @@ public class GuiChoose {
             if (str == null) { return null; } // that is 'cancel'
 
             if (StringUtils.isNumeric(str)) {
-                final Integer val = Integer.valueOf(str);
+                final int val = Integer.parseInt(str);
                 if (val >= min && val <= max) {
                     return val;
                 }
@@ -137,10 +136,10 @@ public class GuiChoose {
         return getChoices(message, min, max, choices, null, null);
     }
 
-    public static <T> List<T> getChoices(final String message, final int min, final int max, final Collection<T> choices, final T selected, final Function<T, String> display) {
+    public static <T> List<T> getChoices(final String message, final int min, final int max, final Collection<T> choices, final Collection<T> selected, final FSerializableFunction<T, String> display) {
         return getChoices(message, min, max, choices, selected, display, null);
     }
-    public static <T> List<T> getChoices(final String message, final int min, final int max, final Collection<T> choices, final T selected, final Function<T, String> display, final CMatchUI matchUI) {
+    public static <T> List<T> getChoices(final String message, final int min, final int max, final Collection<T> choices, final Collection<T> selected, final FSerializableFunction<T, String> display, final CMatchUI matchUI) {
         if (choices == null || choices.isEmpty()) {
             if (min == 0) {
                 return new ArrayList<>();
@@ -148,79 +147,68 @@ public class GuiChoose {
             throw new RuntimeException("choice required from empty list");
         }
 
-        final Callable<List<T>> showChoice = new Callable<List<T>>() {
-            @Override
-            public List<T> call() {
-                final ListChooser<T> c = new ListChooser<>(message, min, max, choices, display);
-                final JList<T> list = c.getLstChoices();
-                if (matchUI != null) {
-                    list.addListSelectionListener(new ListSelectionListener() {
-                        @Override
-                        public void valueChanged(final ListSelectionEvent ev) {
-                            final T sel = list.getSelectedValue();
-                            if (sel instanceof InventoryItem) {
-                                matchUI.setCard((InventoryItem) list.getSelectedValue());
-                                return;
-                            } else if (sel instanceof ICardFace || sel instanceof CardFaceView) {
-                                String faceName;
-                                if (sel instanceof ICardFace) {
-                                    faceName = ((ICardFace) sel).getName();
-                                } else {
-                                    faceName = ((CardFaceView) sel).getOracleName();
-                                }
-                                PaperCard paper = FModel.getMagicDb().getCommonCards().getUniqueByName(faceName);
-                                if (paper == null) {
-                                    paper = FModel.getMagicDb().getVariantCards().getUniqueByName(faceName);
-                                }
-
-                                if (paper != null) {
-                                    Card c = Card.getCardForUi(paper);
-                                    boolean foundState = false;
-                                    for (CardStateName cs : c.getStates()) {
-                                        if (c.getState(cs).getName().equals(faceName)) {
-                                            foundState = true;
-                                            c.setState(cs, true);
-                                            matchUI.setCard(c.getView());
-                                            break;
-                                        }
-                                    }
-                                    if (!foundState) {
-                                        matchUI.setCard(paper);
-                                    }
-                                }
-
-                                return;
-                            }
-
-                            final CardView card;
-                            if (sel instanceof CardStateView) {
-                                card = ((CardStateView) sel).getCard();
-                            } else if (sel instanceof CardView) {
-                                card = (CardView) sel;
-                            } else if (sel instanceof Card) {
-                                card = CardView.get((Card) sel);
-                            } else {
-                                card = null;
-                            }
-
-                            matchUI.setCard(card);
-                            matchUI.clearPanelSelections();
-                            matchUI.setPanelSelection(card);
+        final Callable<List<T>> showChoice = () -> {
+            final ListChooser<T> c = new ListChooser<>(message, min, max, choices, display);
+            final JList<T> list = c.getLstChoices();
+            if (matchUI != null) {
+                list.addListSelectionListener(ev -> {
+                    final T sel = list.getSelectedValue();
+                    if (sel instanceof InventoryItem) {
+                        matchUI.setCard((InventoryItem) list.getSelectedValue());
+                        return;
+                    } else if (sel instanceof ICardFace || sel instanceof CardFaceView) {
+                        String faceName = ((IHasName)sel).getName();
+                        PaperCard paper = FModel.getMagicDb().getCommonCards().getUniqueByName(faceName);
+                        if (paper == null) {
+                            paper = FModel.getMagicDb().getVariantCards().getUniqueByName(faceName);
                         }
-                    });
-                }
 
-                if (selected != null) {
-                    c.show(selected);
-                } else {
-                    c.show();
-                }
+                        if (paper != null) {
+                            Card c1 = Card.getCardForUi(paper);
+                            boolean foundState = false;
+                            for (CardStateName cs : c1.getStates()) {
+                                if (c1.getState(cs).getName().equals(faceName)) {
+                                    foundState = true;
+                                    c1.setState(cs, true);
+                                    matchUI.setCard(c1.getView());
+                                    break;
+                                }
+                            }
+                            if (!foundState) {
+                                matchUI.setCard(paper);
+                            }
+                        }
 
-                if (matchUI != null) {
+                        return;
+                    }
+
+                    final CardView card;
+                    if (sel instanceof CardStateView) {
+                        card = ((CardStateView) sel).getCard();
+                    } else if (sel instanceof CardView) {
+                        card = (CardView) sel;
+                    } else if (sel instanceof Card) {
+                        card = CardView.get((Card) sel);
+                    } else {
+                        card = null;
+                    }
+
+                    matchUI.setCard(card);
                     matchUI.clearPanelSelections();
-                }
-                return c.getSelectedValues();
+                    matchUI.setPanelSelection(card);
+                });
             }
+
+            if (selected != null) {
+                c.show(selected);
+            } else {
+                c.show();
+            }
+
+            if (matchUI != null) {
+                matchUI.clearPanelSelections();
+            }
+            return c.getSelectedValues();
         };
 
         final FutureTask<List<T>> future = new FutureTask<>(showChoice);
@@ -245,48 +233,47 @@ public class GuiChoose {
     }
     public static <T> List<T> order(final String title, final String top, final int remainingObjectsMin, final int remainingObjectsMax,
             final List<T> sourceChoices, final List<T> destChoices, final CardView referenceCard, final boolean sideboardingMode, final CMatchUI matchUI) {
-        // An input box for handling the order of choices.
+        return order(title, top, remainingObjectsMin, remainingObjectsMax, sourceChoices, destChoices, referenceCard, sideboardingMode, false, matchUI).ordered();
+    }
 
-        final Callable<List<T>> callable = new Callable<List<T>>() {
-            @Override
-            public List<T> call() {
-                final DualListBox<T> dual = new DualListBox<>(remainingObjectsMin, remainingObjectsMax, sourceChoices, destChoices, matchUI);
-                dual.setSecondColumnLabelText(top);
-
-                dual.setSideboardMode(sideboardingMode);
-
-                dual.setTitle(title);
-                dual.pack();
-                dual.setDefaultCloseOperation(WindowConstants.DO_NOTHING_ON_CLOSE);
-                if (matchUI != null && referenceCard != null) {
-                    matchUI.setCard(referenceCard);
-                    // MARKED FOR UPDATE
-                }
-                dual.setVisible(true);
-
-                final List<T> objects = dual.getOrderedList();
-
-                dual.dispose();
-                if (matchUI != null) {
-                    matchUI.clearPanelSelections();
-                }
-                return objects;
+    public static <T> OrderResult<T> order(final String title, final String top, final int remainingObjectsMin, final int remainingObjectsMax,
+            final List<T> sourceChoices, final List<T> destChoices, final CardView referenceCard, final boolean sideboardingMode, final boolean showRememberCheckbox, final CMatchUI matchUI) {
+        final Callable<OrderResult<T>> callable = () -> {
+            final DualListBox<T> dual = new DualListBox<>(remainingObjectsMin, remainingObjectsMax, sourceChoices, destChoices, matchUI);
+            dual.setSecondColumnLabelText(top);
+            dual.setRememberDecisionVisible(showRememberCheckbox);
+            dual.setSideboardMode(sideboardingMode);
+            dual.setTitle(title);
+            dual.pack();
+            dual.setDefaultCloseOperation(WindowConstants.DO_NOTHING_ON_CLOSE);
+            if (matchUI != null && referenceCard != null) {
+                matchUI.setCard(referenceCard);
             }
+            dual.setVisible(true);
+
+            final List<T> objects = dual.getOrderedList();
+            final boolean remember = showRememberCheckbox && dual.isRememberDecisionSelected();
+
+            dual.dispose();
+            if (matchUI != null) {
+                matchUI.clearPanelSelections();
+            }
+            return new OrderResult<>(objects, remember);
         };
 
-        final FutureTask<List<T>> ft = new FutureTask<>(callable);
+        final FutureTask<OrderResult<T>> ft = new FutureTask<>(callable);
         FThreads.invokeInEdtAndWait(ft);
         try {
             return ft.get();
-        } catch (final Exception e) { // we have waited enough
+        } catch (final Exception e) {
             e.printStackTrace();
         }
-        return null;
+        return new OrderResult<>(null, false);
     }
 
     public static List<CardView> manipulateCardList(final CMatchUI gui, final String title, final Iterable<CardView> cards, final Iterable<CardView> manipulable, 
 						    final boolean toTop, final boolean toBottom, final boolean toAnywhere) {
-	gui.setSelectables(manipulable);
+	gui.setSelectables(manipulable, 0, 0);
 	@SuppressWarnings("Convert2Lambda") // Avoid lambdas to maintain compatibility with Android 5 API
     final Callable<List<CardView>> callable = new Callable<List<CardView>>() {
         @Override

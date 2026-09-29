@@ -1,8 +1,8 @@
 package forge.ai.ability;
 
-import java.util.List;
-
+import forge.ai.AiAbilityDecision;
 import forge.ai.AiAttackController;
+import forge.ai.AiPlayDecision;
 import forge.ai.SpellAbilityAi;
 import forge.game.ability.AbilityUtils;
 import forge.game.card.Card;
@@ -13,9 +13,11 @@ import forge.game.spellability.SpellAbility;
 import forge.game.zone.ZoneType;
 import forge.util.collect.FCollection;
 
+import java.util.List;
+
 public class TwoPilesAi extends SpellAbilityAi {
     @Override
-    protected boolean canPlayAI(Player ai, SpellAbility sa) {
+    protected AiAbilityDecision canPlay(Player ai, SpellAbility sa) {
         final Card card = sa.getHostCard();
         ZoneType zone = null;
 
@@ -32,7 +34,7 @@ public class TwoPilesAi extends SpellAbilityAi {
             if (sa.canTarget(opp)) {
                 sa.getTargets().add(opp);
             } else {
-                return false;
+                return new AiAbilityDecision(0, AiPlayDecision.CantPlayAi);
             }
         }
 
@@ -49,6 +51,10 @@ public class TwoPilesAi extends SpellAbilityAi {
         }
         pool = CardLists.getValidCards(pool, valid, card.getController(), card, sa);
         int size = pool.size();
-        return size > 2;
+        if (size > 2) {
+            return new AiAbilityDecision(100, AiPlayDecision.WillPlay);
+        } else {
+            return new AiAbilityDecision(0, AiPlayDecision.CantPlayAi);
+        }
     }
 }

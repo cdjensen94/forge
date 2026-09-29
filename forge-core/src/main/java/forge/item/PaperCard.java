@@ -17,18 +17,16 @@
  */
 package forge.item;
 
-import com.google.common.base.Function;
 import forge.ImageKeys;
 import forge.StaticData;
 import forge.card.*;
-import forge.util.CardTranslation;
-import forge.util.ImageUtil;
-import forge.util.Localizer;
-import forge.util.TextUtil;
+import forge.util.*;
 import org.apache.commons.lang3.StringUtils;
 
-import java.io.IOException;
-import java.io.ObjectInputStream;
+import java.io.*;
+import java.util.*;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 /**
  * A lightweight version of a card that matches real-world cards, to use outside of games (eg. inventory, decks, trade).
@@ -38,6 +36,7 @@ import java.io.ObjectInputStream;
  * @author Forge
  */
 public class PaperCard implements Comparable<IPaperCard>, InventoryItemFromSet, IPaperCard {
+    @Serial
     private static final long serialVersionUID = 2942081982620691205L;
 
     // Reference to rules
@@ -45,7 +44,7 @@ public class PaperCard implements Comparable<IPaperCard>, InventoryItemFromSet, 
 
     // These fields are kinda PK for PrintedCard
     private final String name;
-    private final String edition;
+    private String edition;
     /* [NEW] Attribute to store reference to CollectorNumber of each PaperCard.
        By default the attribute is marked as "unset" so that it could be retrieved and set.
        (see getCollectorNumber())
@@ -54,14 +53,17 @@ public class PaperCard implements Comparable<IPaperCard>, InventoryItemFromSet, 
     private String artist;
     private final int artIndex;
     private final boolean foil;
-    private Boolean hasImage;
-    private String sortableName;
+    private final PaperCardFlags flags;
     private final String functionalVariant;
 
     // Calculated fields are below:
     private transient CardRarity rarity; // rarity is given in ctor when set is assigned
     // Reference to a new instance of Self, but foiled!
-    private transient PaperCard foiledVersion;
+    private transient PaperCard foiledVersion, noSellVersion, flaglessVersion;
+    private transient Boolean hasImage;
+    private transient String displayName;
+    private transient String sortableName;
+    private transient boolean hasFlavorName;
 
     @Override
     public String getName() {
@@ -83,6 +85,11 @@ public class PaperCard implements Comparable<IPaperCard>, InventoryItemFromSet, 
     @Override
     public String getFunctionalVariant() {
         return functionalVariant;
+    }
+
+    @Override
+    public ColorSet getMarkedColors() {
+        return this.flags.markedColors;
     }
 
     @Override
@@ -138,18 +145,72 @@ public class PaperCard implements Comparable<IPaperCard>, InventoryItemFromSet, 
                 this.artIndex, false, String.valueOf(collectorNumber), this.artist, this.functionalVariant);
         return unFoiledVersion;
     }
+    public PaperCard getNoSellVersion() {
+        if (this.flags.noSellValue)
+            return this;
 
-//    @Override
-//    public String getImageKey() {
-//        return getImageLocator(getImageName(), getArtIndex(), true, false);
-//    }
+        if (this.noSellVersion == null)
+            this.noSellVersion = new PaperCard(this, this.flags.withNoSellValueFlag(true));
+        return this.noSellVersion;
+    }
 
+    public PaperCard getMeldBaseCard() {
+        if (getRules().getSplitType() != CardSplitType.Meld) {
+            return null;
+        }
+
+        // This is the base part of the meld duo
+        if (getRules().getOtherPart() == null) {
+            return this;
+        }
+
+        String meldWith = getRules().getMeldWith();
+        if (meldWith == null) {
+            return null;
+        }
+        
+        List<PrintSheet> sheets = StaticData.instance().getCardEdition(this.edition).getPrintSheetsBySection();
+        for (PrintSheet sheet : sheets) {
+            if (sheet.contains(this)) {
+                return sheet.find(PaperCardPredicates.name(meldWith));
+            }
+        }
+
+        return null;
+    }
+
+    public PaperCard copyWithoutFlags() {
+        if(this.flaglessVersion == null) {
+            if(this.flags == PaperCardFlags.IDENTITY_FLAGS)
+                this.flaglessVersion = this;
+            else
+                this.flaglessVersion = new PaperCard(this, null);
+        }
+        return flaglessVersion;
+    }
+    public PaperCard copyWithFlags(Map<String, String> flags) {
+        if(flags == null || flags.isEmpty())
+            return this.copyWithoutFlags();
+        return new PaperCard(this, new PaperCardFlags(flags));
+    }
+    public PaperCard copyWithMarkedColors(ColorSet colors) {
+        if(Objects.equals(colors, this.flags.markedColors))
+            return this;
+        return new PaperCard(this, this.flags.withMarkedColors(colors));
+    }
     @Override
     public String getItemType() {
         final Localizer localizer = Localizer.getInstance();
         return localizer.getMessage("lblCard");
     }
 
+    public PaperCardFlags getMarkedFlags() {
+        return this.flags;
+    }
+
+    public boolean hasNoSellValue() {
+        return this.flags.noSellValue;
+    }
     public boolean hasImage() {
         return hasImage(false);
     }
@@ -160,45 +221,48 @@ public class PaperCard implements Comparable<IPaperCard>, InventoryItemFromSet, 
         return hasImage;
     }
 
-    /**
-     * Lambda to get rules for selects from list of printed cards.
-     */
-    public static final Function<PaperCard, CardRules> FN_GET_RULES = new Function<PaperCard, CardRules>() {
-        @Override
-        public CardRules apply(final PaperCard from) {
-            return from.rules;
-        }
-    };
-    public static final Function<PaperCard, String> FN_GET_NAME = new Function<PaperCard, String>() {
-        @Override
-        public String apply(final PaperCard from) {
-            return from.getName();
-        }
-    };
-
     public PaperCard(final CardRules rules0, final String edition0, final CardRarity rarity0) {
         this(rules0, edition0, rarity0, IPaperCard.DEFAULT_ART_INDEX, false,
-                IPaperCard.NO_COLLECTOR_NUMBER, IPaperCard.NO_ARTIST_NAME, "");
+                IPaperCard.NO_COLLECTOR_NUMBER, IPaperCard.NO_ARTIST_NAME, IPaperCard.NO_FUNCTIONAL_VARIANT);
+    }
+
+    public PaperCard(final PaperCard copyFrom, final PaperCardFlags flags) {
+        this(copyFrom.rules, copyFrom.edition, copyFrom.rarity, copyFrom.artIndex, copyFrom.foil, copyFrom.collectorNumber,
+                copyFrom.artist, copyFrom.functionalVariant, flags);
+        this.flaglessVersion = copyFrom.flaglessVersion;
     }
 
     public PaperCard(final CardRules rules0, final String edition0, final CardRarity rarity0,
                      final int artIndex0, final boolean foil0, final String collectorNumber0,
                      final String artist0, final String functionalVariant) {
-        if (rules0 == null || edition0 == null || rarity0 == null) {
+        this(rules0, edition0, rarity0, artIndex0, foil0, collectorNumber0, artist0, functionalVariant, null);
+    }
+
+    protected PaperCard(final CardRules rules, final String edition, final CardRarity rarity,
+                     final int artIndex, final boolean foil, final String collectorNumber,
+                     final String artist, final String functionalVariant, final PaperCardFlags flags) {
+        if (rules == null || edition == null || rarity == null) {
             throw new IllegalArgumentException("Cannot create card without rules, edition or rarity");
         }
-        rules = rules0;
-        name = rules0.getName();
-        edition = edition0;
-        artIndex = Math.max(artIndex0, IPaperCard.DEFAULT_ART_INDEX);
-        foil = foil0;
-        rarity = rarity0;
-        artist = TextUtil.normalizeText(artist0);
-        collectorNumber = (collectorNumber0 != null) && (collectorNumber0.length() > 0) ? collectorNumber0 : IPaperCard.NO_COLLECTOR_NUMBER;
+        this.rules = rules;
+        name = rules.getName();
+        this.edition = edition;
+        this.artIndex = Math.max(artIndex, IPaperCard.DEFAULT_ART_INDEX);
+        this.foil = foil;
+        this.rarity = rarity;
+        this.artist = artist;
+        this.collectorNumber = (collectorNumber != null && !collectorNumber.isEmpty()) ? collectorNumber : IPaperCard.NO_COLLECTOR_NUMBER;
+        this.functionalVariant = functionalVariant != null ? functionalVariant : IPaperCard.NO_FUNCTIONAL_VARIANT;
+        this.displayName = rules.getDisplayNameForVariant(functionalVariant);
+        this.hasFlavorName = !name.equals(displayName);
         // If the user changes the language this will make cards sort by the old language until they restart the game.
         // This is a good tradeoff
-        sortableName = TextUtil.toSortableName(CardTranslation.getTranslatedName(rules0.getName()));
-        this.functionalVariant = functionalVariant != null ? functionalVariant : IPaperCard.NO_FUNCTIONAL_VARIANT;
+        this.sortableName = TextUtil.toSortableName(CardTranslation.getTranslatedName(displayName));
+
+        if(flags == null || flags.equals(PaperCardFlags.IDENTITY_FLAGS))
+            this.flags = PaperCardFlags.IDENTITY_FLAGS;
+        else
+            this.flags = flags;
     }
 
     public static PaperCard FAKE_CARD = new PaperCard(CardRules.getUnsupportedCardNamed("Fake Card"), "Fake Edition", CardRarity.Common);
@@ -225,6 +289,8 @@ public class PaperCard implements Comparable<IPaperCard>, InventoryItemFromSet, 
         }
         if (!getCollectorNumber().equals(other.getCollectorNumber()))
             return false;
+        if (!Objects.equals(flags, other.flags))
+            return false;
         return (other.foil == foil) && (other.artIndex == artIndex);
     }
 
@@ -235,12 +301,7 @@ public class PaperCard implements Comparable<IPaperCard>, InventoryItemFromSet, 
      */
     @Override
     public int hashCode() {
-        final int code = (name.hashCode() * 11) + (edition.hashCode() * 59) +
-                (artIndex * 2) + (getCollectorNumber().hashCode() * 383);
-        if (foil) {
-            return code + 1;
-        }
-        return code;
+        return Objects.hash(name, edition, collectorNumber, artIndex, foil, flags);
     }
 
     // FIXME: Check
@@ -252,6 +313,69 @@ public class PaperCard implements Comparable<IPaperCard>, InventoryItemFromSet, 
     }
     public String getCardName() {
         return name;
+    }
+
+    @Override
+    public String getDisplayName() {
+        return this.displayName;
+    }
+
+    @Override
+    public boolean hasFlavorName() {
+        return this.hasFlavorName;
+    }
+
+    private transient Set<String> searchableNames = null;
+    private transient String searchableNameLang = null;
+
+    public Set<String> getAllSearchableNames() {
+        if(this.searchableNames != null && CardTranslation.getLanguageSelected().equals(searchableNameLang))
+            return searchableNames;
+        if(searchableNameLang != null) //Changed the language. May as well update this.
+            sortableName = TextUtil.toSortableName(CardTranslation.getTranslatedName(displayName));
+        searchableNameLang = CardTranslation.getLanguageSelected();
+        searchableNames = computeSearchableNames(searchableNameLang);
+        return searchableNames;
+    }
+
+    private Set<String> computeSearchableNames(String language) {
+        ICardFace otherFace = this.getOtherFace();
+        if(otherFace == null && NO_FUNCTIONAL_VARIANT.equals(this.functionalVariant))
+        {
+            //99% of cases will land here. This could possibly be optimized further by computing and storing this on
+            //the CardRules instead, but flavor names will still need to work per-print, or at least per-variant.
+            if("en-US".equals(language))
+                return Set.of(this.name);
+            else {
+                String translatedName = CardTranslation.getTranslatedName(this.name);
+                return Stream.of(this.name, translatedName, StringUtils.stripAccents(translatedName))
+                        .filter(Objects::nonNull)
+                        .collect(Collectors.toSet());
+            }
+        }
+        Set<String> names = new HashSet<>();
+        ICardFace mainFace = this.getMainFace();
+        names.add(mainFace.getName());
+        String mainFlavor = mainFace.getFlavorName();
+        if(mainFlavor != null)
+            names.add(mainFlavor);
+        if(otherFace != null) {
+            names.add(otherFace.getName());
+            String otherFlavor = otherFace.getFlavorName();
+            if(otherFlavor != null)
+                names.add(otherFlavor);
+
+            names.add(mainFace.getName() + " // " + otherFace.getName());
+            if(mainFlavor != null && otherFlavor != null)
+                names.add(mainFlavor + " // " + otherFlavor);
+        }
+        if(!"en-US".equals(language)) {
+            Set<String> translated = names.stream().map(CardTranslation::getTranslatedName).filter(Objects::nonNull).collect(Collectors.toSet());
+            names.addAll(translated);
+        }
+        Set<String> noAccents = names.stream().map(StringUtils::stripAccents).collect(Collectors.toSet());
+        names.addAll(noAccents);
+        return names;
     }
 
     /*
@@ -272,7 +396,7 @@ public class PaperCard implements Comparable<IPaperCard>, InventoryItemFromSet, 
         String collectorNumber = collectorNumber0;
         if (collectorNumber.equals(NO_COLLECTOR_NUMBER))
             collectorNumber = null;
-        return CardEdition.CardInSet.getSortableCollectorNumber(collectorNumber);
+        return CardEdition.getSortableCollectorNumber(collectorNumber);
     }
 
     private String sortableCNKey = null;
@@ -304,6 +428,7 @@ public class PaperCard implements Comparable<IPaperCard>, InventoryItemFromSet, 
         return Integer.compare(artIndex, o.getArtIndex());
     }
 
+    @Serial
     private void readObject(ObjectInputStream ois) throws ClassNotFoundException, IOException {
         // default deserialization
         ois.defaultReadObject();
@@ -312,17 +437,50 @@ public class PaperCard implements Comparable<IPaperCard>, InventoryItemFromSet, 
         if (pc == null) {
             pc = StaticData.instance().getVariantCards().getCard(name, edition, artIndex);
             if (pc == null) {
-                throw new IOException(TextUtil.concatWithSpace("Card", name, "not found"));
+                System.out.println("PaperCard: " + name + " not found with set and index " + edition + ", " + artIndex);
+                pc = readObjectAlternate(name, edition);
+                if (pc == null) {
+                    pc = StaticData.instance().getCommonCards().createUnsupportedCard(name);
+                    //throw new IOException(TextUtil.concatWithSpace("Card", name, "not found with set and index", edition, Integer.toString(artIndex)));
+                }
+                System.out.println("Alternate object found: " + pc.getName() + ", " + pc.getEdition() + ", " + pc.getArtIndex());
             }
         }
         rules = pc.getRules();
         rarity = pc.getRarity();
+        displayName = pc.getDisplayName();
+        hasFlavorName = pc.hasFlavorName();
+        sortableName = TextUtil.toSortableName(CardTranslation.getTranslatedName(displayName));
+    }
+
+    private IPaperCard readObjectAlternate(String name, String edition) throws ClassNotFoundException, IOException {
+        IPaperCard pc = StaticData.instance().getCommonCards().getCard(name, edition);
+        if (pc == null) {
+            pc = StaticData.instance().getVariantCards().getCard(name, edition);
+        }
+
+        if (pc == null) {
+            pc = StaticData.instance().getCommonCards().getCard(name);
+            if (pc == null) {
+                pc = StaticData.instance().getVariantCards().getCard(name);
+            }
+        }
+
+        return pc;
+    }
+
+    @Serial
+    private Object readResolve() throws ObjectStreamException {
+        //If we deserialize an old PaperCard with no flags, reinitialize as a fresh copy to set default flags.
+        if(this.flags == null)
+            return new PaperCard(this, null);
+        return this;
     }
 
     @Override
     public String getImageKey(boolean altState) {
-        String noramlizedName = StringUtils.stripAccents(name);
-        String imageKey = ImageKeys.CARD_PREFIX + noramlizedName + CardDb.NameSetSeparator
+        String normalizedName = StringUtils.stripAccents(name);
+        String imageKey = ImageKeys.CARD_PREFIX + normalizedName + CardDb.NameSetSeparator
                 + edition + CardDb.NameSetSeparator + artIndex;
         if (altState) {
             imageKey += ImageKeys.BACKFACE_POSTFIX;
@@ -350,71 +508,41 @@ public class PaperCard implements Comparable<IPaperCard>, InventoryItemFromSet, 
         return cardAltImageKey;
     }
 
-    private String cardWSpecImageKey = null;
-    @Override
-    public String getCardWSpecImageKey() {
-        if (this.cardWSpecImageKey == null) {
-            if (this.rules.getSplitType() == CardSplitType.Specialize)
-                this.cardWSpecImageKey = ImageUtil.getImageKey(this, "white", true);
-            else  // just use cardImageKey
-                this.cardWSpecImageKey = ImageUtil.getImageKey(this, "", true);
-        }
-        return cardWSpecImageKey;
-    }
-
-    private String cardUSpecImageKey = null;
-    @Override
-    public String getCardUSpecImageKey() {
-        if (this.cardUSpecImageKey == null) {
-            if (this.rules.getSplitType() == CardSplitType.Specialize)
-                this.cardUSpecImageKey = ImageUtil.getImageKey(this, "blue", true);
-            else  // just use cardImageKey
-                this.cardUSpecImageKey = ImageUtil.getImageKey(this, "", true);
-        }
-        return cardUSpecImageKey;
-    }
-
-    private String cardBSpecImageKey = null;
-    @Override
-    public String getCardBSpecImageKey() {
-        if (this.cardBSpecImageKey == null) {
-            if (this.rules.getSplitType() == CardSplitType.Specialize)
-                this.cardBSpecImageKey = ImageUtil.getImageKey(this, "black", true);
-            else  // just use cardImageKey
-                this.cardBSpecImageKey = ImageUtil.getImageKey(this, "", true);
-        }
-        return cardBSpecImageKey;
-    }
-
-    private String cardRSpecImageKey = null;
-    @Override
-    public String getCardRSpecImageKey() {
-        if (this.cardRSpecImageKey == null) {
-            if (this.rules.getSplitType() == CardSplitType.Specialize)
-                this.cardRSpecImageKey = ImageUtil.getImageKey(this, "red", true);
-            else  // just use cardImageKey
-                this.cardRSpecImageKey = ImageUtil.getImageKey(this, "", true);
-        }
-        return cardRSpecImageKey;
-    }
-
-    private String cardGSpecImageKey = null;
-    @Override
-    public String getCardGSpecImageKey() {
-        if (this.cardGSpecImageKey == null) {
-            if (this.rules.getSplitType() == CardSplitType.Specialize)
-                this.cardGSpecImageKey = ImageUtil.getImageKey(this, "green", true);
-            else  // just use cardImageKey
-                this.cardGSpecImageKey = ImageUtil.getImageKey(this, "", true);
-        }
-        return cardGSpecImageKey;
-    }
-
     @Override
     public boolean hasBackFace(){
         CardSplitType cst = this.rules.getSplitType();
         return cst == CardSplitType.Transform || cst == CardSplitType.Flip || cst == CardSplitType.Meld
                 || cst == CardSplitType.Modal;
+    }
+
+    @Override
+    public ICardFace getMainFace() {
+        ICardFace face = this.rules.getMainPart();
+        return this.getVariantForFace(face);
+    }
+
+    @Override
+    public ICardFace getOtherFace() {
+        ICardFace face = this.rules.getOtherPart();
+        if(face == null)
+            return null;
+        return this.getVariantForFace(face);
+    }
+
+    @Override
+    public List<ICardFace> getAllFaces() {
+        return this.rules.getAllFaces().stream().map(this::getVariantForFace).collect(Collectors.toList());
+    }
+
+    private ICardFace getVariantForFace(ICardFace face) {
+        if(!face.hasFunctionalVariants() || this.functionalVariant.equals(NO_FUNCTIONAL_VARIANT))
+            return face;
+        ICardFace variant = face.getFunctionalVariant(this.functionalVariant);
+        if(variant == null) {
+            System.err.printf("Tried to apply unknown or unsupported variant - Card: \"%s\"; Variant: %s\n", face.getName(), this.functionalVariant);
+            return face;
+        }
+        return variant;
     }
 
     // Return true if card is one of the five basic lands that can be added for free
@@ -434,5 +562,89 @@ public class PaperCard implements Comparable<IPaperCard>, InventoryItemFromSet, 
     }
     public boolean isRebalanced() {
         return StaticData.instance().isRebalanced(name);
+    }
+
+    /**
+     * Contains properties of a card which distinguish it from an otherwise identical copy of the card with the same
+     * name, edition, and collector number. Examples include permanent markings on the card, and flags for Adventure
+     * mode.
+     */
+    public static class PaperCardFlags implements Serializable {
+        @Serial
+        private static final long serialVersionUID = -3924720485840169336L;
+
+        /**
+         * Chosen colors, for cards like Cryptic Spires.
+         */
+        public final ColorSet markedColors;
+        /**
+         * Removes the sell value of the card in Adventure mode.
+         */
+        public final boolean noSellValue;
+
+        //TODO: Could probably move foil here.
+
+        static final PaperCardFlags IDENTITY_FLAGS = new PaperCardFlags(Map.of());
+
+        protected PaperCardFlags(Map<String, String> flags) {
+            if(flags.containsKey("markedColors"))
+                markedColors = ColorSet.fromNames(flags.get("markedColors").split(""));
+            else
+                markedColors = null;
+            noSellValue = flags.containsKey("noSellValue");
+        }
+
+        //Copy constructor. There are some better ways to do this, and they should be explored once we have more than 4
+        //or 5 fields here. Just need to ensure it's impossible to accidentally change a field while the PaperCardFlags
+        //object is in use.
+        private PaperCardFlags(PaperCardFlags copyFrom, ColorSet markedColors, Boolean noSellValue) {
+            if(markedColors == null)
+                markedColors = copyFrom.markedColors;
+            else if(markedColors.isColorless())
+                markedColors = null;
+            this.markedColors = markedColors;
+            this.noSellValue = noSellValue != null ? noSellValue : copyFrom.noSellValue;
+        }
+
+        public PaperCardFlags withMarkedColors(ColorSet markedColors) {
+            if(markedColors == null)
+                markedColors = ColorSet.C;
+            return new PaperCardFlags(this, markedColors, null);
+        }
+
+        public PaperCardFlags withNoSellValueFlag(boolean noSellValue) {
+            return new PaperCardFlags(this, null, noSellValue);
+        }
+
+        private Map<String, String> asMap;
+        public Map<String, String> toMap() {
+            if(asMap != null)
+                return asMap;
+            Map<String, String> out = new HashMap<>();
+            if(markedColors != null && !markedColors.isColorless())
+                out.put("markedColors", markedColors.toString());
+            if(noSellValue)
+                out.put("noSellValue", "true");
+            asMap = out;
+            return out;
+        }
+
+        @Override
+        public String toString() {
+            return this.toMap().entrySet().stream()
+                    .map((e) -> e.getKey() + "=" + e.getValue())
+                    .collect(Collectors.joining("\t"));
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            if (!(o instanceof PaperCardFlags that)) return false;
+            return noSellValue == that.noSellValue && Objects.equals(markedColors, that.markedColors);
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hash(markedColors, noSellValue);
+        }
     }
 }

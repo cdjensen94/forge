@@ -68,50 +68,51 @@ public class TargetingOverlay {
 
     private TargetingOverlay() {
     }
-    public static void assembleArrows(final Graphics g, final CardView c, final Map<Integer, Vector2> endpoints, final CombatView combat, final Set<PlayerView> playerViewSet) {
-        final CardView attachedTo = c.getAttachedTo();
-        final Iterable<CardView> attachedCards = c.getAttachedCards();
-        final CardView paired = c.getPairedWith();
-        if (null != attachedTo) {
-            if (attachedTo.getController() != null && !attachedTo.getController().equals(c.getController())) {
+    public static void assembleArrows(final Graphics g, final Set<CardView> cardsonBattlefield, final Map<Integer, Vector2> endpoints, final CombatView combat, final Set<PlayerView> playerViewSet) {
+        if (cardsonBattlefield.isEmpty())
+            return;
+        for (CardView c : cardsonBattlefield) {
+            final CardView attachedTo = c.getAttachedTo();
+            final CardView paired = c.getPairedWith();
+            if (null != attachedTo) {
+                if (attachedTo.getController() != null && !attachedTo.getController().equals(c.getController())) {
+                    drawArrow(g, endpoints.get(attachedTo.getId()), endpoints.get(c.getId()), ArcConnection.Friends);
+                }
+            }
+            if (null != attachedTo && c == attachedTo.getAttachedTo()) {
                 drawArrow(g, endpoints.get(attachedTo.getId()), endpoints.get(c.getId()), ArcConnection.Friends);
             }
-        }
-        if (null != attachedTo && c == attachedTo.getAttachedTo()) {
-            drawArrow(g, endpoints.get(attachedTo.getId()), endpoints.get(c.getId()), ArcConnection.Friends);
-        }
-        if (null != attachedCards) {
-            for (final CardView enc : attachedCards) {
+            for (final CardView enc : c.getAttachedCards()) {
                 if (enc.getController() != null && !enc.getController().equals(c.getController())) {
                     drawArrow(g, endpoints.get(c.getId()), endpoints.get(enc.getId()), ArcConnection.Friends);
                 }
             }
-        }
-        if (null != paired) {
-            drawArrow(g, endpoints.get(paired.getId()), endpoints.get(c.getId()), ArcConnection.Friends);
-        }
-        if (null != combat) {
-            final GameEntityView defender = combat.getDefender(c);
-            // if c is attacking a planeswalker or battle
-            if (defender instanceof CardView) {
-                drawArrow(g, endpoints.get(defender.getId()), endpoints.get(c.getId()), ArcConnection.FoesAttacking);
+            if (null != paired) {
+                drawArrow(g, endpoints.get(paired.getId()), endpoints.get(c.getId()), ArcConnection.Friends);
             }
-            // if c is a planeswalker that's being attacked
-            for (final CardView pwAttacker : combat.getAttackersOf(c)) {
-                drawArrow(g, endpoints.get(c.getId()), endpoints.get(pwAttacker.getId()), ArcConnection.FoesAttacking);
-            }
-            for (final CardView attackingCard : combat.getAttackers()) {
-                final Iterable<CardView> cards = combat.getPlannedBlockers(attackingCard);
-                if (cards == null) continue;
-                for (final CardView blockingCard : cards) {
-                    if (!attackingCard.equals(c) && !blockingCard.equals(c)) { continue; }
-                    drawArrow(g, endpoints.get(attackingCard.getId()), endpoints.get(blockingCard.getId()), ArcConnection.FoesBlocking);
+            if (null != combat) {
+                final GameEntityView defender = combat.getDefender(c);
+                // if c is attacking a planeswalker or battle
+                if (defender instanceof CardView) {
+                    drawArrow(g, endpoints.get(defender.getId()), endpoints.get(c.getId()), ArcConnection.FoesAttacking);
                 }
-                if (playerViewSet != null) {
-                    for (final PlayerView p : playerViewSet) {
-                        if (combat.getAttackersOf(p).contains(attackingCard)) {
-                            final Vector2 vPlayer = MatchController.getView().getPlayerPanel(p).getAvatar().getTargetingArrowOrigin();
-                            drawArrow(g, endpoints.get(attackingCard.getId()), vPlayer, TargetingOverlay.ArcConnection.FoesAttacking);
+                // if c is a planeswalker that's being attacked
+                for (final CardView pwAttacker : combat.getAttackersOf(c)) {
+                    drawArrow(g, endpoints.get(c.getId()), endpoints.get(pwAttacker.getId()), ArcConnection.FoesAttacking);
+                }
+                for (final CardView attackingCard : combat.getAttackers()) {
+                    final Iterable<CardView> cards = combat.getPlannedBlockers(attackingCard);
+                    if (cards == null) continue;
+                    for (final CardView blockingCard : cards) {
+                        if (!attackingCard.equals(c) && !blockingCard.equals(c)) { continue; }
+                        drawArrow(g, endpoints.get(blockingCard.getId()), endpoints.get(attackingCard.getId()), ArcConnection.FoesBlocking);
+                    }
+                    if (playerViewSet != null) {
+                        for (final PlayerView p : playerViewSet) {
+                            if (combat.getAttackersOf(p).contains(attackingCard)) {
+                                final Vector2 vPlayer = MatchScreen.getPlayerPanel(p).getAvatar().getTargetingArrowOrigin();
+                                drawArrow(g, endpoints.get(attackingCard.getId()), vPlayer, TargetingOverlay.ArcConnection.FoesAttacking);
+                            }
                         }
                     }
                 }
@@ -136,9 +137,10 @@ public class TargetingOverlay {
                 color = foeDefColor;
         }
 
-        if (FModel.getPreferences().getPrefBoolean(ForgePreferences.FPref.UI_USE_LASER_ARROWS))
-            g.drawLineArrow(Utils.scale(3), color, start.x, start.y, end.x, end.y);
-        else
-            g.drawArrow(BORDER_THICKNESS, ARROW_THICKNESS, ARROW_SIZE, color, start.x, start.y, end.x, end.y);
+        switch (FModel.getPreferences().getPref(ForgePreferences.FPref.UI_ARROW_OPTION)) {
+            case "Point" -> g.drawCurvedLinePointer(Utils.scale(3), color.getColor(), Color.WHITE, start.x, start.y, end.x, end.y);
+            case "Line" -> g.drawLinePointer(Utils.scale(3), color.getColor(), start.x, start.y, end.x, end.y);
+            default -> g.drawCurvedArrow(Utils.scale(3), color.alphaColor(0.8f).getColor(), FSkinColor.getStandardColor(Color.WHITE).alphaColor(0.9f).getColor(), start.x, start.y, end.x, end.y, ArcConnection.Friends.equals(connects));
+        }
     }
 }

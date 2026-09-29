@@ -1,8 +1,6 @@
 package forge.itemmanager.filters;
 
 import com.badlogic.gdx.utils.Align;
-import com.google.common.base.Predicate;
-import com.google.common.base.Predicates;
 
 import forge.Forge;
 import forge.Graphics;
@@ -11,9 +9,9 @@ import forge.item.InventoryItem;
 import forge.itemmanager.ItemManager;
 import forge.itemmanager.SFilterUtil;
 import forge.toolbox.FDisplayObject;
-import forge.toolbox.FEvent;
-import forge.toolbox.FEvent.FEventHandler;
 import forge.toolbox.FTextField;
+
+import java.util.function.Predicate;
 
 
 public class TextSearchFilter<T extends InventoryItem> extends ItemFilter<T> {
@@ -52,12 +50,7 @@ public class TextSearchFilter<T extends InventoryItem> extends ItemFilter<T> {
         txtSearch = new SearchField();
         widget.add(txtSearch);
 
-        txtSearch.setChangedHandler(new FEventHandler() {
-            @Override
-            public void handleEvent(FEvent e) {
-                applyChange();
-            }
-        });
+        txtSearch.setChangedHandler(e -> applyChange());
     }
 
     @Override
@@ -69,7 +62,7 @@ public class TextSearchFilter<T extends InventoryItem> extends ItemFilter<T> {
     protected Predicate<T> buildPredicate() {
         String text = txtSearch.getText();
         if (text.trim().isEmpty()) {
-            return Predicates.alwaysTrue();
+            return x -> true;
         }
         return SFilterUtil.buildItemTextFilter(text);
     }
@@ -92,6 +85,7 @@ public class TextSearchFilter<T extends InventoryItem> extends ItemFilter<T> {
             setFont(FONT);
             setGhostText(Forge.getLocalizer().getMessage("lblSearch"));
             setHeight(getDefaultHeight(DEFAULT_FONT)); //set height based on default filter font
+            setLiveChangeEvents(true); //filter the list as characters are typed (local-only, no network)
         }
 
         @Override

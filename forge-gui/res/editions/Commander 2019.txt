@@ -2,7 +2,6 @@
 Code=C19
 Date=2019-08-23
 Name=Commander 2019
-Code2=C19
 Type=Commander
 ScryfallCode=C19
 
@@ -57,7 +56,7 @@ ScryfallCode=C19
 48 M Rayami, First of the Fallen @Kieran Yanner
 49 M Sevinne, the Chronoclasm @Zoltan Boros
 50 R Tahngarth, First Mate @Anna Steinbauer
-51 M Volrath, the Shapestealer @Heonhwa Choe
+51 M Volrath, the Shapestealer @Heonhwa
 52 R Aeon Engine @Ralph Horsley
 53 U Bloodthirsty Blade @Jason Kang
 54 R Empowered Autogenerator @Piotr Dura
@@ -129,7 +128,7 @@ ScryfallCode=C19
 120 R Hex @Michael Sutfin
 121 R In Garruk's Wake @Chase Stone
 122 C Murderous Compulsion @David Palumbo
-123 C Nightshade Assassin @Darren Tan
+123 U Nightshade Assassin @Darren Tan
 124 M Ob Nixilis Reignited @Chris Rahn
 125 R Overseer of the Damned @rk post
 126 U Plaguecrafter @Anna Steinbauer
@@ -193,7 +192,7 @@ ScryfallCode=C19
 184 R Thelonite Hermit @Chippy
 185 R Thragtusk @Nils Hamm
 186 R Trail of Mystery @Raymond Swanland
-187 R Biomass Mutation @Dan Scott
+187 R Biomass Mutation @Dan Murayama Scott
 188 R Bloodhall Priest @Mark Winters
 189 R Bounty of the Luxa @Jonas De Ro
 190 U Crackling Drake @Victor Adame Minguez
@@ -287,12 +286,12 @@ ScryfallCode=C19
 278 R Sunken Hollow @Adam Paquette
 279 C Swiftwater Cliffs @Eytan Zana
 280 U Temple of the False God @James Zapata
-281 C Terramorphic Expanse @Dan Scott
+281 C Terramorphic Expanse @Dan Murayama Scott
 282 R Thespian's Stage @John Avon
 283 C Thornwood Falls @Eytan Zana
 284 C Tranquil Cove @John Avon
 285 C Wind-Scarred Crag @Eytan Zana
-286 C Woodland Stream @Efflam Mercier
+286 C Woodland Stream @Enora Mercier
 287 R Yavimaya Coast @Anthony S. Waters
 288 L Plains @Alayna Danner
 289 L Plains @Jonas De Ro
@@ -311,30 +310,33 @@ ScryfallCode=C19
 302 L Forest @Richard Wright
 
 [tokens]
-b_1_1_assassin_lose_con
-b_2_2_zombie
-c_3_4_a_gargoyle_flying
-c_10_10_eldrazi
-c_a_treasure_sac
-c_x_x_a_phyrexian_horror
-c_x_x_a_sculpture_total_sculptures
-g_0_1_egg_defender
-g_1_1_plant
-g_1_1_saproling
-g_1_1_snake
-g_3_3_beast
-g_3_3_centaur
-g_4_4_beast
-g_4_4_rhino_trample
-g_6_6_wurm
-r_5_5_dragon_flying
-w_1_1_human
-w_1_1_pegasus_flying
-w_1_1_spirit_flying
-w_3_3_bird_flying
-w_3_4_bird_flying
-u_2_2_drake_flying
+1 w_3_4_bird_flying @Mark Zug
+2 w_3_3_bird_flying @Jana Schirmer
+3 w_1_1_human @Michael C. Hayes
+4 w_1_1_pegasus_flying @Greg Hildebrandt
+5 w_1_1_spirit_flying @Jason A. Engle
+8 u_2_2_drake_flying @Svetlin Velinov
+9 b_1_1_assassin_lose_con @Svetlin Velinov
+10 b_2_2_zombie @Anna Steinbauer
+12 r_5_5_dragon_flying @Raymond Swanland
+13 g_3_3_beast @Dave Allsop
+14 g_4_4_beast @Steve Prescott
+15 g_3_3_centaur @Slawomir Maniak
+16 g_0_1_egg_defender @Christopher Burdett
+17 g_1_1_plant @Sam Burley
+18 g_4_4_rhino_trample @Aaron Miller
+19 g_1_1_saproling @Brad Rigney
+20 g_1_1_snake @Lars Grant-West
+21 g_6_6_wurm @Anthony Francisco
+22 c_x_x_a_phyrexian_horror @Scott Chou
+22 c_3_4_a_gargoyle_flying @Paul Bonner
+24 c_x_x_a_sculpture_total_sculptures @Victor Adame Minguez
+25 c_a_treasure_sac @Alayna Danner
+26 c_10_10_eldrazi @Jack Wang
 
 [other]
-embalm_angel_of_sanctions
-embalm_heart-piercer_manticore
+6 embalm_angel_of_sanctions @Min Yum
+7 embalm_heart-piercer_manticore @Cristi Balanescu
+27 morph @Raymond Swanland
+28 manifest @Raymond Swanland
+29 emblem_ob_nixilis_reignited @Chris Rahn

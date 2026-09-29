@@ -1,9 +1,8 @@
 package forge.itemmanager.filters;
 
 import com.badlogic.gdx.utils.Align;
-import com.google.common.base.Predicate;
-import com.google.common.collect.Iterables;
 
+import com.google.common.collect.Iterables;
 import forge.Forge;
 import forge.assets.FSkinImage;
 import forge.assets.TextRenderer;
@@ -25,7 +24,9 @@ import forge.toolbox.FLabel;
 import forge.toolbox.FList;
 import forge.toolbox.FScrollPane;
 import forge.toolbox.FTextField;
-import forge.util.Callback;
+
+import java.util.function.Consumer;
+import java.util.function.Predicate;
 
 
 public class AdvancedSearchFilter<T extends InventoryItem> extends ItemFilter<T> {
@@ -146,27 +147,15 @@ public class AdvancedSearchFilter<T extends InventoryItem> extends ItemFilter<T>
                     protected void buildMenu() {
                         //add a menu item for each filter to allow easily editing just that filter
                         for (final IFilterControl<T> control : model.getControls()) {
-                            FMenuItem item = new FMenuItem(control.getFilter().toString(), Forge.hdbuttons ? FSkinImage.HDEDIT : FSkinImage.EDIT, new FEventHandler() {
-                                @Override
-                                public void handleEvent(FEvent e) {
-                                    model.editFilterControl(control, onFilterChange);
-                                }
-                            });
+                            FMenuItem item = new FMenuItem(control.getFilter().toString(), Forge.hdbuttons ? FSkinImage.HDEDIT : FSkinImage.EDIT,
+                                    e -> model.editFilterControl(control, onFilterChange));
                             item.setTextRenderer(new TextRenderer()); //ensure symbols are displayed
                             addItem(item);
                         }
-                        addItem(new FMenuItem(Forge.getLocalizer().getMessage("lblEditExpression"), Forge.hdbuttons ? FSkinImage.HDEDIT : FSkinImage.EDIT, new FEventHandler() {
-                            @Override
-                            public void handleEvent(FEvent e) {
-                                edit();
-                            }
-                        }));
-                        addItem(new FMenuItem(Forge.getLocalizer().getMessage("lblRemoveFilter"), Forge.hdbuttons ? FSkinImage.HDDELETE : FSkinImage.DELETE, new FEventHandler() {
-                            @Override
-                            public void handleEvent(FEvent e) {
-                                reset();
-                                itemManager.applyNewOrModifiedFilter(AdvancedSearchFilter.this);
-                            }
+                        addItem(new FMenuItem(Forge.getLocalizer().getMessage("lblEditExpression"), Forge.hdbuttons ? FSkinImage.HDEDIT : FSkinImage.EDIT, e -> edit()));
+                        addItem(new FMenuItem(Forge.getLocalizer().getMessage("lblRemoveFilter"), Forge.hdbuttons ? FSkinImage.HDDELETE : FSkinImage.DELETE, e -> {
+                            reset();
+                            itemManager.applyNewOrModifiedFilter(AdvancedSearchFilter.this);
                         }));
                     }
                 };
@@ -222,7 +211,7 @@ public class AdvancedSearchFilter<T extends InventoryItem> extends ItemFilter<T>
         }
 
         @Override
-        public void onClose(Callback<Boolean> canCloseCallback) {
+        public void onClose(Consumer<Boolean> canCloseCallback) {
             onFilterChange.run();
             super.onClose(canCloseCallback);
         }
@@ -256,6 +245,11 @@ public class AdvancedSearchFilter<T extends InventoryItem> extends ItemFilter<T>
                 scroller.remove(nextFilter);
                 scroller.revalidate();
             }
+        }
+
+        @Override
+        public FScreen getLandscapeBackdropScreen() {
+            return null;
         }
 
         private class Filter extends FContainer implements AdvancedSearch.IFilterControl<T> {

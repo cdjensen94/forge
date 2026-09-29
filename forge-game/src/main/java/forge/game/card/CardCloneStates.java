@@ -1,12 +1,11 @@
 package forge.game.card;
 
-import java.util.Map;
-
 import com.google.common.collect.ForwardingMap;
 import com.google.common.collect.Maps;
-
 import forge.card.CardStateName;
 import forge.game.CardTraitBase;
+
+import java.util.Map;
 
 public class CardCloneStates extends ForwardingMap<CardStateName, CardState> {
 
@@ -48,6 +47,10 @@ public class CardCloneStates extends ForwardingMap<CardStateName, CardState> {
         result.copyFrom(original, false);
         dataMap.put(key, result);
         return result;
+    }
+
+    public void add(CardState state) {
+        put(state.getStateName(), state);
     }
 
     public CardCloneStates copy(final Card host, final boolean lki) {

@@ -1,20 +1,27 @@
 package forge.ai.ability;
 
 import forge.ai.*;
+import forge.card.ColorSet;
 import forge.game.ability.AbilityUtils;
 import forge.game.card.Card;
 import forge.game.card.CardCollection;
 import forge.game.card.CardLists;
+import forge.game.card.CardPredicates;
+import forge.game.combat.CombatUtil;
 import forge.game.cost.Cost;
+import forge.game.cost.CostPart;
+import forge.game.cost.CostPayLife;
 import forge.game.phase.PhaseHandler;
 import forge.game.phase.PhaseType;
 import forge.game.player.Player;
 import forge.game.spellability.SpellAbility;
 import forge.game.zone.ZoneType;
+import forge.util.collect.FCollectionView;
 
 public class TapAi extends TapAiBase {
+
     @Override
-    protected boolean canPlayAI(Player ai, SpellAbility sa) {
+    protected AiAbilityDecision checkApiLogic(Player ai, SpellAbility sa) {
         final PhaseHandler phase = ai.getGame().getPhaseHandler();
         final Player turn = phase.getPlayerTurn();
 
@@ -25,26 +32,19 @@ public class TapAi extends TapAiBase {
                 // Cast it if it's a sorcery.
             } else if (phase.getPhase().isBefore(PhaseType.COMBAT_DECLARE_BLOCKERS)) {
                 // Aggro Brains are willing to use TapEffects aggressively instead of defensively
-                AiController aic = ((PlayerControllerAi) ai.getController()).getAi();
-                if (!aic.getBooleanProperty(AiProps.PLAY_AGGRO)) {
-                    return false;
+                if (!AiProfileUtil.getBoolProperty(ai, AiProps.PLAY_AGGRO)) {
+                    return new AiAbilityDecision(0, AiPlayDecision.CantPlayAi);
                 }
             } else {
                 // Don't tap down after blockers
-                return false;
+                return new AiAbilityDecision(0, AiPlayDecision.CantPlayAi);
             }
         } else if (!playReusable(ai, sa)) {
             // Generally don't want to tap things with an Instant during Players turn outside of combat
-            return false;
-        }
-
-        // prevent run-away activations - first time will always return true
-        if (ComputerUtil.preventRunAwayActivations(sa)) {
-            return false;
+            return new AiAbilityDecision(0, AiPlayDecision.CantPlayAi);
         }
 
         final Card source = sa.getHostCard();
-        final Cost abCost = sa.getPayCosts();
 
         final String aiLogic = sa.getParamOrDefault("AILogic", "");
         if ("GoblinPolkaBand".equals(aiLogic)) {
@@ -53,11 +53,18 @@ public class TapAi extends TapAiBase {
             return SpecialCardAi.Arena.consider(ai, sa);
         }
 
-        if (!ComputerUtilCost.checkDiscardCost(ai, abCost, source, sa)) {
-            return false;
-        }
+        if (sa.usesTargeting()) {
+            // X controls the minimum targets
+            if ("X".equals(sa.getTargetRestrictions().getMinTargets()) && sa.getSVar("X").equals("Count$xPaid")) {
+                ComputerUtilCost.setMaxXValue(sa, ai, sa.isTrigger());
+            }
 
-        if (!sa.usesTargeting()) {
+            sa.resetTargets();
+            if (tapPrefTargeting(ai, source, sa, false)) {
+                return new AiAbilityDecision(100, AiPlayDecision.WillPlay);
+            }
+            return new AiAbilityDecision(0, AiPlayDecision.TargetingFailed);
+        } else {
             CardCollection untap;
             if (sa.hasParam("CardChoices")) {
                 untap = CardLists.getValidCards(source.getGame().getCardsIn(ZoneType.Battlefield), sa.getParam("CardChoices"), ai, source, sa);
@@ -65,23 +72,69 @@ public class TapAi extends TapAiBase {
                 untap = AbilityUtils.getDefinedCards(source, sa.getParam("Defined"), sa);
             }
 
-            boolean bFlag = false;
+            int value = 0;
             for (final Card c : untap) {
-                bFlag |= c.isUntapped();
+                if (c.isUntapped()) {
+                    value += ComputerUtilCard.evaluateCreature(c);
+                }
             }
 
-            return bFlag;
-        } else {
-            // X controls the minimum targets
-            if ("X".equals(sa.getTargetRestrictions().getMinTargets()) && sa.getSVar("X").equals("Count$xPaid")) {
-                // Set PayX here to maximum value.
-                // TODO need to set XManaCostPaid for targets, maybe doesn't need PayX anymore?
-                sa.setXManaCostPaid(ComputerUtilCost.getMaxXValue(sa, ai, sa.isTrigger()));
+            if (value > 0) {
+                return new AiAbilityDecision(100, AiPlayDecision.WillPlay);
             }
-
-            sa.resetTargets();
-            return tapPrefTargeting(ai, source, sa, false);
+            return new AiAbilityDecision(0, AiPlayDecision.CantPlayAi);
         }
     }
 
+    @Override
+    public boolean willPayUnlessCost(Player payer, SpellAbility sa, Cost cost, boolean alreadyPaid, FCollectionView<Player> payers) {
+        // Check for shocklands and similar ETB replacement effects
+        if (sa.hasParam("ETB")) {
+            final Card source = sa.getHostCard();
+            for (final CostPart part : cost.getCostParts()) {
+                if (part instanceof CostPayLife) {
+                    final CostPayLife lifeCost = (CostPayLife) part;
+                    Integer amount = lifeCost.convertAmount();
+                    if (payer.getLife() > (amount + 1) && payer.canPayLife(amount, true, sa)) {
+                        final int landsize = payer.getLandsInPlay().size() + 1;
+                        // Check if the AI has enough lands to play the card
+                        final CardCollection playable = CardLists.filter(
+                                payer.getCardsIn(ZoneType.Hand), CardPredicates.hasCMC(landsize));
+                        if (playable.isEmpty()) {
+                            return false;
+                        }
+                        // the same sources answer this for every card in hand, so ask once
+                        final byte availableColors = ColorSet.fromNames(
+                                ComputerUtilCost.getAvailableManaColors(payer, source)).getColor();
+                        for (Card c : playable) {
+                            // Check if the AI can pay for the card with the mana it has and intends to play it
+                            if (c.getManaCost().canBePaidWithAvailable(availableColors)
+                                    && ComputerUtil.hasReasonToPlayCardThisTurn(payer, c)) {
+                                return true;
+                            }
+                        }
+                    }
+                    return false;
+                }
+            }
+        } else if (sa.hasParam("UnlessSwitched")) {
+            // effect is each opponent may sacrifice to tap creature
+            Card source = sa.getHostCard();
+            if (alreadyPaid) {
+                return false;
+            }
+            // if it can't attack the payer, do nothing?
+            // TODO check if it can attack team mates?
+            if (!CombatUtil.canAttack(source, payer)) {
+                return false;
+            }
+
+            // predict combat damage
+            int dmg = ComputerUtilCombat.damageIfUnblocked(source, payer, null, false);
+            if (payer.getLife() < dmg * 1.5) {
+                return true;
+            }
+        }
+        return super.willPayUnlessCost(payer, sa, cost, alreadyPaid, payers);
+    }
 }

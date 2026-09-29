@@ -10,6 +10,7 @@ import forge.adventure.util.*;
 
 import java.io.Serializable;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Random;
 
 /**
@@ -19,7 +20,6 @@ public class PointOfInterest implements Serializable, SaveFileContent {
 
     @Override
     public void load(SaveFileData saveFileData) {
-
         position.set(saveFileData.readVector2("position"));
         data=PointOfInterestData.getPointOfInterest(saveFileData.readString("name"));
         rectangle.set(saveFileData.readRectangle("rectangle"));
@@ -46,7 +46,6 @@ public class PointOfInterest implements Serializable, SaveFileContent {
 
     @Override
     public SaveFileData save() {
-
         SaveFileData data=new SaveFileData();
         data.store("name",this.data.name);
         data.store("position",position);
@@ -80,9 +79,7 @@ public class PointOfInterest implements Serializable, SaveFileContent {
         data = d;
         active = d.active;
         position.set(pos);
-        for (DialogData.ActionData.QuestFlag flag : data.questFlagsToActivate) {
-            questFlagsToActivate.add(flag);
-        }
+        questFlagsToActivate.addAll(Arrays.asList(data.questFlagsToActivate));
 
         rectangle.set(position.x, position.y, sprite.getWidth(), sprite.getHeight());
     }
@@ -109,6 +106,10 @@ public class PointOfInterest implements Serializable, SaveFileContent {
 
     public Rectangle getBoundingRectangle() {
         return rectangle;
+    }
+
+    public Vector2 getCenter() {
+        return rectangle.getCenter(new Vector2());
     }
 
     public PointOfInterestData getData() {

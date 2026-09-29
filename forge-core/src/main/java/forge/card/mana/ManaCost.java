@@ -17,14 +17,13 @@
  */
 package forge.card.mana;
 
+import com.google.common.collect.Lists;
+import org.apache.commons.lang3.StringUtils;
+
 import java.io.Serializable;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
-
-import org.apache.commons.lang3.StringUtils;
-
-import com.google.common.collect.Lists;
 
 /**
  * <p>
@@ -92,16 +91,24 @@ public final class ManaCost implements Comparable<ManaCost>, Iterable<ManaCostSh
      */
     public ManaCost(final IParserManaCost parser) {
         final List<ManaCostShard> shardsTemp = Lists.newArrayList();
-        this.hasNoCost = false;
+        boolean xMana = false;
         while (parser.hasNext()) {
             final ManaCostShard shard = parser.next();
             if (shard != null && shard != ManaCostShard.GENERIC) {
+                if (shard == ManaCostShard.X) {
+                    xMana = true;
+                }
                 shardsTemp.add(shard);
             } // null is OK - that was generic mana
         }
-        this.genericCost = parser.getTotalGenericCost(); // collect generic mana
-        // here
+        int generic = parser.getTotalGenericCost(); // collect generic mana here
+        this.hasNoCost = !xMana && generic == -1;
+        this.genericCost = hasNoCost ? 0 : generic;
         sealClass(shardsTemp);
+    }
+
+    public ManaCost(final String str) {
+        this(new ManaCostParser(str));
     }
 
     public String getSimpleString() {
@@ -118,10 +125,14 @@ public final class ManaCost implements Comparable<ManaCost>, Iterable<ManaCostSh
         }
         for (final ManaCostShard s : this.shards) {
             if (s == ManaCostShard.X) {
-                sb.insert(0, s.toString());
+                sb.insert(0, s);
             } else {
                 sb.append(s.toString());
             }
+        }
+        // If the generic cost has been reduced below 0, display the reduction. (Only set for X cost spells)
+        if (this.genericCost < 0) {
+            sb.append(' ').append(this.genericCost);
         }
         return sb.toString();
     }
@@ -242,7 +253,7 @@ public final class ManaCost implements Comparable<ManaCost>, Iterable<ManaCostSh
             if (this.hasNoCost) {
                 weight = -1; // for those who doesn't even have a 0 sign on card
             }
-            this.compareWeight = Float.valueOf(weight);
+            this.compareWeight = weight;
         }
         return this.compareWeight;
     }
@@ -281,6 +292,9 @@ public final class ManaCost implements Comparable<ManaCost>, Iterable<ManaCostSh
      * @return
      */
     public String getShortString() {
+        if (isNoCost()) {
+            return "-1";
+        }
     	StringBuilder sb = new StringBuilder();
         int generic = getGenericCost();
         if (this.isZero()) {
@@ -292,6 +306,10 @@ public final class ManaCost implements Comparable<ManaCost>, Iterable<ManaCostSh
         for (ManaCostShard s : this.shards) {
             sb.append(' ');
             sb.append(s);
+        }
+        // If the generic cost has been reduced below 0, display the reduction. (Only set for X cost spells)
+        if (generic < 0) {
+            sb.append(' ').append(generic);
         }
         return sb.toString().trim();
     }
@@ -328,13 +346,13 @@ public final class ManaCost implements Comparable<ManaCost>, Iterable<ManaCostSh
         return false;
     }
 
-    public String getFirstPhyrexianPip() {
+    public boolean hasHybrid() {
         for (ManaCostShard shard : shards) {
-            if (shard.isPhyrexian()) {
-                return shard.toString();
+            if (shard.isHybrid()) {
+                return true;
             }
         }
-        return null;
+        return false;
     }
 
     /**
@@ -395,6 +413,12 @@ public final class ManaCost implements Comparable<ManaCost>, Iterable<ManaCostSh
     public int getGlyphCount() { // counts all colored shards or 1 for {0} costs 
         int width = shards.size();
         if (genericCost > 0 || (genericCost == 0 && width == 0)) {
+            width++;
+        }
+        // If the generic cost has been reduced below 0 (due to perpetual cost decrease effects)
+        // and there is an X cost (so the below 0 generic cost actually does something) then
+        // add space for an additional symbol to display the extra cost reduction.
+        if (genericCost < 0 && countX() > 0) {
             width++;
         }
         return width;

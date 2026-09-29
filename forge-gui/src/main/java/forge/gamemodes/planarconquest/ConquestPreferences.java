@@ -20,14 +20,15 @@ package forge.gamemodes.planarconquest;
 import java.io.Serializable;
 
 import forge.localinstance.properties.ForgeConstants;
-import forge.localinstance.properties.PreferencesStore;
+import forge.localinstance.properties.AbstractPreferences;
+import forge.model.FModel;
 
 @SuppressWarnings("serial")
-public class ConquestPreferences extends PreferencesStore<ConquestPreferences.CQPref> implements Serializable {
+public class ConquestPreferences extends AbstractPreferences<ConquestPreferences.CQPref> implements Serializable {
     /**
      * Preference identifiers, and their default values.
      */
-    public enum CQPref {
+    public enum CQPref implements AbstractPreferences.IPref {
         CURRENT_CONQUEST("DEFAULT"),
 
         AETHER_BASE_DUPLICATE_VALUE("100"),
@@ -61,6 +62,7 @@ public class ConquestPreferences extends PreferencesStore<ConquestPreferences.CQ
             this.strDefaultVal = s0;
         }
 
+        @Override
         public String getDefault() {
             return this.strDefaultVal;
         }
@@ -73,7 +75,7 @@ public class ConquestPreferences extends PreferencesStore<ConquestPreferences.CQ
     @Override
     public void save() {
         super.save();
-        ConquestUtil.updateRarityFilterOdds();
+        ConquestUtil.updateRarityFilterOdds(FModel.getConquestPreferences());
     }
 
     protected CQPref[] getEnumValues() {
@@ -87,10 +89,6 @@ public class ConquestPreferences extends PreferencesStore<ConquestPreferences.CQ
         catch (Exception e) {
             return null;
         }
-    }
-
-    protected String getPrefDefault(CQPref key) {
-        return key.getDefault();
     }
 
     public String validatePreference(CQPref qpref, int val) {

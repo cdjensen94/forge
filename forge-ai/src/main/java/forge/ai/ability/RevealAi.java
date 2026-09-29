@@ -1,56 +1,82 @@
 package forge.ai.ability;
 
 import com.google.common.collect.Iterables;
-
+import forge.ai.AiAbilityDecision;
 import forge.ai.AiPlayDecision;
 import forge.ai.PlayerControllerAi;
 import forge.game.ability.AbilityUtils;
 import forge.game.card.Card;
-import forge.game.cost.Cost;
+import forge.game.card.CardCollection;
+import forge.game.card.CardLists;
+import forge.game.keyword.Keyword;
+import forge.game.keyword.KeywordWithCost;
 import forge.game.player.Player;
 import forge.game.spellability.Spell;
 import forge.game.spellability.SpellAbility;
-import forge.util.MyRandom;
+import forge.game.zone.ZoneType;
 
 public class RevealAi extends RevealAiBase {
 
     @Override
-    protected boolean checkApiLogic(final Player ai, final SpellAbility sa) {
-        // we can reuse this function here...
-        final boolean bFlag = revealHandTargetAI(ai, sa, false);
-
-        if (!bFlag) {
-            return false;
+    protected AiAbilityDecision checkApiLogic(final Player ai, final SpellAbility sa) {
+        if (isRememberedSelfRevealAnyNumber(sa)) {
+            CardCollection revealable = getRevealableCards(ai, sa);
+            if (revealable.isEmpty()) {
+                return new AiAbilityDecision(0, AiPlayDecision.MissingNeededCards);
+            }
+            setAiEvaluationHost(sa, revealable);
         }
 
-        boolean randomReturn = MyRandom.getRandom().nextFloat() <= Math.pow(.667, sa.getActivationsThisTurn() + 1);
+        if (!revealHandTargetAI(ai, sa, false)) {
+            return new AiAbilityDecision(0, AiPlayDecision.TargetingFailed);
+        }
 
         if (playReusable(ai, sa)) {
-            randomReturn = true;
+            return new AiAbilityDecision(100, AiPlayDecision.WillPlay);
         }
-        return randomReturn;
+
+        return super.checkApiLogic(ai, sa);
+    }
+
+    private static boolean isRememberedSelfRevealAnyNumber(final SpellAbility sa) {
+        return sa.hasParam("AnyNumber") && sa.hasParam("RememberRevealed") && !sa.usesTargeting()
+                && (!sa.hasParam("Defined") || "You".equals(sa.getParam("Defined")));
+    }
+
+    private static CardCollection getRevealableCards(final Player ai, final SpellAbility sa) {
+        final CardCollection cards = sa.hasParam("RevealValid")
+                ? CardLists.getValidCards(ai.getCardsIn(ZoneType.Hand), sa.getParam("RevealValid"),
+                        ai, sa.getHostCard(), sa)
+                : new CardCollection(ai.getCardsIn(ZoneType.Hand));
+        cards.remove(sa.getHostCard());
+        return cards;
     }
 
     @Override
-    protected boolean doTriggerAINoCost(Player ai, SpellAbility sa, boolean mandatory) {
+    protected AiAbilityDecision doTriggerNoCost(Player ai, SpellAbility sa, boolean mandatory) {
         // logic to see if it should reveal Miracle Card
-        if (sa.hasParam("MiracleCost")) {
-            final Card c = sa.getHostCard();
-            for (SpellAbility s : c.getBasicSpells()) {
-                Spell spell = (Spell) s;
-                s.setActivatingPlayer(ai, true);
-                // timing restrictions still apply
-                if (!s.getRestrictions().checkTimingRestrictions(c, s))
+        if (sa.isKeyword(Keyword.MIRACLE)) {
+            // the PlayEffect with Miracle Cost
+            SpellAbility playSub = sa.getSubAbility().getAdditionalAbility("Execute");
+
+            for (SpellAbility s : AbilityUtils.getBasicSpellsFromPlayEffect(sa.getHostCard(), ai)) {
+                if (!(s instanceof Spell)) {
                     continue;
+                }
 
-                spell = (Spell) spell.copyWithDefinedCost(new Cost(sa.getParam("MiracleCost"), false));
+                Spell spell = (Spell) s.copyWithDefinedCost(((KeywordWithCost) sa.getKeyword()).getCost());
+                if (playSub.hasParam("PlayReduceCost")) {
+                    spell.putParam("ReduceCost", playSub.getParam("PlayReduceCost"));
+                }
 
-                if (AiPlayDecision.WillPlay == ((PlayerControllerAi) ai.getController()).getAi()
-                        .canPlayFromEffectAI(spell, false, false)) {
-                    return true;
+                AiPlayDecision decision = ((PlayerControllerAi) ai.getController()).getAi()
+                        .canPlayFromEffectAI(spell, false, false);
+
+                if (AiPlayDecision.WillPlay == decision) {
+                    return new AiAbilityDecision(100, decision);
                 }
             }
-            return false;
+            return new AiAbilityDecision(0, AiPlayDecision.CantPlayAi);
         }
 
         if ("Kefnet".equals(sa.getParam("AILogic"))) {
@@ -59,9 +85,12 @@ public class RevealAi extends RevealAiBase {
             );
 
             if (c == null || (!c.isInstant() && !c.isSorcery())) {
-                return false;
+                return new AiAbilityDecision(0, AiPlayDecision.CantPlayAi);
             }
-            for (SpellAbility s : c.getBasicSpells()) {
+            for (SpellAbility s : c.getAllPossibleAbilities(ai, false)) {
+                if (!s.isBasicSpell()) {
+                    continue;
+                }
                 Spell spell = (Spell) s.copy(ai);
                 // timing restrictions still apply
                 if (!spell.getRestrictions().checkTimingRestrictions(c, spell))
@@ -69,21 +98,21 @@ public class RevealAi extends RevealAiBase {
 
                 // use hard coded reduce cost
                 spell.putParam("ReduceCost", "2");
+                AiPlayDecision decision = ((PlayerControllerAi) ai.getController()).getAi()
+                        .canPlayFromEffectAI(spell, false, false);
 
-                if (AiPlayDecision.WillPlay == ((PlayerControllerAi) ai.getController()).getAi()
-                        .canPlayFromEffectAI(spell, false, false)) {
-                    return true;
+                if (AiPlayDecision.WillPlay == decision) {
+                    return new AiAbilityDecision(100, decision);
                 }
             }
-            return false;
-
+            return new AiAbilityDecision(0, AiPlayDecision.CantPlayAi);
         }
 
         if (!revealHandTargetAI(ai, sa, mandatory)) {
-            return false;
+            return new AiAbilityDecision(0, AiPlayDecision.CantPlayAi);
         }
 
-        return true;
+        return new AiAbilityDecision(100, AiPlayDecision.WillPlay);
     }
 
 }

@@ -5,6 +5,7 @@ import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.function.Consumer;
 
 import com.badlogic.gdx.utils.Align;
 
@@ -22,11 +23,8 @@ import forge.screens.settings.SettingsScreen;
 import forge.toolbox.FCheckBox;
 import forge.toolbox.FComboBox;
 import forge.toolbox.FDisplayObject;
-import forge.toolbox.FEvent;
-import forge.toolbox.FEvent.FEventHandler;
 import forge.toolbox.FGroupList;
 import forge.toolbox.FList;
-import forge.util.Callback;
 import forge.util.TextUtil;
 import forge.util.Utils;
 
@@ -35,7 +33,7 @@ public abstract class FormatFilter<T extends InventoryItem> extends ItemFilter<T
     protected GameFormat format;
     private String selectedFormat;
     private boolean preventHandling = false;
-    private FComboBox<Object> cbxFormats = new FComboBox<>();
+    private final FComboBox<Object> cbxFormats = new FComboBox<>();
 
     public FormatFilter(ItemManager<? super T> itemManager0) {
         super(itemManager0);
@@ -47,47 +45,39 @@ public abstract class FormatFilter<T extends InventoryItem> extends ItemFilter<T
         }
         cbxFormats.addItem(Forge.getLocalizer().getMessage("lblOtherFormats"));
         cbxFormats.addItem(Forge.getLocalizer().getMessage("lblChooseSets"));
-        cbxFormats.setEnabled(!Forge.isMobileAdventureMode);
+
         selectedFormat = cbxFormats.getText();
 
-        cbxFormats.setChangedHandler(new FEventHandler() {
-            @Override
-            public void handleEvent(FEvent e) {
-                if (preventHandling) { return; }
+        cbxFormats.setChangedHandler(e -> {
+            if (preventHandling) {
+                return;
+            }
 
-                int index = cbxFormats.getSelectedIndex();
-                if (index == -1) {
-                    //Do nothing when index set to -1
-                }
-                else if (index == 0) {
-                    format = null;
+            int index = cbxFormats.getSelectedIndex();
+            if (index == -1) {
+                //Do nothing when index set to -1
+            } else if (index == 0) {
+                format = null;
+                applyChange();
+            } else if (index == cbxFormats.getItemCount() - 2) {
+                preventHandling = true;
+                cbxFormats.setText(selectedFormat); //restore previous selection by default
+                preventHandling = false;
+                ArchivedFormatSelect archivedFormatSelect = new ArchivedFormatSelect();
+                archivedFormatSelect.setOnCloseCallBack(() -> {
+                    format = archivedFormatSelect.getSelectedFormat();
+                    cbxFormats.setText(format.getName());
                     applyChange();
-                }
-                else if (index == cbxFormats.getItemCount() - 2) {
-                    preventHandling = true;
-                    cbxFormats.setText(selectedFormat); //restore previous selection by default
-                    preventHandling = false;
-                    ArchivedFormatSelect archivedFormatSelect = new ArchivedFormatSelect();
-                    archivedFormatSelect.setOnCloseCallBack(new Runnable(){
-                        @Override
-                        public void run() {
-                            format = archivedFormatSelect.getSelectedFormat();
-                            cbxFormats.setText(format.getName());
-                            applyChange();
-                        }
-                    });
-                    Forge.openScreen(archivedFormatSelect);
-                }
-                else if (index == cbxFormats.getItemCount() - 1) {
-                    preventHandling = true;
-                    cbxFormats.setText(selectedFormat); //restore previous selection by default
-                    preventHandling = false;
-                    Forge.openScreen(new MultiSetSelect());
-                }
-                else {
-                    format = (GameFormat)cbxFormats.getSelectedItem();
-                    applyChange();
-                }
+                });
+                Forge.openScreen(archivedFormatSelect);
+            } else if (index == cbxFormats.getItemCount() - 1) {
+                preventHandling = true;
+                cbxFormats.setText(selectedFormat); //restore previous selection by default
+                preventHandling = false;
+                Forge.openScreen(new MultiSetSelect());
+            } else {
+                format = (GameFormat) cbxFormats.getSelectedItem();
+                applyChange();
             }
         });
     }
@@ -147,7 +137,6 @@ public abstract class FormatFilter<T extends InventoryItem> extends ItemFilter<T
             lstSets.addGroup("Draft Innovation Sets");
 
 
-
             lstSets.addGroup("Commander Sets");
             lstSets.addGroup("Multiplayer Sets");
             lstSets.addGroup("Other Supplemental Sets");
@@ -171,7 +160,7 @@ public abstract class FormatFilter<T extends InventoryItem> extends ItemFilter<T
                         lstSets.addItem(set, 3);
                         break;
                     case BOXED_SET:
-                        lstSets.addItem(set,4);
+                        lstSets.addItem(set, 4);
                         break;
                     case COLLECTOR_EDITION:
                         lstSets.addItem(set, 5);
@@ -210,7 +199,7 @@ public abstract class FormatFilter<T extends InventoryItem> extends ItemFilter<T
         }
 
         @Override
-        public void onClose(Callback<Boolean> canCloseCallback) {
+        public void onClose(Consumer<Boolean> canCloseCallback) {
             if (selectedSets.size() > 0) {
                 List<String> setCodes = new ArrayList<>();
                 List<CardEdition> sortedSets = new ArrayList<>(selectedSets);
@@ -241,12 +230,10 @@ public abstract class FormatFilter<T extends InventoryItem> extends ItemFilter<T
                 if (selectedSets.contains(value)) {
                     if (count == 2) {
                         Forge.back(); //support double tap to confirm selection without unselecting double tapped item
-                    }
-                    else {
+                    } else {
                         selectedSets.remove(value);
                     }
-                }
-                else {
+                } else {
                     selectedSets.add(value);
                     if (count == 2) {
                         Forge.back(); //support double tap to confirm selection after selecting double tapped item

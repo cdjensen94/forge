@@ -1,14 +1,6 @@
 package forge.gamemodes.match.input;
 
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Queue;
-
 import com.google.common.collect.Lists;
-
 import forge.ai.ComputerUtilMana;
 import forge.ai.PlayerControllerAi;
 import forge.card.ColorSet;
@@ -17,21 +9,25 @@ import forge.card.mana.ManaAtom;
 import forge.game.Game;
 import forge.game.GameActionUtil;
 import forge.game.card.Card;
+import forge.game.card.CardView;
+import forge.game.card.CardCollection;
 import forge.game.mana.ManaCostBeingPaid;
+import forge.game.player.PlaySpellAbility;
 import forge.game.player.Player;
+import forge.game.player.PlayerController.FullControlFlag;
 import forge.game.player.PlayerView;
 import forge.game.player.actions.PayManaFromPoolAction;
 import forge.game.spellability.AbilityManaPart;
 import forge.game.spellability.SpellAbility;
 import forge.game.spellability.SpellAbilityView;
 import forge.gui.FThreads;
-import forge.gui.GuiBase;
-import forge.player.HumanPlay;
 import forge.player.PlayerControllerHuman;
 import forge.util.Evaluator;
 import forge.util.ITriggerEvent;
 import forge.util.Localizer;
 import forge.util.TextUtil;
+
+import java.util.*;
 
 public abstract class InputPayMana extends InputSyncronizedBase {
     private static final long serialVersionUID = 718128600948280315L;
@@ -48,7 +44,9 @@ public abstract class InputPayMana extends InputSyncronizedBase {
     private final Queue<Card> delaySelectCards = new LinkedList<>();
 
     private boolean bPaid = false;
-    protected Boolean canPayManaCost = null;
+    /** null = not yet evaluated, or not payable; otherwise cards Auto would tap */
+    private CardCollection autoPayManaSources = null;
+    private boolean autoPayManaSourcesKnown = false;
 
     private boolean locked = false;
 
@@ -68,6 +66,7 @@ public abstract class InputPayMana extends InputSyncronizedBase {
 
     @Override
     protected void onStop() {
+        getController().clearActionableCards();
         if (!isFinished()) {
             // Clear current Mana cost being paid for SA
             saPaidFor.setManaCostBeingPaid(null);
@@ -81,7 +80,7 @@ public abstract class InputPayMana extends InputSyncronizedBase {
 
     @Override
     protected boolean onCardSelected(final Card card, final List<Card> otherCardsToSelect, final ITriggerEvent triggerEvent) {
-        if (GuiBase.getInterface().isLibgdxPort()) {
+        if (getController().getGui().isLibgdxPort()) {
             // Mobile Forge allows to tap cards underneath the current card even if the current one is tapped
             if (otherCardsToSelect != null) {
                 for (Card c : otherCardsToSelect) {
@@ -97,19 +96,18 @@ public abstract class InputPayMana extends InputSyncronizedBase {
                 return true;
             }
             return activateDelayedCard();
-        } else {
-            List<SpellAbility> manaAbilities = getAllManaAbilities(card);
-            // Desktop Forge floating menu functionality
-            if (manaAbilities.size() == 1) {
-                activateManaAbility(card, manaAbilities.get(0));
-            } else {
-                SpellAbility spellAbility = getController().getAbilityToPlay(card, manaAbilities, triggerEvent);
-                if (spellAbility != null) {
-                    activateManaAbility(card, spellAbility);
-                }
-            }
-            return true;
         }
+
+        List<SpellAbility> manaAbilities = getAllManaAbilities(card);
+        // Desktop Forge floating menu functionality
+        if (manaAbilities.size() == 1) {
+            return activateManaAbility(card, manaAbilities.get(0));
+        }
+        SpellAbility spellAbility = getController().getAbilityToPlay(card, manaAbilities, triggerEvent);
+        if (spellAbility != null) {
+            return activateManaAbility(card, spellAbility);
+        }
+        return true;
     }
 
     protected List<SpellAbility> getAllManaAbilities(Card card) {
@@ -121,8 +119,6 @@ public abstract class InputPayMana extends InputSyncronizedBase {
         final Collection<SpellAbility> toRemove = Lists.newArrayListWithCapacity(result.size());
         for (final SpellAbility sa : result) {
             sa.setActivatingPlayer(player);
-            // fix things like retrace
-            // check only if SA can't be cast normally
             if (sa.canPlay(true)) {
                 continue;
             }
@@ -136,7 +132,7 @@ public abstract class InputPayMana extends InputSyncronizedBase {
     public String getActivateAction(Card card) {
         for (SpellAbility sa : getAllManaAbilities(card)) {
             if (sa.canPlay()) {
-                return "pay mana with card";
+                return Localizer.getInstance().getMessage("lblPayManaWithCard");
             }
         }
         return null;
@@ -203,7 +199,6 @@ public abstract class InputPayMana extends InputSyncronizedBase {
         if (player.getManaPool().tryPayCostWithColor(colorCode, saPaidFor, manaCost, saPaidFor.getPayingMana())) {
             // Record paying mana from pool here
             getController().macros().addRememberedAction(new PayManaFromPoolAction(colorCode));
-            onManaAbilityPaid();
             showMessage();
         }
     }
@@ -251,10 +246,8 @@ public abstract class InputPayMana extends InputSyncronizedBase {
                 int maAmount = ma.totalAmountOfManaGenerated(saPaidFor, true);
                 if (amountOfMana == -1) {
                     amountOfMana = maAmount;
-                } else {
-                    if (amountOfMana != maAmount) {
-                        guessAbilityWithRequiredColors = false;
-                    }
+                } else if (amountOfMana != maAmount) {
+                    guessAbilityWithRequiredColors = false;
                 }
 
                 abilitiesMap.put(ma.getView(), ma);
@@ -283,7 +276,7 @@ public abstract class InputPayMana extends InputSyncronizedBase {
 
             // If the card has any ability that tracks mana spent, skip express Mana choice
             if (saPaidFor.tracksManaSpent()) {
-                colorCanUse = ColorSet.ALL_COLORS.getColor();
+                colorCanUse = ColorSet.WUBRG.getColor();
                 guessAbilityWithRequiredColors = false;
             }
 
@@ -295,8 +288,7 @@ public abstract class InputPayMana extends InputSyncronizedBase {
                     //avoid unnecessary prompt by pretending we need White
                     //for the sake of "Add one mana of any color" effects
                     colorNeeded = MagicColor.WHITE;
-                }
-                else {
+                } else {
                     final HashMap<SpellAbilityView, SpellAbility> colorMatches = new HashMap<>();
                     for (SpellAbility sa : abilitiesMap.values()) {
                         if (sa.isManaAbilityFor(saPaidFor, colorNeeded)) {
@@ -331,40 +323,35 @@ public abstract class InputPayMana extends InputSyncronizedBase {
                 producedColorMask |= color;
             }
         }
-        ColorSet producedAndNeededColors = ColorSet.fromMask(producedColorMask);
 
-        chosen.setManaExpressChoice(producedAndNeededColors);
+        chosen.setManaExpressChoice(ColorSet.fromMask(producedColorMask));
 
         // System.out.println("Chosen sa=" + chosen + " of " + chosen.getHostCard() + " to pay mana");
 
         locked = true;
-        game.getAction().invoke(new Runnable() {
-            @Override
-            public void run() {
-                if (HumanPlay.playSpellAbility(getController(), chosen.getActivatingPlayer(), chosen)) {
-                    final List<AbilityManaPart> manaAbilities = chosen.getAllManaParts();
-                    boolean restrictionsMet = true;
+        game.getAction().invoke(() -> {
+            if (PlaySpellAbility.playSpellAbility(getController(), chosen.getActivatingPlayer(), chosen)) {
+                final List<AbilityManaPart> manaAbilities = chosen.getAllManaParts();
+                boolean restrictionsMet = true;
 
-                    for (AbilityManaPart sa : manaAbilities) {
-                        if (!sa.meetsManaRestrictions(saPaidFor)) {
-                            restrictionsMet = false;
-                            break;
-                        }
+                for (AbilityManaPart sa : manaAbilities) {
+                    if (!sa.meetsManaRestrictions(saPaidFor)) {
+                        restrictionsMet = false;
+                        break;
                     }
-
-                    if (restrictionsMet && !player.getController().isFullControl()) {
-                        player.getManaPool().payManaFromAbility(saPaidFor, manaCost, chosen);
-                    }
-                    if (!restrictionsMet || chosen.getPayCosts().hasManaCost()) {
-                        // force refresh in case too much mana got spent
-                        updateButtons();
-                        canPayManaCost = null;
-                    }
-                    onManaAbilityPaid();
                 }
-                // Need to call this to unlock
-                onStateChanged();
+
+                if (restrictionsMet && !player.getController().isFullControl(FullControlFlag.NoPaymentFromManaAbility)) {
+                    player.getManaPool().payManaFromAbility(saPaidFor, manaCost, chosen);
+                }
+                if (!restrictionsMet || chosen.getPayCosts().hasManaCost()) {
+                    // force refresh in case too much mana got spent
+                    updateButtons();
+                    invalidateAutoPayManaSources();
+                }
             }
+            // Need to call this to unlock
+            onStateChanged();
         });
 
         return true;
@@ -390,19 +377,11 @@ public abstract class InputPayMana extends InputSyncronizedBase {
         if (supportAutoPay() && !locked) { //prevent AI taking over from double-clicking Auto
             locked = true;
             //use AI utility to automatically pay mana cost if possible
-            final Runnable proc = new Runnable() {
-                @Override
-                public void run() {
-                    ComputerUtilMana.payManaCost(manaCost, saPaidFor, player, effect);
-                }
-            };
+            final Runnable proc = () -> ComputerUtilMana.payManaCost(manaCost, saPaidFor, player, effect);
             //must run in game thread as certain payment actions can only be automated there
-            game.getAction().invoke(new Runnable() {
-                @Override
-                public void run() {
-                    runAsAi(proc);
-                    onStateChanged();
-                }
+            game.getAction().invoke(() -> {
+                runAsAi(proc);
+                onStateChanged();
             });
         }
     }
@@ -421,27 +400,20 @@ public abstract class InputPayMana extends InputSyncronizedBase {
             return;
         }
         if (supportAutoPay()) {
-            if (canPayManaCost == null) {
-                //use AI utility to determine if mana cost can be paid if that hasn't been determined yet
-                Evaluator<Boolean> proc = new Evaluator<Boolean>() {
-                    @Override
-                    public Boolean evaluate() {
-                        return ComputerUtilMana.canPayManaCost(manaCost, saPaidFor, player, effect);
-                    }
-                };
-                runAsAi(proc);
-                canPayManaCost = proc.getResult();
-            }
-            if (canPayManaCost) { //enabled Auto button if mana cost can be paid
+            ensureAutoPayManaSources();
+            if (autoPayManaSources != null) { //enabled Auto button if mana cost can be paid
                 getController().getGui().updateButtons(getOwner(), Localizer.getInstance().getMessage("lblAuto"), Localizer.getInstance().getMessage("lblCancel"), true, !mandatory, true);
             }
         }
+        // Drop just-tapped sources from the highlight set; emphasize the AI's auto-tap plan.
+        getController().pushActionableCards(true, getAutoTapPreviewViews());
         showMessage(getMessage(), saPaidFor.getView());
     }
 
     @Override
     public void showMessage() {
         if (isFinished()) { return; }
+        getController().pushActionableCards(true);
         updateButtons();
         onStateChanged();
     }
@@ -451,18 +423,46 @@ public abstract class InputPayMana extends InputSyncronizedBase {
             done();
             stop();
         } else {
-            FThreads.invokeInEdtNowOrLater(new Runnable() {
-                @Override
-                public void run() {
-                    updateMessage();
-                }
-            });
+            FThreads.invokeInEdtNowOrLater(this::updateMessage);
         }
     }
 
-    protected void onManaAbilityPaid() {} // some inputs overload it
     protected abstract void done();
     protected abstract String getMessage();
+
+    private void invalidateAutoPayManaSources() {
+        autoPayManaSourcesKnown = false;
+        autoPayManaSources = null;
+    }
+
+    private void ensureAutoPayManaSources() {
+        if (autoPayManaSourcesKnown) {
+            return;
+        }
+        final ManaCostBeingPaid costCopy = new ManaCostBeingPaid(manaCost);
+        Evaluator<CardCollection> proc = new Evaluator<>() {
+            @Override
+            public CardCollection evaluate() {
+                return ComputerUtilMana.getManaSourcesToPayCost(costCopy, saPaidFor, player, effect);
+            }
+        };
+        runAsAi(proc);
+        autoPayManaSources = proc.getResult();
+        autoPayManaSourcesKnown = true;
+    }
+
+    /** Cards the Auto button would tap, for emphasized highlighting; null when unavailable. */
+    private Iterable<CardView> getAutoTapPreviewViews() {
+        if (!supportAutoPay() || manaCost == null || manaCost.isPaid()
+                || !autoPayManaSourcesKnown || autoPayManaSources == null) {
+            return null;
+        }
+        final Set<CardView> views = new HashSet<>();
+        for (Card c : autoPayManaSources) {
+            views.add(c.getView());
+        }
+        return views;
+    }
 
     @Override
     public String toString() {
@@ -470,6 +470,8 @@ public abstract class InputPayMana extends InputSyncronizedBase {
     }
 
     public boolean isPaid() { return bPaid; }
+
+    public boolean isActivatingManaAbility() { return locked; }
 
     protected String messagePrefix;
     public void setMessagePrefix(String prompt) {

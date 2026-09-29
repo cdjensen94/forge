@@ -12,6 +12,7 @@
 .settings
 .classpath
 .project
+.checkstyle
 
 # Ignore VS Code config files
 
@@ -24,6 +25,8 @@
 
 nbactions.xml
 
+# Ignore flattened pom
+.flattened-pom.xml
 
 # Ignore binaries, temp files and test output, everywhere
 
@@ -55,6 +58,9 @@ forge-gui-android/res/*/*
 !forge-gui-android/res/*/ic_launcher.png
 !forge-gui-android/res/*/ic_launcher*.png
 !forge-gui-android/res/layout/main.xml
+# iOS app-icon asset catalog; the negation outranks any contributor-global
+# '*.png' excludes rule that would otherwise silently drop the icons
+!forge-gui-ios/resources/**
 forge-gui-android/*.keystore
 forge-gui-android/**/Thumbs.db
 forge-gui-mobile-dev/**/Thumbs.db
@@ -62,6 +68,9 @@ forge-gui-mobile-dev/res
 forge-gui-mobile-dev/testAssets
 
 forge-gui/res/cardsfolder/*.bat
+
+# Generated changelog file
+forge-gui/release-files/CHANGES.txt
 
 forge-gui/res/PerSetTrackingResults
 forge-gui/res/decks
@@ -84,3 +93,13 @@ forge-gui/tools/PerSetTrackingResults
 *.tiled-session
 /forge-gui/res/adventure/*.tiled-project
 /forge-gui/res/adventure/*.tiled-session
+
+# Ignore python temporaries
+__pycache__
+*.pyc
+
+# Ignore Claude configuration
+.claude
+# EDHREC commander matrix tool intermediates
+forge-gui/tools/build
+forge-gui-ios/robovm.properties

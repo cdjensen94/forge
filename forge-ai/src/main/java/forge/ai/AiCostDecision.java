@@ -1,10 +1,11 @@
 package forge.ai;
 
-import com.google.common.base.Predicate;
-import com.google.common.base.Predicates;
 import com.google.common.collect.Lists;
+import com.google.common.collect.Multiset;
+
+import forge.ai.AiCardMemory.MemorySet;
 import forge.card.CardType;
-import forge.card.MagicColor;
+import forge.card.ColorSet;
 import forge.game.Game;
 import forge.game.GameEntityCounterTable;
 import forge.game.ability.AbilityUtils;
@@ -16,23 +17,31 @@ import forge.game.spellability.SpellAbility;
 import forge.game.spellability.SpellAbilityStackInstance;
 import forge.game.zone.ZoneType;
 import forge.util.Aggregates;
+import forge.util.MyRandom;
 import forge.util.TextUtil;
 import forge.util.collect.FCollectionView;
-import org.apache.commons.lang3.ObjectUtils;
 
 import java.util.*;
 
 import static forge.ai.ComputerUtilCard.getBestCreatureAI;
+import static forge.ai.ComputerUtilCard.getWorstCreatureAI;
 
 public class AiCostDecision extends CostDecisionMakerBase {
     private final CardCollection discarded;
     private final CardCollection tapped;
 
     public AiCostDecision(Player ai0, SpellAbility sa, final boolean effect) {
+        this(ai0, sa, effect, false);
+    }
+    public AiCostDecision(Player ai0, SpellAbility sa, final boolean effect, final boolean payMana) {
         super(ai0, effect, sa, sa.getHostCard());
 
         discarded = new CardCollection();
         tapped = new CardCollection();
+        Set<Card> tappedForMana = AiCardMemory.getMemorySet(ai0, MemorySet.PAYS_TAP_COST);
+        if (!payMana && tappedForMana != null) {
+            tapped.addAll(tappedForMana);
+        }
     }
 
     @Override
@@ -43,17 +52,30 @@ public class AiCostDecision extends CostDecisionMakerBase {
     }
 
     @Override
+    public PaymentDecision visit(CostBehold cost) {
+        final String type = cost.getType();
+        CardCollectionView hand = player.getCardsIn(cost.getRevealFrom());
+        hand = CardLists.getValidCards(hand, type.split(";"), player, source, ability);
+        return hand.isEmpty() ? null : PaymentDecision.card(getBestCreatureAI(hand));
+    }
+
+    @Override
+    public PaymentDecision visit(CostBeholdExile cost) {
+        final String type = cost.getType();
+        CardCollectionView hand = player.getCardsIn(cost.getRevealFrom());
+        hand = CardLists.getValidCards(hand, type.split(";"), player, source, ability);
+        return hand.isEmpty() ? null : PaymentDecision.card(getWorstCreatureAI(hand));
+    }
+
+    @Override
     public PaymentDecision visit(CostChooseColor cost) {
         int c = cost.getAbilityAmount(ability);
-        List<String> choices = player.getController().chooseColors("Color", ability, c, c,
-                new ArrayList<>(MagicColor.Constant.ONLY_COLORS));
-        return PaymentDecision.colors(choices);
+        return PaymentDecision.colors(player.getController().chooseColors("Color", ability, c, c, ColorSet.WUBRG));
     }
 
     @Override
     public PaymentDecision visit(CostChooseCreatureType cost) {
-        String choice = player.getController().chooseSomeType("Creature", ability, CardType.getAllCreatureTypes(),
-                Lists.newArrayList());
+        String choice = player.getController().chooseSomeType("Creature", ability, CardType.getAllCreatureTypes());
         return PaymentDecision.type(choice);
     }
 
@@ -75,13 +97,14 @@ public class AiCostDecision extends CostDecisionMakerBase {
                 return null;
             }
             return PaymentDecision.card(player.getLastDrawnCard());
-        } else if (cost.payCostFromSource()) {
+        }
+        if (cost.payCostFromSource()) {
             if (!hand.contains(source)) {
                 return null;
             }
-
             return PaymentDecision.card(source);
-        } else if (type.equals("Hand")) {
+        }
+        if (type.equals("Hand")) {
             if (hand.size() > 1 && ability.getActivatingPlayer() != null) {
                 hand = ability.getActivatingPlayer().getController().orderMoveToZoneList(hand, ZoneType.Graveyard, ability);
             }
@@ -99,32 +122,32 @@ public class AiCostDecision extends CostDecisionMakerBase {
                 randomSubset = ability.getActivatingPlayer().getController().orderMoveToZoneList(randomSubset, ZoneType.Graveyard, ability);
             }
             return PaymentDecision.card(randomSubset);
-        } else if (type.equals("DifferentNames")) {
+        }
+        if (type.contains("+WithDifferentNames")) {
             CardCollection differentNames = new CardCollection();
             CardCollection discardMe = CardLists.filter(hand, CardPredicates.hasSVar("DiscardMe"));
             while (c > 0) {
                 Card chosen;
                 if (!discardMe.isEmpty()) {
                     chosen = Aggregates.random(discardMe);
-                    discardMe = CardLists.filter(discardMe, Predicates.not(CardPredicates.sharesNameWith(chosen)));
+                    discardMe = CardLists.filter(discardMe, CardPredicates.sharesNameWith(chosen).negate());
                 } else {
                     final Card worst = ComputerUtilCard.getWorstAI(hand);
                     chosen = worst != null ? worst : Aggregates.random(hand);
                 }
                 differentNames.add(chosen);
-                hand = CardLists.filter(hand, Predicates.not(CardPredicates.sharesNameWith(chosen)));
+                hand = CardLists.filter(hand, CardPredicates.sharesNameWith(chosen).negate());
                 c--;
             }
             return PaymentDecision.card(differentNames);
-        } else {
-            final AiController aic = ((PlayerControllerAi)player.getController()).getAi();
-
-            CardCollection result = aic.getCardsToDiscard(c, type.split(";"), ability, discarded);
-            if (result != null) {
-                discarded.addAll(result);
-            }
-            return PaymentDecision.card(result);
         }
+        final AiController aic = ((PlayerControllerAi)player.getController()).getAi();
+
+        CardCollection result = aic.getCardsToDiscard(c, type.split(";"), ability, discarded);
+        if (result != null) {
+            discarded.addAll(result);
+        }
+        return PaymentDecision.card(result);
     }
 
     @Override
@@ -149,6 +172,19 @@ public class AiCostDecision extends CostDecisionMakerBase {
     }
 
     @Override
+    public PaymentDecision visit(CostPromiseGift cost) {
+        if (!cost.canPay(ability, player, isEffect())) {
+            return null;
+        }
+        List<Player> res = cost.getPotentialPlayers(player, ability);
+        // I should only choose one of these right?
+        // TODO Choose the "worst" player.
+        Collections.shuffle(res, MyRandom.getRandom());
+
+        return PaymentDecision.players(res.subList(0, 1));
+    }
+
+    @Override
     public PaymentDecision visit(CostExile cost) {
         String type = cost.getType();
         if (cost.payCostFromSource()) {
@@ -166,8 +202,7 @@ public class AiCostDecision extends CostDecisionMakerBase {
             CardCollection valid = CardLists.getValidCards(player.getGame().getCardsIn(cost.getFrom().get(0)), typeCleaned, player, source, ability);
             CardCollection chosen = new CardCollection();
 
-            CardLists.sortByCmcDesc(valid);
-            Collections.reverse(valid);
+            valid.sort(CardLists.CmcComparator);
 
             int totalCMC = 0;
             for (Card card : valid) {
@@ -399,8 +434,9 @@ public class AiCostDecision extends CostDecisionMakerBase {
             return PaymentDecision.card(source);
         }
 
-        final CardCollection typeList = CardLists.getValidCards(player.getGame().getCardsIn(ZoneType.Battlefield),
+        CardCollection typeList = CardLists.getValidCards(player.getGame().getCardsIn(ZoneType.Battlefield),
                 cost.getType().split(";"), player, source, ability);
+        typeList = CardLists.filter(typeList, CardPredicates.canReceiveCounters(cost.getCounter()));
 
         Card card;
         if (cost.getType().equals("Creature.YouCtrl")) {
@@ -409,6 +445,11 @@ public class AiCostDecision extends CostDecisionMakerBase {
             card = ComputerUtilCard.getWorstPermanentAI(typeList, false, false, false, false);
         }
         return PaymentDecision.card(card);
+    }
+
+    @Override
+    public PaymentDecision visit(CostPutCounterYou cost) {
+        return PaymentDecision.number(cost.getAbilityAmount(ability));
     }
 
     @Override
@@ -426,24 +467,6 @@ public class AiCostDecision extends CostDecisionMakerBase {
 
         if (type.contains("sharesCreatureTypeWith")) {
             return null;
-        }
-
-        if ("DontPayTapCostWithManaSources".equals(source.getSVar("AIPaymentPreference"))) {
-            CardCollectionView toExclude =
-                    CardLists.getValidCards(player.getCardsIn(ZoneType.Battlefield), type.split(";"),
-                            ability.getActivatingPlayer(), ability.getHostCard(), ability);
-            toExclude = CardLists.filter(toExclude, new Predicate<Card>() {
-                @Override
-                public boolean apply(Card card) {
-                    for (final SpellAbility sa : card.getSpellAbilities()) {
-                        if (sa.isManaAbility() && sa.getPayCosts().hasTapCost()) {
-                            return true;
-                        }
-                    }
-                    return false;
-                }
-            });
-            exclude.addAll(toExclude);
         }
 
         String totalP = "";
@@ -557,7 +580,7 @@ public class AiCostDecision extends CostDecisionMakerBase {
                 int thisRemove = Math.min(prefCard.getCounters(cType), stillToRemove);
                 if (thisRemove > 0) {
                     removed += thisRemove;
-                    table.put(null, prefCard, CounterType.get(cType), thisRemove);
+                    table.put(null, prefCard, cType, thisRemove);
                 }
             }
         }
@@ -567,13 +590,18 @@ public class AiCostDecision extends CostDecisionMakerBase {
     @Override
     public PaymentDecision visit(CostRemoveAnyCounter cost) {
         final int c = cost.getAbilityAmount(ability);
-        final Card originalHost = ObjectUtils.defaultIfNull(ability.getOriginalHost(), source);
+        final Card originalHost = Objects.requireNonNullElse(ability.getOriginalHost(), source);
 
         if (c <= 0) {
             return null;
         }
 
-        CardCollectionView typeList = CardLists.getValidCards(player.getCardsIn(ZoneType.Battlefield), cost.getType().split(";"), player, source, ability);
+        CardCollectionView typeList;
+        if (cost.payCostFromSource()) {
+            typeList = new CardCollection(ability.getHostCard());
+        } else {
+            typeList = CardLists.getValidCards(player.getCardsIn(ZoneType.Battlefield), cost.getType().split(";"), player, source, ability);
+        }
         // only cards with counters are of interest
         typeList = CardLists.filter(typeList, CardPredicates.hasCounters());
 
@@ -629,27 +657,24 @@ public class AiCostDecision extends CostDecisionMakerBase {
 
         // filter for negative counters
         if (c > toRemove && cost.counter == null) {
-            List<Card> negatives = CardLists.filter(typeList, new Predicate<Card>() {
-                @Override
-                public boolean apply(final Card crd) {
-                    for (CounterType cType : table.filterToRemove(crd).keySet()) {
-                        if (ComputerUtil.isNegativeCounter(cType, crd)) {
-                            return true;
-                        }
+            List<Card> negatives = CardLists.filter(typeList, crd -> {
+                for (CounterType cType : table.filterToRemove(crd).elementSet()) {
+                    if (ComputerUtil.isNegativeCounter(cType, crd)) {
+                        return true;
                     }
-                    return false;
                 }
+                return false;
             });
 
             if (!negatives.isEmpty()) {
                 // TODO sort negatives to remove from best Cards first?
                 for (final Card crd : negatives) {
-                    for (Map.Entry<CounterType, Integer> e : table.filterToRemove(crd).entrySet()) {
-                        if (ComputerUtil.isNegativeCounter(e.getKey(), crd)) {
-                            int over = Math.min(e.getValue(), c - toRemove);
+                    for (Multiset.Entry<CounterType> e : table.filterToRemove(crd).entrySet()) {
+                        if (ComputerUtil.isNegativeCounter(e.getElement(), crd) && crd.canRemoveCounters(e.getElement())) {
+                            int over = Math.min(e.getCount(), c - toRemove);
                             if (over > 0) {
                                 toRemove += over;
-                                table.put(null, crd, e.getKey(), over);
+                                table.put(null, crd, e.getElement(), over);
                             }
                         }
                     }
@@ -660,26 +685,23 @@ public class AiCostDecision extends CostDecisionMakerBase {
         // filter for useless counters
         // they have no effect on the card, if they are there or removed
         if (c > toRemove && cost.counter == null) {
-            List<Card> useless = CardLists.filter(typeList, new Predicate<Card>() {
-                @Override
-                public boolean apply(final Card crd) {
-                    for (CounterType ctype : table.filterToRemove(crd).keySet()) {
-                        if (ComputerUtil.isUselessCounter(ctype, crd)) {
-                            return true;
-                        }
+            List<Card> useless = CardLists.filter(typeList, crd -> {
+                for (CounterType ctype : table.filterToRemove(crd).elementSet()) {
+                    if (ComputerUtil.isUselessCounter(ctype, crd)) {
+                        return true;
                     }
-                    return false;
                 }
+                return false;
             });
 
             if (!useless.isEmpty()) {
                 for (final Card crd : useless) {
-                    for (Map.Entry<CounterType, Integer> e : table.filterToRemove(crd).entrySet()) {
-                        if (ComputerUtil.isUselessCounter(e.getKey(), crd)) {
-                            int over = Math.min(e.getValue(), c - toRemove);
+                    for (Multiset.Entry<CounterType> e : table.filterToRemove(crd).entrySet()) {
+                        if (ComputerUtil.isUselessCounter(e.getElement(), crd)) {
+                            int over = Math.min(e.getCount(), c - toRemove);
                             if (over > 0) {
                                 toRemove += over;
-                                table.put(null, crd, e.getKey(), over);
+                                table.put(null, crd, e.getElement(), over);
                             }
                         }
                     }
@@ -696,30 +718,28 @@ public class AiCostDecision extends CostDecisionMakerBase {
 
         // try to remove Quest counter on something with enough counters for the
         // effect to continue
-        if (c > toRemove && (cost.counter == null || cost.counter.is(CounterEnumType.QUEST))) {
-            List<Card> prefs = CardLists.filter(typeList, new Predicate<Card>() {
-                @Override
-                public boolean apply(final Card crd) {
-                    // a Card without MaxQuestEffect doesn't need any Quest
-                    // counters
-                    int e = 0;
-                    if (crd.hasSVar("MaxQuestEffect")) {
-                        e = Integer.parseInt(crd.getSVar("MaxQuestEffect"));
-                    }
-                    return crd.getCounters(CounterEnumType.QUEST) > e;
+        CounterType quest = CounterType.getType("QUEST");
+        if (c > toRemove && (cost.counter == null || quest == cost.counter)) {
+            List<Card> prefs = CardLists.filter(typeList, crd -> {
+                // a Card without MaxQuestEffect doesn't need any Quest
+                // counters
+                int e = 0;
+                if (crd.hasSVar("MaxQuestEffect")) {
+                    e = Integer.parseInt(crd.getSVar("MaxQuestEffect"));
                 }
+                return crd.getCounters(quest) > e;
             });
-            prefs.sort(Collections.reverseOrder(CardPredicates.compareByCounterType(CounterEnumType.QUEST)));
+            prefs.sort(Collections.reverseOrder(CardPredicates.compareByCounterType(quest)));
 
             for (final Card crd : prefs) {
                 int e = 0;
                 if (crd.hasSVar("MaxQuestEffect")) {
                     e = Integer.parseInt(crd.getSVar("MaxQuestEffect"));
                 }
-                int over = Math.min(crd.getCounters(CounterEnumType.QUEST) - e, c - toRemove);
+                int over = Math.min(crd.getCounters(quest) - e, c - toRemove);
                 if (over > 0) {
                     toRemove += over;
-                    table.put(null, crd, CounterType.get(CounterEnumType.QUEST), over);
+                    table.put(null, crd, quest, over);
                 }
             }
         }
@@ -752,17 +772,17 @@ public class AiCostDecision extends CostDecisionMakerBase {
         if (c > toRemove && cost.counter == null && originalHost.hasSVar("AIRemoveCounterCostPriority") && "ANY".equalsIgnoreCase(originalHost.getSVar("AIRemoveCounterCostPriority"))) {
             for (Card card : typeList) {
                 // TODO try not to remove to much positive counters from the same card
-                for (Map.Entry<CounterType, Integer> e : table.filterToRemove(card).entrySet()) {
-                    int thisRemove = Math.min(e.getValue(), c - toRemove);
+                for (Multiset.Entry<CounterType> e : table.filterToRemove(card).entrySet()) {
+                    int thisRemove = Math.min(e.getCount(), c - toRemove);
                     if (thisRemove > 0) {
                         toRemove += thisRemove;
-                        table.put(null, card, e.getKey(), thisRemove);
+                        table.put(null, card, e.getElement(), thisRemove);
                     }
                 }
             }
         }
 
-        // if table is empty, than no counter was removed
+        // if table is empty, then no counter was removed
         return table.isEmpty() ? null : PaymentDecision.counters(table);
     }
 
@@ -770,6 +790,12 @@ public class AiCostDecision extends CostDecisionMakerBase {
     public PaymentDecision visit(CostRemoveCounter cost) {
         final String amount = cost.getAmount();
         final String type = cost.getType();
+        final GameEntityCounterTable counterTable = new GameEntityCounterTable();
+
+        // TODO Help AI filter card with most useless counters and put those counters in countertable for things like
+        //  Moxite Refinery, similar to CostRemoveAnyCounter
+        //  Probably a lot of that decision making can be re-used or pulled out for both PaymentDecisions to use
+        if (cost.counter == null) return null;
 
         int c;
 
@@ -798,7 +824,8 @@ public class AiCostDecision extends CostDecisionMakerBase {
             }
             for (Card card : typeList) {
                 if (card.getCounters(cost.counter) >= c) {
-                    return PaymentDecision.card(card, c);
+                    counterTable.put(null, card, cost.counter, c);
+                    return PaymentDecision.counters(counterTable);
                 }
             }
             return null;
@@ -809,7 +836,8 @@ public class AiCostDecision extends CostDecisionMakerBase {
             return null;
         }
 
-        return PaymentDecision.card(source, c);
+        counterTable.put(null, source, cost.counter, c);
+        return PaymentDecision.counters(counterTable);
     }
 
     @Override
@@ -838,12 +866,18 @@ public class AiCostDecision extends CostDecisionMakerBase {
 
     @Override
     public PaymentDecision visit(CostUnattach cost) {
-        final Card cardToUnattach = cost.findCardToUnattach(source, player, ability);
-        if (cardToUnattach == null) {
+        final CardCollection cardToUnattach = cost.findCardToUnattach(source, player, ability);
+        if (cardToUnattach.isEmpty()) {
             // We really shouldn't be able to get here if there's nothing to unattach
             return null;
         }
-        return PaymentDecision.card(cardToUnattach);
+        return PaymentDecision.card(cardToUnattach.getFirst());
+    }
+
+    @Override
+    public PaymentDecision visit(CostBlight cost) {
+        // This tells the AI: "Treat this like placing counters"
+        return this.visit((CostPutCounter) cost);
     }
 
     @Override

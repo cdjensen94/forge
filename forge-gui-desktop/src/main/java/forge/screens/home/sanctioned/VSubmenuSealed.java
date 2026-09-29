@@ -2,8 +2,6 @@ package forge.screens.home.sanctioned;
 
 import java.awt.Font;
 import java.awt.Rectangle;
-import java.awt.event.ActionEvent;
-import java.awt.event.ActionListener;
 
 import javax.swing.JButton;
 import javax.swing.JComboBox;
@@ -122,6 +120,7 @@ public enum VSubmenuSealed implements IVSubmenu<CSubmenuSealed> {
         grpPanel.add(radAll, "w 200px!, h 30px!");
         radSingle.setSelected(true);
         grpPanel.add(cbOpponent, "w 200px!, h 30px!");
+        pnlStart.removeAll();
         pnlStart.setLayout(new MigLayout("insets 0, gap 0, wrap 2"));
         pnlStart.setOpaque(false);
         pnlStart.add(grpPanel, "gapright 20");
@@ -210,8 +209,7 @@ public enum VSubmenuSealed implements IVSubmenu<CSubmenuSealed> {
 
         final JButton btnCloseBig = new FButton(localizer.getMessage("lblOK"));
         btnCloseBig.setBounds(new Rectangle((w / 2 - 100), 510, 200, 30));
-        btnCloseBig.addActionListener(new ActionListener() { @Override
-            public void actionPerformed(final ActionEvent arg0) { SOverlayUtils.hideOverlay(); } });
+        btnCloseBig.addActionListener(arg0 -> SOverlayUtils.hideOverlay());
 
         final FPanel pnl = new FPanel();
         pnl.setCornerDiameter(0);

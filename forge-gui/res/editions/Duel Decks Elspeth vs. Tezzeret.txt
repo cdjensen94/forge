@@ -13,7 +13,7 @@ ScryfallCode=DDF
 5 R Loyal Sentry @Michael Sutfin
 6 C Mosquito Guard @Randy Gallegos
 7 C Glory Seeker @Matt Cavotta
-8 C Kor Skyfisher @Dan Scott
+8 C Kor Skyfisher @Dan Murayama Scott
 9 C Temple Acolyte @Lubov
 10 U Kor Aeronaut @Karl Kopinski
 11 C Burrenton Bombardier @Ron Spencer
@@ -87,5 +87,4 @@ ScryfallCode=DDF
 79 L Island @Chippy
 
 [tokens]
-w_1_1_soldier
-c_1_1_a_pentavite_flying
+1 w_1_1_soldier @Paolo Parente

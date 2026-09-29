@@ -17,30 +17,19 @@
  */
 package forge.ai.ability;
 
-import java.util.List;
-import java.util.Map;
-
-import com.google.common.base.Predicate;
-import com.google.common.collect.Iterables;
-
-import forge.ai.ComputerUtil;
-import forge.ai.ComputerUtilCard;
-import forge.ai.SpellAbilityAi;
+import forge.ai.*;
 import forge.game.Game;
 import forge.game.ability.AbilityUtils;
-import forge.game.card.Card;
-import forge.game.card.CardCollection;
-import forge.game.card.CardCollectionView;
-import forge.game.card.CardLists;
-import forge.game.card.CardPredicates;
-import forge.game.card.CounterEnumType;
-import forge.game.card.CounterType;
+import forge.game.card.*;
 import forge.game.keyword.Keyword;
 import forge.game.player.Player;
 import forge.game.player.PlayerController.BinaryChoiceType;
 import forge.game.spellability.SpellAbility;
 import forge.game.spellability.TargetRestrictions;
 import forge.game.zone.ZoneType;
+
+import java.util.List;
+import java.util.Map;
 
 /**
  * <p>
@@ -59,9 +48,12 @@ public class CountersPutOrRemoveAi extends SpellAbilityAi {
      * forge.game.spellability.SpellAbility)
      */
     @Override
-    protected boolean checkApiLogic(Player ai, SpellAbility sa) {
+    protected AiAbilityDecision checkApiLogic(Player ai, SpellAbility sa) {
         if (sa.usesTargeting()) {
-            return doTgt(ai, sa, false);
+            if (doTgt(ai, sa, false)) {
+                return new AiAbilityDecision(100, AiPlayDecision.WillPlay);
+            }
+            return new AiAbilityDecision(0, AiPlayDecision.TargetingFailed);
         }
         return super.checkApiLogic(ai, sa);
     }
@@ -107,15 +99,10 @@ public class CountersPutOrRemoveAi extends SpellAbilityAi {
 
             if (!countersList.isEmpty()) {
                 CardCollectionView marit = ai.getCardsIn(ZoneType.Battlefield, "Marit Lage");
-                boolean maritEmpty = marit.isEmpty() || Iterables.contains(marit, new Predicate<Card>() {
-                    @Override
-                    public boolean apply(Card input) {
-                        return input.ignoreLegendRule();
-                    }
-                });
+                boolean maritEmpty = marit.isEmpty() || marit.get(0).ignoreLegendRule();
                 if (maritEmpty) {
                     CardCollectionView depthsList = CardLists.filter(countersList,
-                            CardPredicates.nameEquals("Dark Depths"), CardPredicates.hasCounter(CounterEnumType.ICE));
+                            CardPredicates.nameEquals("Dark Depths"), CardPredicates.hasCounter(CounterType.getType("ICE")));
 
                     if (!depthsList.isEmpty()) {
                         sa.getTargets().add(depthsList.getFirst());
@@ -127,7 +114,7 @@ public class CountersPutOrRemoveAi extends SpellAbilityAi {
                 // with one touch
                 CardCollection planeswalkerList = CardLists.filter(
                         CardLists.filterControlledBy(countersList, ai.getOpponents()),
-                        CardPredicates.Presets.PLANESWALKERS,
+                        CardPredicates.PLANESWALKERS,
                         CardPredicates.hasLessCounter(CounterEnumType.LOYALTY, amount));
 
                 if (!planeswalkerList.isEmpty()) {
@@ -168,12 +155,12 @@ public class CountersPutOrRemoveAi extends SpellAbilityAi {
                 if (!oppList.isEmpty()) {
                     final Card best = ComputerUtilCard.getBestAI(oppList);
 
-                    for (final CounterType aType : best.getCounters().keySet()) {
+                    for (final CounterType aType : best.getCounters().elementSet()) {
                         if (!ComputerUtil.isNegativeCounter(aType, best)) {
                             sa.getTargets().add(best);
                             return true;
                         } else if (!ComputerUtil.isUselessCounter(aType, best)) {
-                            // whould remove positive counter
+                            // would remove positive counter
                             if (best.getCounters(aType) <= amount) {
                                 sa.getTargets().add(best);
                                 return true;
@@ -192,11 +179,25 @@ public class CountersPutOrRemoveAi extends SpellAbilityAi {
     }
 
     @Override
-    protected boolean doTriggerAINoCost(Player ai, SpellAbility sa, boolean mandatory) {
+    protected AiAbilityDecision doTriggerNoCost(Player ai, SpellAbility sa, boolean mandatory) {
         if (sa.usesTargeting()) {
-            return doTgt(ai, sa, mandatory);
+            if (doTgt(ai, sa, mandatory)) {
+                // if we can target, then we can play it
+                if (sa.isTargetNumberValid()) {
+                    return new AiAbilityDecision(100, AiPlayDecision.WillPlay);
+                }
+                return new AiAbilityDecision(0, AiPlayDecision.TargetingFailed);
+            } else {
+                // if we can't target, then we can't play it
+                return new AiAbilityDecision(0, AiPlayDecision.CantPlayAi);
+            }
         }
-        return mandatory;
+        if (mandatory) {
+            // if mandatory, just play it
+            return new AiAbilityDecision(100, AiPlayDecision.WillPlay);
+        }
+        // if not mandatory, check if we can play it
+        return new AiAbilityDecision(0, AiPlayDecision.CantPlayAi);
     }
 
     /*
@@ -211,19 +212,21 @@ public class CountersPutOrRemoveAi extends SpellAbilityAi {
 
         Card tgt = (Card) params.get("Target");
 
+        CounterType ice = CounterType.getType("ICE");
+
         // planeswalker has high priority for loyalty counters
-        if (tgt.isPlaneswalker() && options.contains(CounterType.get(CounterEnumType.LOYALTY))) {
-            return CounterType.get(CounterEnumType.LOYALTY);
+        if (tgt.isPlaneswalker() && options.contains(CounterEnumType.LOYALTY)) {
+            return CounterEnumType.LOYALTY;
         }
 
         if (tgt.getController().isOpponentOf(ai)) {
             // creatures with BaseToughness below or equal zero might be
             // killed if their counters are removed
             if (tgt.isCreature() && tgt.getBaseToughness() <= 0) {
-                if (options.contains(CounterType.get(CounterEnumType.P1P1))) {
-                    return CounterType.get(CounterEnumType.P1P1);
-                } else if (options.contains(CounterType.get(CounterEnumType.M1M1))) {
-                    return CounterType.get(CounterEnumType.M1M1);
+                if (options.contains(CounterEnumType.P1P1)) {
+                    return CounterEnumType.P1P1;
+                } else if (options.contains(CounterEnumType.M1M1)) {
+                    return CounterEnumType.M1M1;
                 }
             }
 
@@ -235,22 +238,17 @@ public class CountersPutOrRemoveAi extends SpellAbilityAi {
             }
         } else {
             // this counters are treat first to be removed
-            if ("Dark Depths".equals(tgt.getName()) && options.contains(CounterType.get(CounterEnumType.ICE))) {
+            if ("Dark Depths".equals(tgt.getName()) && options.contains(ice)) {
                 CardCollectionView marit = ai.getCardsIn(ZoneType.Battlefield, "Marit Lage");
-                boolean maritEmpty = marit.isEmpty() || Iterables.contains(marit, new Predicate<Card>() {
-                    @Override
-                    public boolean apply(Card input) {
-                        return input.ignoreLegendRule();
-                    }
-                });
+                boolean maritEmpty = marit.isEmpty() || marit.get(0).ignoreLegendRule();
 
                 if (maritEmpty) {
-                    return CounterType.get(CounterEnumType.ICE);
+                    return ice;
                 }
-            } else if (tgt.hasKeyword(Keyword.UNDYING) && options.contains(CounterType.get(CounterEnumType.P1P1))) {
-                return CounterType.get(CounterEnumType.P1P1);
-            } else if (tgt.hasKeyword(Keyword.PERSIST) && options.contains(CounterType.get(CounterEnumType.M1M1))) {
-                return CounterType.get(CounterEnumType.M1M1);
+            } else if (tgt.hasKeyword(Keyword.UNDYING) && options.contains(CounterEnumType.P1P1)) {
+                return CounterEnumType.P1P1;
+            } else if (tgt.hasKeyword(Keyword.PERSIST) && options.contains(CounterEnumType.M1M1)) {
+                return CounterEnumType.M1M1;
             }
 
             // fallback logic, select positive counter to add more
@@ -278,6 +276,7 @@ public class CountersPutOrRemoveAi extends SpellAbilityAi {
 
             Card tgt = (Card) params.get("Target");
             CounterType type = (CounterType) params.get("CounterType");
+            CounterType ice = CounterType.getType("ICE");
 
             if (tgt.getController().isOpponentOf(ai)) {
                 if (type.is(CounterEnumType.LOYALTY) && tgt.isPlaneswalker()) {
@@ -285,27 +284,22 @@ public class CountersPutOrRemoveAi extends SpellAbilityAi {
                 }
 
                 return ComputerUtil.isNegativeCounter(type, tgt);
-            } else {
-                if (type.is(CounterEnumType.ICE) && "Dark Depths".equals(tgt.getName())) {
-                    CardCollectionView marit = ai.getCardsIn(ZoneType.Battlefield, "Marit Lage");
-                    boolean maritEmpty = marit.isEmpty() || Iterables.contains(marit, new Predicate<Card>() {
-                        @Override
-                        public boolean apply(Card input) {
-                            return input.ignoreLegendRule();
-                        }
-                    });
+            }
 
-                    if (maritEmpty) {
-                        return false;
-                    }
-                } else if (type.is(CounterEnumType.M1M1) && tgt.hasKeyword(Keyword.PERSIST)) {
-                    return false;
-                } else if (type.is(CounterEnumType.P1P1) && tgt.hasKeyword(Keyword.UNDYING)) {
+            if (type == ice && "Dark Depths".equals(tgt.getName())) {
+                CardCollectionView marit = ai.getCardsIn(ZoneType.Battlefield, "Marit Lage");
+                boolean maritEmpty = marit.isEmpty() || marit.get(0).ignoreLegendRule();
+
+                if (maritEmpty) {
                     return false;
                 }
-
-                return !ComputerUtil.isNegativeCounter(type, tgt);
+            } else if (type.is(CounterEnumType.M1M1) && tgt.hasKeyword(Keyword.PERSIST)) {
+                return false;
+            } else if (type.is(CounterEnumType.P1P1) && tgt.hasKeyword(Keyword.UNDYING)) {
+                return false;
             }
+
+            return !ComputerUtil.isNegativeCounter(type, tgt);
         }
         return super.chooseBinary(kindOfChoice, sa, params);
     }

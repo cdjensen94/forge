@@ -1,7 +1,5 @@
 package forge.gamemodes.planarconquest;
 
-import com.google.common.base.Predicate;
-
 import forge.card.CardRules;
 import forge.deck.Deck;
 import forge.deck.DeckSection;
@@ -25,12 +23,9 @@ public class ConquestCommander implements InventoryItem, IXmlWritable {
         this(card0, null, null);
     }
     public ConquestCommander(PaperCard card0, ConquestPlane startingPlane) {
-        this(card0, ConquestUtil.generateDeck(card0, new DeckGenPool(startingPlane.getCardPool().getAllCards(new Predicate<PaperCard>() {
-            @Override
-            public boolean apply(PaperCard pc) {
-                CardRules rules = pc.getRules();
-                return !rules.canBeCommander() && !rules.getType().isPlaneswalker(); //prevent including additional commanders or planeswalkers in starting deck
-            }
+        this(card0, ConquestUtil.generateDeck(card0, new DeckGenPool(startingPlane.getCardPool().getAllCards(pc -> {
+            CardRules rules = pc.getRules();
+            return !rules.canBeCommander() && !rules.getType().isPlaneswalker(); //prevent including additional commanders or planeswalkers in starting deck
         })), false), null);
     }
     private ConquestCommander(PaperCard card0, Deck deck0, ConquestRecord record0) {
@@ -41,7 +36,7 @@ public class ConquestCommander implements InventoryItem, IXmlWritable {
         }
         record = record0;
 
-        //determine origin of commander
+        // Determine origin of commander
         ConquestPlane originPlane0 = null;
         String originRegionName0 = null;
         for (ConquestPlane plane : FModel.getPlanes()) {
@@ -73,8 +68,18 @@ public class ConquestCommander implements InventoryItem, IXmlWritable {
         return card.getName();
     }
 
+    @Override
+    public String getDisplayName() {
+        return card.getDisplayName();
+    }
+
+    @Override
+    public boolean hasFlavorName() {
+        return card.hasFlavorName();
+    }
+
     public String getPlayerName() {
-        String name = card.getName();
+        String name = card.getDisplayName();
         int idx = name.indexOf(',');
         if (idx != -1) { //trim everything after the comma
             name = name.substring(0, idx);

@@ -17,13 +17,33 @@
  */
 package forge.item;
 
-import forge.util.IHasName;
+import forge.util.ITranslatable;
 
 /**
  * Interface to define a player's inventory may hold. Should include
  * CardPrinted, Booster, Pets, Plants... etc
  */
-public interface InventoryItem extends IHasName {
+public interface InventoryItem extends ITranslatable {
     String getItemType();
     String getImageKey(boolean altState);
+
+    /**
+     * Supplies the user-facing name of this item. Usually the same as `getName()`, but may be overwritten in cases such
+     * as flavor names for cards.
+     */
+    default String getDisplayName() {
+        return getName();
+    }
+
+    /**
+     * @return true if this item's display name is different from its actual name. False otherwise.
+     */
+    default boolean hasFlavorName() {
+        return false;
+    }
+
+    @Override
+    default String getUntranslatedType() {
+        return getItemType();
+    }
 }

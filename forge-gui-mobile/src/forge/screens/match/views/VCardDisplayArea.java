@@ -2,51 +2,66 @@ package forge.screens.match.views;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.Input;
+import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.math.Vector2;
 
+import com.google.common.base.Supplier;
+import com.google.common.base.Suppliers;
 import forge.Forge;
 import forge.Graphics;
 import forge.card.CardRenderer.CardStackPosition;
 import forge.card.CardZoom;
 import forge.card.CardZoom.ActivateHandler;
 import forge.game.card.CardView;
-import forge.game.zone.ZoneType;
 import forge.gui.FThreads;
 import forge.gui.GuiBase;
+import forge.localinstance.properties.ForgePreferences.FPref;
+import forge.model.FModel;
 import forge.screens.match.MatchController;
 import forge.toolbox.FCardPanel;
 import forge.toolbox.FDisplayObject;
 import forge.util.ThreadUtil;
+import io.sentry.Sentry;
 
 public abstract class VCardDisplayArea extends VDisplayArea implements ActivateHandler {
     private static final float CARD_STACK_OFFSET = 0.2f;
 
-    protected final List<CardView> orderedCards = new ArrayList<>();
-    protected final List<CardAreaPanel> cardPanels = new ArrayList<>();
+    protected Supplier<List<CardView>> orderedCards = Suppliers.memoize(ArrayList::new);
+    protected Supplier<List<CardAreaPanel>> cardPanels = Suppliers.memoize(ArrayList::new);
+    // Cards shown only as informational exile ghosts here, so the zoom carousel doesn't act on them
+    private final Supplier<Set<Integer>> infoGhostCardIds = Suppliers.memoize(HashSet::new);
     private boolean rotateCards180;
 
     public Iterable<CardView> getOrderedCards() {
-        return orderedCards;
+        return orderedCards.get();
     }
 
     public Iterable<CardAreaPanel> getCardPanels() {
-        return cardPanels;
+        return cardPanels.get();
     }
 
     @Override
     public int getCount() {
-        return cardPanels.size();
+        return cardPanels.get().size();
     }
 
     @Override
     public void setRotate180(boolean b0) {
         //only rotate cards themselves
         rotateCards180 = b0;
+    }
+
+    private float getCardStackOffset() {
+        if (Forge.isHorizontalTabLayout())
+            return 0.125f;
+        return CARD_STACK_OFFSET;
     }
 
     protected void refreshCardPanels(Iterable<CardView> model) {
@@ -57,15 +72,15 @@ public abstract class VCardDisplayArea extends VDisplayArea implements ActivateH
             for (CardView card : model) {
                 CardAreaPanel cardPanel = CardAreaPanel.get(card);
                 addCardPanelToDisplayArea(cardPanel);
-                cardPanels.add(cardPanel);
-                if (newCardPanel == null && !orderedCards.contains(card)) {
+                cardPanels.get().add(cardPanel);
+                if (newCardPanel == null && !orderedCards.get().contains(card)) {
                     newCardPanel = cardPanel;
                 }
             }
         }
         if (isVisible()) { //only revalidate if currently visible
             revalidate();
-    
+
             if (newCardPanel != null) { //if new cards added, ensure first new card is scrolled into view
                 scrollIntoView(newCardPanel);
             }
@@ -74,10 +89,12 @@ public abstract class VCardDisplayArea extends VDisplayArea implements ActivateH
 
     @Override
     public void setVisible(boolean b0) {
-        if (isVisible() == b0) { return; }
+        if (isVisible() == b0) {
+            return;
+        }
         super.setVisible(b0);
         if (b0) { //when zone becomes visible, ensure display area of panels is updated and panels layed out
-            for (CardAreaPanel pnl : cardPanels) {
+            for (CardAreaPanel pnl : cardPanels.get()) {
                 pnl.displayArea = this;
             }
             revalidate();
@@ -112,7 +129,7 @@ public abstract class VCardDisplayArea extends VDisplayArea implements ActivateH
             CardPanelContainer.this.remove(CardPanel.getDragAnimationPanel());
             CardPanelContainer.this.setMouseDragPanel(null);
         }*/
-        cardPanels.remove(fromPanel);
+        cardPanels.get().remove(fromPanel);
         remove(fromPanel);
     }
 
@@ -123,33 +140,39 @@ public abstract class VCardDisplayArea extends VDisplayArea implements ActivateH
     @Override
     public void clear() {
         super.clear();
-        if (!cardPanels.isEmpty()) {
-            for (CardAreaPanel panel : cardPanels) {
+        if (!cardPanels.get().isEmpty()) {
+            for (CardAreaPanel panel : cardPanels.get()) {
                 if (panel.displayArea == null || panel.displayArea == this ||
-                        !panel.displayArea.cardPanels.contains(panel)) { //don't reset if panel's displayed in another area already
+                        !panel.displayArea.cardPanels.get().contains(panel)) { //don't reset if panel's displayed in another area already
                     panel.reset();
                 }
             }
-            cardPanels.clear();
+            cardPanels.get().clear();
         }
     }
 
-    private final int addCards(CardAreaPanel cardPanel, float x, float y, float cardWidth, float cardHeight) {
+    private int addCards(CardAreaPanel cardPanel, float x, float y, float cardWidth, float cardHeight) {
         int totalCount = 0;
         List<CardAreaPanel> attachedPanels = cardPanel.getAttachedPanels();
         if (!attachedPanels.isEmpty()) {
             for (int i = attachedPanels.size() - 1; i >= 0; i--) {
-                int count = addCards(attachedPanels.get(i), x, y, cardWidth, cardHeight);
-                x += count * cardWidth * CARD_STACK_OFFSET;
-                totalCount += count;
+                CardAreaPanel attachedPanel = attachedPanels.get(i);
+                if (attachedPanel != null) {
+                    int count = addCards(attachedPanel, x, y, cardWidth, cardHeight);
+                    x += count * cardWidth * getCardStackOffset();
+                    totalCount += count;
+                }
             }
         }
 
-        orderedCards.add(cardPanel.getCard());
+        orderedCards.get().add(cardPanel.getCard());
+        if (cardPanel.isInfoGhost()) {
+            infoGhostCardIds.get().add(cardPanel.getCard().getId());
+        }
         cardPanel.setBounds(x, y, cardWidth, cardHeight);
 
         if (cardPanel.getNextPanelInStack() != null) { //add next panel in stack if needed
-            x += cardWidth * CARD_STACK_OFFSET;
+            x += cardWidth * getCardStackOffset();
             totalCount += addCards(cardPanel.getNextPanelInStack(), x, y, cardWidth, cardHeight);
         }
         return totalCount + 1;
@@ -158,22 +181,26 @@ public abstract class VCardDisplayArea extends VDisplayArea implements ActivateH
     protected float getCardWidth(float cardHeight) {
         return (cardHeight - 2 * FCardPanel.PADDING) / FCardPanel.ASPECT_RATIO + 2 * FCardPanel.PADDING; //ensure aspect ratio maintained after padding applied
     }
+
     protected float getCardHeight(float cardWidth) {
         return (cardWidth - 2 * FCardPanel.PADDING) * FCardPanel.ASPECT_RATIO + 2 * FCardPanel.PADDING; //ensure aspect ratio maintained after padding applied
     }
 
     @Override
     protected ScrollBounds layoutAndGetScrollBounds(float visibleWidth, float visibleHeight) {
-        orderedCards.clear();
+        orderedCards.get().clear();
+        infoGhostCardIds.get().clear();
 
         float x = 0;
         float y = 0;
         float cardHeight = visibleHeight;
         float cardWidth = getCardWidth(cardHeight);
 
-        for (CardAreaPanel cardPanel : cardPanels) {
-            int count = addCards(cardPanel, x, y, cardWidth, cardHeight);
-            x += cardWidth + (count - 1) * cardWidth * CARD_STACK_OFFSET;
+        for (CardAreaPanel cardPanel : new ArrayList<>(cardPanels.get())) {
+            if (cardPanel != null) {
+                int count = addCards(cardPanel, x, y, cardWidth, cardHeight);
+                x += cardWidth + (count - 1) * cardWidth * getCardStackOffset();
+            }
         }
 
         return new ScrollBounds(x, visibleHeight);
@@ -188,34 +215,40 @@ public abstract class VCardDisplayArea extends VDisplayArea implements ActivateH
 
     @Override
     public String getActivateAction(int index) {
-        if(!GuiBase.isNetworkplay()) //causes lag on netplay client side
-            return MatchController.instance.getGameController().getActivateDescription(orderedCards.get(index));
+        if (!GuiBase.isNetPlay(MatchController.instance)) {
+            //causes lag on netplay client side, also index shouldn't be out of bounds
+            if (index >= 0 && index < orderedCards.get().size())
+                return MatchController.instance.getGameController().getActivateDescription(orderedCards.get().get(index));
+        }
 
-        return "Activate | Cast | Play (if allowed)"; //simple text on card zoom swipe up
+        return Forge.getLocalizer().getMessage("lblActivateAction"); //simple text on card zoom swipe up
     }
 
     @Override
     public void setSelectedIndex(int index) {
         //just scroll card into view
-        if (index < orderedCards.size()) {
-            final CardAreaPanel cardPanel = CardAreaPanel.get(orderedCards.get(index));
-            scrollIntoView(cardPanel);
+        if (index < orderedCards.get().size()) {
+            final CardView card = orderedCards.get().get(index);
+            if (infoGhostCardIds.get().contains(card.getId())) {
+                return;
+            }
+            scrollIntoView(CardAreaPanel.get(card));
         }
     }
 
     @Override
     public void activate(int index) {
-        final CardAreaPanel cardPanel = CardAreaPanel.get(orderedCards.get(index));
-        ThreadUtil.invokeInGameThread(new Runnable() { //must invoke in game thread in case a dialog needs to be shown
-            @Override
-            public void run() {
-                cardPanel.selectCard(false);
-            }
-        });
+        final CardView card = orderedCards.get().get(index);
+        if (infoGhostCardIds.get().contains(card.getId())) {
+            return; //informational exile ghost: not actionable
+        }
+        final CardAreaPanel cardPanel = CardAreaPanel.get(card);
+        //must invoke in game thread in case a dialog needs to be shown
+        ThreadUtil.invokeInGameThread(() -> cardPanel.selectCard(false));
     }
 
     public static class CardAreaPanel extends FCardPanel {
-        private static final Map<Integer, CardAreaPanel> allCardPanels = new HashMap<>();
+        private static Map<Integer, CardAreaPanel> allCardPanels = new HashMap<>();
 
         public static CardAreaPanel get(CardView card0) {
             CardAreaPanel cardPanel = allCardPanels.get(card0.getId());
@@ -227,20 +260,29 @@ public abstract class VCardDisplayArea extends VDisplayArea implements ActivateH
         }
 
         public static void resetForNewGame() {
-            for (CardAreaPanel cardPanel : allCardPanels.values()) {
-                cardPanel.displayArea = null;
-                cardPanel.attachedToPanel = null;
-                cardPanel.attachedPanels.clear();
-                cardPanel.prevPanelInStack = null;
-                cardPanel.nextPanelInStack = null;
+            if (allCardPanels != null) {
+                for (CardAreaPanel cardPanel : allCardPanels.values()) {
+                    cardPanel.displayArea = null;
+                    cardPanel.attachedToPanel = null;
+                    cardPanel.attachedPanels.clear();
+                    cardPanel.prevPanelInStack = null;
+                    cardPanel.nextPanelInStack = null;
+                }
+                allCardPanels.clear();
+            } else {
+                allCardPanels = new HashMap<>();
             }
-            allCardPanels.clear();
         }
 
         private VCardDisplayArea displayArea;
         private CardAreaPanel attachedToPanel;
-        private final List<CardAreaPanel> attachedPanels = new ArrayList<>();
+        private List<CardAreaPanel> attachedPanels = new ArrayList<>();
         private CardAreaPanel nextPanelInStack, prevPanelInStack;
+
+        // CASTABLE = a prepared spell (tap to cast); INFO = a card exiled until this permanent leaves (inspect only)
+        public enum GhostKind { NONE, CASTABLE, INFO }
+        private static final Color GHOST_TINT = new Color(90 / 255f, 120 / 255f, 175 / 255f, 0.45f);
+        private GhostKind ghostKind = GhostKind.NONE;
 
         //use static get(card) function instead
         private CardAreaPanel(CardView card0) {
@@ -254,21 +296,41 @@ public abstract class VCardDisplayArea extends VDisplayArea implements ActivateH
         public CardAreaPanel getAttachedToPanel() {
             return attachedToPanel;
         }
+
+        public boolean isGhost() {
+            return ghostKind != GhostKind.NONE;
+        }
+
+        public boolean isInfoGhost() {
+            return ghostKind == GhostKind.INFO;
+        }
+
         public void setAttachedToPanel(final CardAreaPanel attachedToPanel0) {
             attachedToPanel = attachedToPanel0;
         }
+
         public List<CardAreaPanel> getAttachedPanels() {
+            if (attachedPanels == null) {
+                attachedPanels = new ArrayList<>();
+                String error = getCard() + " - Attached panel is null.";
+                Sentry.captureMessage(error);
+                System.err.println(error);
+            }
             return attachedPanels;
         }
+
         public CardAreaPanel getNextPanelInStack() {
             return nextPanelInStack;
         }
+
         public void setNextPanelInStack(CardAreaPanel nextPanelInStack0) {
             nextPanelInStack = nextPanelInStack0;
         }
+
         public CardAreaPanel getPrevPanelInStack() {
             return prevPanelInStack;
         }
+
         public void setPrevPanelInStack(CardAreaPanel prevPanelInStack0) {
             prevPanelInStack = prevPanelInStack0;
         }
@@ -289,27 +351,65 @@ public abstract class VCardDisplayArea extends VDisplayArea implements ActivateH
 
             attachedPanels.clear();
 
-            if (card.hasAnyCardAttachments()) {
-                final Iterable<CardView> enchants = card.getAllAttachedCards();
-                for (final CardView e : enchants) {
-                    final CardAreaPanel cardE = CardAreaPanel.get(e);
-                    if (cardE != null) {
-                        attachedPanels.add(cardE);
-                    }
+            for (final CardView e : card.getAllAttachedCards()) {
+                final CardAreaPanel cardE = CardAreaPanel.get(e);
+                if (cardE != null) {
+                    attachedPanels.add(cardE);
                 }
             }
-       
-            if (card.getAttachedTo() != null) {
-                if (card != card.getAttachedTo().getAttachedTo())
-                    setAttachedToPanel(CardAreaPanel.get(card.getAttachedTo()));
+            CardView getAttachedto = card.getAttachedTo();
+            if (getAttachedto != null) {
+                if (card != getAttachedto.getAttachedTo())
+                    setAttachedToPanel(CardAreaPanel.get(getAttachedto));
                 else {
-                    attachedPanels.remove(CardAreaPanel.get(card.getAttachedTo()));
+                    attachedPanels.remove(CardAreaPanel.get(getAttachedto));
                     setAttachedToPanel(null);
                 }
-            }
-            else {
+            } else {
                 setAttachedToPanel(null);
             }
+
+            addLinkedExileGhosts(card);
+        }
+
+        // Fresh instances each refresh, never the shared CardAreaPanel cache (which the exile zone reuses)
+        private void addLinkedExileGhosts(final CardView card) {
+            if (!FModel.getPreferences().getPrefBoolean(FPref.UI_SHOW_LINKED_EXILE_CARDS)) {
+                return;
+            }
+            int cap = FModel.getPreferences().getPrefInt(FPref.UI_MAX_STACK_DEPTH) - attachedPanels.size();
+            if (cap <= 0) {
+                return;
+            }
+            final CardView prepared = card.getPreparedSpell();
+            if (prepared != null) {
+                attachedPanels.add(newGhost(prepared, GhostKind.CASTABLE));
+                cap--;
+            }
+            for (final CardView exiled : card.getUntilLeavesBattlefield()) {
+                if (cap <= 0) {
+                    break;
+                }
+                attachedPanels.add(newGhost(exiled, GhostKind.INFO));
+                cap--;
+            }
+        }
+
+        private CardAreaPanel newGhost(final CardView ghostCard, final GhostKind kind) {
+            final CardAreaPanel ghost = new CardAreaPanel(ghostCard);
+            ghost.ghostKind = kind;
+            ghost.setAttachedToPanel(this);
+            return ghost;
+        }
+
+        private void drawGhostOverlay(Graphics g) {
+            final float padding = getPadding();
+            float w = getWidth() - 2 * padding;
+            final float h = getHeight() - 2 * padding;
+            if (w == h) {
+                w = h / ASPECT_RATIO;
+            }
+            g.fillRect(GHOST_TINT, padding, padding, w, h);
         }
 
         //clear and reset all pointers from this panel
@@ -331,26 +431,14 @@ public abstract class VCardDisplayArea extends VDisplayArea implements ActivateH
             if (count > 1) //prevent double choice lists or activate handle
                 return false;
             if (renderedCardContains(x, y)) {
-                ThreadUtil.invokeInGameThread(new Runnable() { //must invoke in game thread in case a dialog needs to be shown
-                    @Override
-                    public void run() {
-                        if (GuiBase.getInterface().isRunningOnDesktop() && Forge.mouseButtonID == Input.Buttons.RIGHT) {
-                            FThreads.invokeInEdtLater(new Runnable() {
-                                @Override
-                                public void run() {
-                                    showZoom();
-                                }
-                            });
-                            return;
-                        } else if (!selectCard(false)) {
-                            //if no cards in stack can be selected, just show zoom/details for card
-                            FThreads.invokeInEdtLater(new Runnable() {
-                                @Override
-                                public void run() {
-                                    showZoom();
-                                }
-                            });
-                        }
+                //must invoke in game thread in case a dialog needs to be shown
+                ThreadUtil.invokeInGameThread(() -> {
+                    if (GuiBase.getInterface().isRunningOnDesktop() && Forge.mouseButtonID == Input.Buttons.RIGHT) {
+                        FThreads.invokeInEdtLater(CardAreaPanel.this::showZoom);
+                    } else if (!selectCard(false)) {
+                        //if no cards in stack can be selected, just show zoom/details for card
+                        if (!MatchController.instance.isSelecting())
+                            FThreads.invokeInEdtLater(CardAreaPanel.this::showZoom);
                     }
                 });
                 return true;
@@ -361,26 +449,14 @@ public abstract class VCardDisplayArea extends VDisplayArea implements ActivateH
         @Override
         public boolean flick(float x, float y) {
             if (renderedCardContains(x, y)) {
-                ThreadUtil.invokeInGameThread(new Runnable() { //must invoke in game thread in case a dialog needs to be shown
-                    @Override
-                    public void run() {
-                        selectCard(true);
-                    }
-                });
+                //must invoke in game thread in case a dialog needs to be shown
+                ThreadUtil.invokeInGameThread(() -> selectCard(true));
                 return true;
             }
             return false;
         }
 
         public boolean selectCard(boolean selectEntireStack) {
-            if (!getCard().getController().equals(MatchController.instance.getCurrentPlayer()) && ZoneType.Hand.equals(getCard().getZone())) {
-                if (getCard().mayPlayerLook(MatchController.instance.getCurrentPlayer())) { // can see the card, check if can play...
-                    if (!getCard().getMayPlayPlayers(MatchController.instance.getCurrentPlayer()))
-                        return false;
-                } else {
-                    return false;
-                }
-            }
             if (MatchController.instance.getGameController().selectCard(getCard(), getOtherCardsToSelect(selectEntireStack), null)) {
                 Gdx.graphics.requestRendering();
                 return true;
@@ -392,6 +468,9 @@ public abstract class VCardDisplayArea extends VDisplayArea implements ActivateH
             }
             //as a last resort try to select attached panels
             for (CardAreaPanel panel : attachedPanels) {
+                if (panel.isGhost()) {
+                    continue; //ghosts are selected only by a direct tap, never via the host
+                }
                 if (panel.selectCard(selectEntireStack)) {
                     Gdx.graphics.requestRendering();
                     return true;
@@ -410,9 +489,11 @@ public abstract class VCardDisplayArea extends VDisplayArea implements ActivateH
         }
 
         public void showZoom() {
-            if (displayArea == null) { return; }
+            if (displayArea == null) {
+                return;
+            }
 
-            final List<CardView> cards = displayArea.orderedCards;
+            final List<CardView> cards = displayArea.orderedCards.get();
             CardZoom.show(cards, cards.indexOf(getCard()), displayArea);
         }
 
@@ -431,10 +512,14 @@ public abstract class VCardDisplayArea extends VDisplayArea implements ActivateH
         }
 
         private List<CardView> getOtherCardsToSelect(boolean selectOtherCardsInStack) {
-            if (!selectOtherCardsInStack) { return null; }
+            if (!selectOtherCardsInStack) {
+                return null;
+            }
 
             //on double-tap select all other cards in stack if any
-            if (prevPanelInStack == null && nextPanelInStack == null) { return null; }
+            if (prevPanelInStack == null && nextPanelInStack == null) {
+                return null;
+            }
 
             List<CardView> cards = new ArrayList<>();
 
@@ -477,7 +562,9 @@ public abstract class VCardDisplayArea extends VDisplayArea implements ActivateH
 
         public Vector2 getTargetingArrowOrigin() {
             //don't show targeting arrow unless in display area that's visible
-            if (displayArea == null || !displayArea.isVisible()) { return null; }
+            if (displayArea == null || !displayArea.isVisible()) {
+                return null;
+            }
 
             return getTargetingArrowOrigin(this, isTapped());
         }
@@ -504,9 +591,11 @@ public abstract class VCardDisplayArea extends VDisplayArea implements ActivateH
                 g.startRotateTransform(x + w / 2, y + h / 2, 180);
                 super.draw(g);
                 g.endTransform();
-            }
-            else {
+            } else {
                 super.draw(g);
+            }
+            if (ghostKind != GhostKind.NONE) {
+                drawGhostOverlay(g);
             }
         }
     }

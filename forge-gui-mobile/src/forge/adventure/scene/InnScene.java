@@ -11,6 +11,7 @@ import forge.adventure.stage.GameHUD;
 import forge.adventure.util.AdventureEventController;
 import forge.adventure.util.Controls;
 import forge.adventure.util.Current;
+import forge.model.CardBlock;
 
 /**
  * Scene for the Inn in towns
@@ -34,7 +35,7 @@ public class InnScene extends UIScene {
         localObjectId = objectId;
         if (lastGameScene != null)
             object.lastGameScene=lastGameScene;
-        getLocalEvent();
+        initLocalEvent();
 
         return object;
     }
@@ -97,19 +98,19 @@ public class InnScene extends UIScene {
     public void enter() {
         super.enter();
         refreshStatus();
-        GameHUD.getInstance().switchAudio();
+        GameHUD.getInstance().updateBGM();
     }
 
     private void refreshStatus(){
-
-        tempHealthCost = Math.round(Current.player().falseLifeCost() * changes.getTownPriceModifier());
+        float townPriceModifier = changes == null ? 1f : changes.getTownPriceModifier();
+        tempHealthCost = Math.round(Current.player().falseLifeCost() * townPriceModifier);
         boolean purchaseable = Current.player().getMaxLife() == Current.player().getLife() &&
                 tempHealthCost <= Current.player().getGold();
 
         tempHitPointCost.setDisabled(!purchaseable);
         tempHitPointCost.setText("[+GoldCoin] " + tempHealthCost);
 
-        getLocalEvent();
+        initLocalEvent();
         if (localEvent == null){
             eventDescription.setText("[GREY]No events at this time");
             event.setDisabled(true);
@@ -144,13 +145,12 @@ public class InnScene extends UIScene {
     }
 
     private void sell() {
-        ShopScene.instance().loadChanges(changes);
-        Forge.switchScene(ShopScene.instance());
+        ShopScene scene = ShopScene.instance(getUIBackground());
+        scene.loadChanges(changes);
+        Forge.switchScene(scene);
     }
 
-
-
-    private static void getLocalEvent() {
+    private static void initLocalEvent() {
         localEvent = null;
         for (AdventureEventData data :  AdventurePlayer.current().getEvents()){
             if (data.sourceID.equals(localPointOfInterestId) && data.eventOrigin == localObjectId){
@@ -158,7 +158,18 @@ public class InnScene extends UIScene {
                 return;
             }
         }
-        localEvent = AdventureEventController.instance().createEvent(AdventureEventController.EventStyle.Bracket, localPointOfInterestId, localObjectId, changes);
+        AdventureEventController controller = AdventureEventController.instance();
+        localEvent = controller.createEvent(localPointOfInterestId);
+        if(localEvent != null)
+            controller.initializeEvent(localEvent, localPointOfInterestId, localObjectId, changes);
+    }
+
+    public static void replaceLocalEvent(AdventureEventController.EventFormat format, CardBlock cardBlock) {
+        AdventurePlayer.current().getEvents().removeIf((data) -> data.sourceID.equals(localPointOfInterestId) && data.eventOrigin == localObjectId);
+        AdventureEventController controller = AdventureEventController.instance();
+        localEvent = controller.createEvent(format, cardBlock, localPointOfInterestId);
+        if(localEvent != null)
+            controller.initializeEvent(localEvent, localPointOfInterestId, localObjectId, changes);
     }
 
     private void startEvent(){

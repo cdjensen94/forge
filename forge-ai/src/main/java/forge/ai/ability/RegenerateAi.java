@@ -17,26 +17,19 @@
  */
 package forge.ai.ability;
 
-import java.util.ArrayList;
-import java.util.List;
-
-import forge.ai.ComputerUtil;
-import forge.ai.ComputerUtilCard;
-import forge.ai.ComputerUtilCombat;
-import forge.ai.SpellAbilityAi;
+import forge.ai.*;
 import forge.game.Game;
 import forge.game.GameObject;
 import forge.game.ability.AbilityUtils;
-import forge.game.card.Card;
-import forge.game.card.CardCollection;
-import forge.game.card.CardCollectionView;
-import forge.game.card.CardLists;
-import forge.game.card.CardPredicates;
+import forge.game.card.*;
 import forge.game.combat.Combat;
 import forge.game.phase.PhaseType;
 import forge.game.player.Player;
 import forge.game.spellability.SpellAbility;
 import forge.game.zone.ZoneType;
+
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * <p>
@@ -49,7 +42,7 @@ import forge.game.zone.ZoneType;
 public class RegenerateAi extends SpellAbilityAi {
 
     @Override
-    protected boolean checkApiLogic(final Player ai, final SpellAbility sa) {
+    protected AiAbilityDecision checkApiLogic(final Player ai, final SpellAbility sa) {
         final Game game = ai.getGame();
         final Combat combat = game.getCombat();
         final Card hostCard = sa.getHostCard();
@@ -61,7 +54,7 @@ public class RegenerateAi extends SpellAbilityAi {
             List<Card> targetables = CardLists.getTargetableCards(ai.getCardsIn(ZoneType.Battlefield), sa);
 
             if (targetables.isEmpty()) {
-                return false;
+                return new AiAbilityDecision(0, AiPlayDecision.TargetingFailed);
             }
 
             if (!game.getStack().isEmpty()) {
@@ -82,7 +75,7 @@ public class RegenerateAi extends SpellAbilityAi {
                     chance = true;
                 }
             } else if (game.getPhaseHandler().is(PhaseType.COMBAT_DECLARE_BLOCKERS)) {
-                final CardCollection combatants = CardLists.filter(targetables, CardPredicates.Presets.CREATURES);
+                final CardCollection combatants = CardLists.filter(targetables, CardPredicates.CREATURES);
                 ComputerUtilCard.sortByEvaluateCreature(combatants);
 
                 for (final Card c : combatants) {
@@ -94,12 +87,12 @@ public class RegenerateAi extends SpellAbilityAi {
                 }
             }
             if (sa.getTargets().isEmpty()) {
-                return false;
+                return new AiAbilityDecision(0, AiPlayDecision.TargetingFailed);
             }
         } else {
             final List<Card> list = AbilityUtils.getDefinedCards(hostCard, sa.getParam("Defined"), sa);
             if (list.isEmpty()) {
-                return false;
+                return new AiAbilityDecision(0, AiPlayDecision.MissingNeededCards);
             }
             // when regenerating more than one is possible try for slightly more value
             int numToSave = Math.min(2, list.size());
@@ -123,21 +116,23 @@ public class RegenerateAi extends SpellAbilityAi {
             chance = saved >= numToSave;
         }
 
-        return chance;
+        if (chance) {
+            return new AiAbilityDecision(100, AiPlayDecision.WillPlay);
+        }
+
+        return new AiAbilityDecision(0, AiPlayDecision.CantPlayAi);
     }
 
     @Override
-    protected boolean doTriggerAINoCost(Player ai, SpellAbility sa, boolean mandatory) {
-        boolean chance = false;
-
+    protected AiAbilityDecision doTriggerNoCost(Player ai, SpellAbility sa, boolean mandatory) {
+        boolean chance;
         if (sa.usesTargeting()) {
             chance = regenMandatoryTarget(ai, sa, mandatory);
         } else {
             // If there's no target on the trigger, just say yes.
             chance = true;
         }
-
-        return chance;
+        return chance ? new AiAbilityDecision(100, AiPlayDecision.WillPlay) : new AiAbilityDecision(0, AiPlayDecision.CantPlayAi);
     }
 
     private static boolean regenMandatoryTarget(final Player ai, final SpellAbility sa, final boolean mandatory) {
@@ -156,7 +151,7 @@ public class RegenerateAi extends SpellAbilityAi {
         }
 
         if (compTargetables.size() > 0) {
-            final CardCollection combatants = CardLists.filter(compTargetables, CardPredicates.Presets.CREATURES);
+            final CardCollection combatants = CardLists.filter(compTargetables, CardPredicates.CREATURES);
             ComputerUtilCard.sortByEvaluateCreature(combatants);
             if (game.getPhaseHandler().is(PhaseType.COMBAT_DECLARE_BLOCKERS)) {
                 Combat combat = game.getCombat();

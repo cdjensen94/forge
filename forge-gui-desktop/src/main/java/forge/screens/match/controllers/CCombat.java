@@ -1,8 +1,7 @@
 package forge.screens.match.controllers;
 
-import org.apache.commons.lang3.StringUtils;
-
 import com.google.common.collect.Iterables;
+import org.apache.commons.lang3.StringUtils;
 
 import forge.game.GameEntityView;
 import forge.game.card.CardView;
@@ -70,21 +69,23 @@ public class CCombat implements ICDoc {
     }
 
     private static String getCombatDescription(final CombatView localCombat, final GameEntityView defender) {
-        final StringBuilder display = new StringBuilder();
-
         final Iterable<FCollection<CardView>> bands = localCombat.getAttackingBandsOf(defender);
         if (bands == null || Iterables.isEmpty(bands)) {
             return StringUtils.EMPTY;
         }
 
+        final StringBuilder display = new StringBuilder();
         display.append("\n");
-
-        if (defender instanceof CardView) {
-            final PlayerView controller = ((CardView) defender).getController();
-            display.append(Lang.getInstance().getPossesive(controller.getName())).append(" ");
+        if (defender instanceof CardView def) {
+            PlayerView controller = def.getController();
+            if (controller == null) {
+                //shouldn't be null but display card's + controller ie Black Knight's controller
+                display.append(Lang.getInstance().getPossesive(defender.getName())).append(" controller");
+            } else {
+                display.append(Lang.getInstance().getPossesive(controller.getName())).append(" ");
+            }
         }
-
-        display.append(defender).append(" is attacked by:\n");
+        display.append(defender).append(" is attacked by:\n`");
 
         // Associate Bands, Attackers Blockers
         boolean previousBand = false;

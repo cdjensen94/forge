@@ -17,28 +17,7 @@
  */
 package forge.gui.download;
 
-import java.io.File;
-import java.io.FileNotFoundException;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.net.ConnectException;
-import java.net.HttpURLConnection;
-import java.net.InetSocketAddress;
-import java.net.MalformedURLException;
-import java.net.Proxy;
-import java.net.URL;
-import java.net.URLDecoder;
-import java.util.HashSet;
-import java.util.Map;
-import java.util.Map.Entry;
-import java.util.concurrent.TimeUnit;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
-
-import org.apache.commons.lang3.tuple.Pair;
-
-import com.esotericsoftware.minlog.Log;
+import org.tinylog.Logger;
 
 import forge.gui.FThreads;
 import forge.gui.GuiBase;
@@ -48,9 +27,20 @@ import forge.gui.interfaces.IButton;
 import forge.gui.interfaces.IProgressBar;
 import forge.gui.interfaces.ITextField;
 import forge.localinstance.properties.ForgeConstants;
+import forge.util.BuildInfo;
 import forge.util.FileUtil;
 import forge.util.HttpUtil;
+import forge.util.ScryfallRateLimiter;
 import forge.util.TextUtil;
+import org.apache.commons.lang3.tuple.Pair;
+
+import java.io.*;
+import java.net.*;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Map.Entry;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 @SuppressWarnings("serial")
 public abstract class GuiDownloadService implements Runnable {
@@ -102,25 +92,19 @@ public abstract class GuiDownloadService implements Runnable {
         String startOverrideDesc = getStartOverrideDesc();
         if (startOverrideDesc == null) {
             // Free up the EDT by assembling card list on a background thread
-            FThreads.invokeInBackgroundThread(new Runnable() {
-                @Override
-                public void run() {
-                    try {
-                        files = getNeededFiles();
-                    }
-                    catch (Exception e) {
-                        e.printStackTrace();
-                    }
-                    FThreads.invokeInEdtLater(new Runnable() {
-                        @Override
-                        public void run() {
-                            if (onReadyToStart != null) {
-                                onReadyToStart.run();
-                            }
-                            readyToStart();
-                        }
-                    });
+            FThreads.invokeInBackgroundThread(() -> {
+                try {
+                    files = getNeededFiles();
                 }
+                catch (Exception e) {
+                    e.printStackTrace();
+                }
+                FThreads.invokeInEdtLater(() -> {
+                    if (onReadyToStart != null) {
+                        onReadyToStart.run();
+                    }
+                    readyToStart();
+                });
             });
         } else {
             //handle special case of zip service
@@ -131,17 +115,17 @@ public abstract class GuiDownloadService implements Runnable {
             btnStart.setCommand(cmdStartDownload);
             btnStart.setEnabled(true);
 
-            FThreads.invokeInEdtLater(new Runnable() {
-                @Override
-                public void run() {
-                    btnStart.requestFocusInWindow();
-                }
-            });
+            FThreads.invokeInEdtLater(() -> btnStart.requestFocusInWindow());
         }
     }
 
     protected String getStartOverrideDesc() {
         return null;
+    }
+
+    /** Updates the visible progress description from a background thread. */
+    protected void reportStatus(String message) {
+        FThreads.invokeInEdtLater(() -> progressBar.setDescription(message));
     }
 
     private void readyToStart() {
@@ -161,12 +145,7 @@ public abstract class GuiDownloadService implements Runnable {
         }
         btnStart.setEnabled(true);
 
-        FThreads.invokeInEdtLater(new Runnable() {
-            @Override
-            public void run() {
-                btnStart.requestFocusInWindow();
-            }
-        });
+        FThreads.invokeInEdtLater(() -> btnStart.requestFocusInWindow());
     }
 
     public void setType(int type0) {
@@ -200,43 +179,40 @@ public abstract class GuiDownloadService implements Runnable {
     }
 
     private void update(final int count) {
-        FThreads.invokeInEdtLater(new Runnable() {
-            @Override
-            public void run() {
-                if (onUpdate != null) {
-                    onUpdate.run();
-                }
-
-                final StringBuilder sb = new StringBuilder();
-
-                final int a = getAverageTimePerObject();
-
-                if (count != files.size()) {
-                    sb.append(count).append("/").append(files.size()).append(" - ");
-
-                    long t2Go = (files.size() - count) * a;
-
-                    if (t2Go > 3600000) {
-                        sb.append(String.format("%02d:", t2Go / 3600000));
-                        t2Go = t2Go % 3600000;
-                    }
-                    if (t2Go > 60000) {
-                        sb.append(String.format("%02d:", t2Go / 60000));
-                        t2Go = t2Go % 60000;
-                    } else {
-                        sb.append("00:");
-                    }
-
-                    sb.append(String.format("%02d remaining.", t2Go / 1000));
-                } else {
-                    sb.append(String.format("%d of %d items finished! Skipped " + skipped + " items. Please close!",
-                            count, files.size()));
-                    finish();
-                }
-
-                progressBar.setValue(count);
-                progressBar.setDescription(sb.toString());
+        FThreads.invokeInEdtLater(() -> {
+            if (onUpdate != null) {
+                onUpdate.run();
             }
+
+            final StringBuilder sb = new StringBuilder();
+
+            final int a = getAverageTimePerObject();
+
+            if (count != files.size()) {
+                sb.append(count).append("/").append(files.size()).append(" - ");
+
+                long t2Go = (files.size() - count) * a;
+
+                if (t2Go > 3600000) {
+                    sb.append(String.format("%02d:", t2Go / 3600000));
+                    t2Go = t2Go % 3600000;
+                }
+                if (t2Go > 60000) {
+                    sb.append(String.format("%02d:", t2Go / 60000));
+                    t2Go = t2Go % 60000;
+                } else {
+                    sb.append("00:");
+                }
+
+                sb.append(String.format("%02d remaining.", t2Go / 1000));
+            } else {
+                sb.append(String.format("%d of %d items finished! Skipped " + skipped + " items. Please close!",
+                        count, files.size()));
+                finish();
+            }
+
+            progressBar.setValue(count);
+            progressBar.setDescription(sb.toString());
         });
     }
 
@@ -281,14 +257,22 @@ public abstract class GuiDownloadService implements Runnable {
             FileOutputStream fos = null;
             try {
                 final File base = fileDest.getParentFile();
-                if (FileUtil.ensureDirectoryExists(base)) { //ensure destination directory exists
+                if (ScryfallRateLimiter.isApiUrl(url)) {
+                    // Wait out an active cooldown rather than skipping -- this is a background,
+                    // cancelable bulk run, so it's worth pausing to actually finish downloading
+                    // instead of racing through the rest of a large queue in skip-only mode.
+                    ScryfallRateLimiter.awaitCooldownCleared(() -> cancel, this::reportStatus);
+                }
+                if (!cancel && FileUtil.ensureDirectoryExists(base)) { //ensure destination directory exists
                     URL imageUrl = new URL(url);
                     HttpURLConnection conn = (HttpURLConnection) imageUrl.openConnection(p);
+                    // Scryfall asks for a descriptive User-Agent and rate-limits harder without one.
+                    conn.setRequestProperty("User-Agent", BuildInfo.getUserAgent());
                     // don't allow redirections here -- they indicate 'file not found' on the server
                     // only allow redirections to consume Scryfall API
-                    if(url.contains("api.scryfall.com")) {
+                    if (ScryfallRateLimiter.isApiUrl(url)) {
                         conn.setInstanceFollowRedirects(true);
-                        TimeUnit.MILLISECONDS.sleep(100);
+                        ScryfallRateLimiter.acquire(url);
                     } else {
                         conn.setInstanceFollowRedirects(false);
                     }
@@ -340,12 +324,16 @@ public abstract class GuiDownloadService implements Runnable {
                         if(url.contains("/images/") && !isJPG && !isLogged)
                             System.out.println("File not found: .." + url.substring(url.lastIndexOf("/images/")+1));
                         break;
+                    case 429:
+                        ScryfallRateLimiter.noteIfRateLimited(429, url, conn.getHeaderField("Retry-After"));
+                        conn.disconnect();
+                        break;
                     default:
                         conn.disconnect();
                         System.out.println("  Connection failed for url: " + url);
                         break;
                     }
-                } else {
+                } else if (!cancel) {
                     System.out.println("  Can't create folder: " + base.getAbsolutePath());
                 }
             }
@@ -357,10 +345,10 @@ public abstract class GuiDownloadService implements Runnable {
             }
             catch (final FileNotFoundException fnfe) {
                 String formatStr = "  Error - the LQ picture %s could not be found on the server. [%s] - %s";
-                System.out.println(String.format(formatStr, fileDest.getName(), url, fnfe.getMessage()));
+                System.out.printf((formatStr) + "%n", fileDest.getName(), url, fnfe.getMessage());
             }
             catch (final Exception ex) {
-                Log.error("LQ Pictures", "Error downloading pictures", ex);
+                Logger.error(ex, "Error downloading pictures");
             }
             finally {
                 if (fos != null) {
@@ -407,7 +395,7 @@ public abstract class GuiDownloadService implements Runnable {
     }
 
     public abstract String getTitle();
-    protected abstract Map<String, String> getNeededFiles();
+    protected abstract Map<String, String> getNeededFiles() throws UnsupportedEncodingException;
 
     protected static void addMissingItems(Map<String, String> list, String nameUrlFile, String dir) {
         addMissingItems(list, nameUrlFile, dir, false);

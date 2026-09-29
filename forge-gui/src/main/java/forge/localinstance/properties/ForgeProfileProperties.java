@@ -18,8 +18,8 @@
 package forge.localinstance.properties;
 
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.IOException;
+import java.nio.file.Files;
 import java.util.Map;
 import java.util.Properties;
 
@@ -43,7 +43,6 @@ public class ForgeProfileProperties {
     private static Map<String, String> cardPicsSubDirs;
     private static String decksDir;
     private static String decksConstructedDir;
-    private static int serverPort;
 
     private static final String USER_DIR_KEY      = "userDir";
     private static final String CACHE_DIR_KEY     = "cacheDir";
@@ -51,7 +50,7 @@ public class ForgeProfileProperties {
     private static final String CARD_PICS_SUB_DIRS_KEY = "cardPicsSubDirs";
     private static final String DECKS_DIR_KEY      = "decksDir";
     private static final String DECKS_CONSTRUCTED_DIR_KEY = "decksConstructedDir";
-    private static final String SERVER_PORT_KEY = "serverPort";
+
 
     private ForgeProfileProperties() {
         //prevent initializing static class
@@ -62,7 +61,7 @@ public class ForgeProfileProperties {
         final File propFile = new File(ForgeConstants.PROFILE_FILE);
         try {
             if (propFile.canRead() && !isUsingAppDirectory) {
-                props.load(new FileInputStream(propFile));
+                props.load(Files.newInputStream(propFile.toPath()));
             }
         } catch (final IOException e) {
             System.err.println("error while reading from profile properties file");
@@ -75,9 +74,7 @@ public class ForgeProfileProperties {
         cardPicsSubDirs = getMap(props, CARD_PICS_SUB_DIRS_KEY);
         decksDir    = getDir(props, DECKS_DIR_KEY, userDir + "decks" + File.separator);
         decksConstructedDir = getDir(props, DECKS_CONSTRUCTED_DIR_KEY, decksDir + "constructed" + File.separator);
-        serverPort = getInt(props, SERVER_PORT_KEY, 36743); // "Forge" using phone keypad
 
-        //ensure directories exist
         FileUtil.ensureDirectoryExists(userDir);
         FileUtil.ensureDirectoryExists(cacheDir);
         FileUtil.ensureDirectoryExists(cardPicsDir);
@@ -127,10 +124,6 @@ public class ForgeProfileProperties {
         save();
     }
 
-    public static int getServerPort() {
-        return serverPort;
-    }
-
     private static Map<String, String> getMap(final Properties props, final String propertyKey) {
         final String strMap = props.getProperty(propertyKey, "").trim();
         return FileSection.parseToMap(strMap, FileSection.ARROW_KV_SEPARATOR);
@@ -164,6 +157,14 @@ public class ForgeProfileProperties {
     // returns a pair <userDir, cacheDir>
     private static Pair<String, String> getDefaultDirs() {
         if (!GuiBase.getInterface().isRunningOnDesktop()) { //special case for mobile devices
+            // iOS: Main.java points these at the writable Documents sandbox; the
+            // assets dir is the read-only app bundle, so deriving data/cache from
+            // it would make every write (image cache, prefs) fail on device
+            String iosUserDir = System.getProperty("forge.ios.userDir");
+            String iosCacheDir = System.getProperty("forge.ios.cacheDir");
+            if (iosUserDir != null && iosCacheDir != null) {
+                return Pair.of(iosUserDir, iosCacheDir);
+            }
             final String assetsDir = ForgeConstants.ASSETS_DIR;
             return Pair.of(assetsDir + "data" + File.separator, assetsDir + "cache" + File.separator);
         }
@@ -233,9 +234,6 @@ public class ForgeProfileProperties {
                 sb.append(entry.getKey()).append("->").append(entry.getValue());
             }
             sb.append("\n");
-        }
-        if (serverPort != 0) {
-            sb.append(SERVER_PORT_KEY + "=").append(serverPort);
         }
         if (sb.length() > 0) {
             FileUtil.writeFile(ForgeConstants.PROFILE_FILE, sb.toString());

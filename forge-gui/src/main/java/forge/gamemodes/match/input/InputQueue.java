@@ -17,12 +17,13 @@
  */
 package forge.gamemodes.match.input;
 
+import forge.game.GameView;
+import forge.util.IHasForgeLog;
+import forge.player.PlayerControllerHuman;
+
 import java.util.Observable;
 import java.util.concurrent.BlockingDeque;
 import java.util.concurrent.LinkedBlockingDeque;
-
-import forge.game.GameView;
-import forge.player.PlayerControllerHuman;
 
 /**
  * <p>
@@ -32,7 +33,8 @@ import forge.player.PlayerControllerHuman;
  * @author Forge
  * @version $Id: InputQueue.java 24769 2014-02-09 13:56:04Z Hellfish $
  */
-public class InputQueue extends Observable {
+public class InputQueue extends Observable implements IHasForgeLog {
+
     private final BlockingDeque<InputSynchronized> inputStack = new LinkedBlockingDeque<>();
     private final GameView gameView;
 
@@ -56,16 +58,23 @@ public class InputQueue extends Observable {
 
         if (topMostInput != inp) {
             System.out.println("Cannot remove input " + inp.getClass().getSimpleName() + " because it's not on top of stack. Stack = " + inputStack );
-        } else {
-          inputStack.pop();
+        } else if (topMostInput != null) {
+            // if topMostInput is null then it means the inputstack is already empty, why this is called twice?
+           inputStack.pop();
         }
         updateObservers();
     }
 
     public final void clearInputs() {
+        netLog.trace("clearInputs() called, stack size = {}", inputStack.size());
+        int count = 0;
         while(!inputStack.isEmpty()) {
-            inputStack.pop().stop();
+            InputSynchronized inp = inputStack.pop();
+            netLog.trace("Stopping input #{}: {}", count, inp.getClass().getSimpleName());
+            inp.stop();
+            count++;
         }
+        netLog.trace("clearInputs() done, stopped {} inputs", count);
 
         updateObservers();
     }

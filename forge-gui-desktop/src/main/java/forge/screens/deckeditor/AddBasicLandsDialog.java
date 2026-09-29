@@ -21,8 +21,6 @@ import java.awt.Dimension;
 import java.awt.FlowLayout;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
-import java.awt.event.ActionEvent;
-import java.awt.event.ActionListener;
 import java.awt.event.MouseEvent;
 import java.awt.image.BufferedImage;
 import java.util.Map;
@@ -32,7 +30,6 @@ import javax.swing.JOptionPane;
 import javax.swing.SwingConstants;
 
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.Iterables;
 
 import forge.ImageCache;
 import forge.StaticData;
@@ -57,6 +54,7 @@ import forge.toolbox.FOptionPane;
 import forge.toolbox.FSkin;
 import forge.toolbox.FSkin.SkinnedPanel;
 import forge.toolbox.FTextField;
+import forge.util.IterableUtil;
 import forge.util.Localizer;
 import forge.util.MyRandom;
 import forge.view.arcane.CardPanel;
@@ -70,7 +68,7 @@ public class AddBasicLandsDialog {
     private static final int LAND_PANEL_PADDING = 3;
 
     private final FComboBoxPanel<CardEdition> cbLandSet = new FComboBoxPanel<>(Localizer.getInstance().getMessage("lblLandSet") + ":", FlowLayout.CENTER,
-            Iterables.filter(StaticData.instance().getSortedEditions(), CardEdition.Predicates.hasBasicLands));
+            IterableUtil.filter(StaticData.instance().getSortedEditions(), CardEdition::hasBasicLands));
 
     private final MainPanel panel = new MainPanel();
     private final LandPanel pnlPlains = new LandPanel("Plains");
@@ -127,16 +125,13 @@ public class AddBasicLandsDialog {
         });
         lblDeckInfo.setToolTipText(Localizer.getInstance().getMessage("lblDeckStatisticsAutoSuggest"));
 
-        cbLandSet.addActionListener(new ActionListener() {
-            @Override
-            public void actionPerformed(final ActionEvent arg0) {
-                landSet = cbLandSet.getSelectedItem();
-                pnlPlains.refreshArtChoices();
-                pnlIsland.refreshArtChoices();
-                pnlSwamp.refreshArtChoices();
-                pnlMountain.refreshArtChoices();
-                pnlForest.refreshArtChoices();
-            }
+        cbLandSet.addActionListener(arg0 -> {
+            landSet = cbLandSet.getSelectedItem();
+            pnlPlains.refreshArtChoices();
+            pnlIsland.refreshArtChoices();
+            pnlSwamp.refreshArtChoices();
+            pnlMountain.refreshArtChoices();
+            pnlForest.refreshArtChoices();
         });
         cbLandSet.setSelectedItem(defaultLandSet);
 
@@ -323,34 +318,25 @@ public class AddBasicLandsDialog {
             cardPanel = new LandCardPanel();
             cbLandArt = new FComboBox<>();
             cbLandArt.setFont(FSkin.getFont());
-            cbLandArt.addActionListener(new ActionListener() {
-                @Override
-                public void actionPerformed(final ActionEvent arg0) {
-                    int artIndex = cbLandArt.getSelectedIndex();
-                    if (artIndex < 0) { return; }
-                    card = generateCard(artIndex); //generate card for display
-                    cardPanel.repaint();
-                }
+            cbLandArt.addActionListener(arg0 -> {
+                int artIndex = cbLandArt.getSelectedIndex();
+                if (artIndex < 0) { return; }
+                card = generateCard(artIndex); //generate card for display
+                cardPanel.repaint();
             });
             lblCount = new FLabel.Builder().text("0").fontSize(22).fontAlign(SwingConstants.CENTER).build();
-            btnSubtract = new FLabel.ButtonBuilder().icon(FSkin.getIcon(FSkinProp.ICO_MINUS)).cmdClick(new UiCommand() {
-                @Override
-                public void run() {
-                    if (count > 0) {
-                        count--;
-                        lblCount.setText(String.valueOf(count));
-                        updateDeckInfoLabel();
-                    }
+            btnSubtract = new FLabel.ButtonBuilder().icon(FSkin.getIcon(FSkinProp.ICO_MINUS)).cmdClick((UiCommand) () -> {
+                if (count > 0) {
+                    count--;
+                    lblCount.setText(String.valueOf(count));
+                    updateDeckInfoLabel();
                 }
             }).build();
-            btnAdd = new FLabel.ButtonBuilder().icon(FSkin.getIcon(FSkinProp.ICO_PLUS)).cmdClick(new UiCommand() {
-                @Override
-                public void run() {
-                    if (maxCount == 0 || count < maxCount) {
-                        count++;
-                        lblCount.setText(String.valueOf(count));
-                        updateDeckInfoLabel();
-                    }
+            btnAdd = new FLabel.ButtonBuilder().icon(FSkin.getIcon(FSkinProp.ICO_PLUS)).cmdClick((UiCommand) () -> {
+                if (maxCount == 0 || count < maxCount) {
+                    count++;
+                    lblCount.setText(String.valueOf(count));
+                    updateDeckInfoLabel();
                 }
             }).build();
             btnSubtract.getAccessibleContext().setAccessibleName("Remove " + cardName);

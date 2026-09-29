@@ -2,7 +2,6 @@
 Code=DDS
 Date=2017-03-31
 Name=Duel Decks: Mind vs. Might
-Code2=DDS
 Type=Duel_Deck
 ScryfallCode=DDS
 
@@ -14,7 +13,7 @@ ScryfallCode=DDS
 5 C Peer Through Depths @Anthony S. Waters
 6 R Quicken @Aleksi Briclot
 7 C Reach Through Mists @Anthony S. Waters
-8 R Sage-Eye Avengers @Dan Scott
+8 R Sage-Eye Avengers @Dan Murayama Scott
 9 C Sift Through Sands @Anthony S. Waters
 10 C Snap @Véronique Meignaud
 11 R Talrand, Sky Summoner @Svetlin Velinov
@@ -27,7 +26,7 @@ ScryfallCode=DDS
 18 U Shivan Meteor @Chippy
 19 R Volcanic Vision @Noah Bradley
 20 U Young Pyromancer @Cynthia Sheppard
-21 R Firemind's Foresight @Dan Scott
+21 R Firemind's Foresight @Dan Murayama Scott
 22 C Goblin Electromancer @Svetlin Velinov
 23 R Jori En, Ruin Diver @Igor Kieryluk
 24 C Nivix Cyclops @Wayne Reynolds
@@ -74,10 +73,10 @@ ScryfallCode=DDS
 65 L Forest @Stephen Tappin
 
 [tokens]
-u_2_2_drake_flying
-r_1_1_elemental
-r_1_1_goblin
-g_4_4_beast
-g_3_3_elephant
-g_1_1_elf_warrior
-g_6_6_wurm
+1 u_2_2_drake_flying @Svetlin Velinov
+2 r_1_1_elemental @Winona Nelson
+3 r_1_1_goblin @Dave Kendall
+4 g_4_4_beast @Steve Prescott
+5 g_3_3_elephant @Lars Grant-West
+6 g_1_1_elf_warrior @William O'Connor
+7 g_6_6_wurm @Anthony Francisco

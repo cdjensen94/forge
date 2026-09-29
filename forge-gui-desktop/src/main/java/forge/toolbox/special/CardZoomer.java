@@ -18,14 +18,10 @@
 
 package forge.toolbox.special;
 
-import java.awt.event.ActionEvent;
-import java.awt.event.ActionListener;
 import java.awt.event.KeyAdapter;
 import java.awt.event.KeyEvent;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
-import java.awt.event.MouseWheelEvent;
-import java.awt.event.MouseWheelListener;
 import java.awt.image.BufferedImage;
 
 import javax.swing.JPanel;
@@ -142,17 +138,15 @@ public enum CardZoomer {
      * <li>if image is a double-sided card then show other side.
      */
     private void setMouseWheelListener() {
-        overlay.addMouseWheelListener(new MouseWheelListener() {
-            @Override public void mouseWheelMoved(final MouseWheelEvent e) {
-                if (!isButtonMode) {
-                    if (isMouseWheelEnabled) {
-                        isMouseWheelEnabled = false;
-                        if (e.getWheelRotation() > 0) {
-                            closeZoomer();
-                        } else {
-                            toggleCardImage();
-                            startMouseWheelCoolDownTimer(250);
-                        }
+        overlay.addMouseWheelListener(e -> {
+            if (!isButtonMode) {
+                if (isMouseWheelEnabled) {
+                    isMouseWheelEnabled = false;
+                    if (e.getWheelRotation() > 0) {
+                        closeZoomer();
+                    } else {
+                        toggleCardImage();
+                        startMouseWheelCoolDownTimer(250);
                     }
                 }
             }
@@ -236,13 +230,17 @@ public enum CardZoomer {
             return 0;
         }
         if (thisCard.getCard().isSplitCard()) {
-            String cardName = thisCard.getCard().getName();
-            if (cardName.isEmpty()) { cardName = thisCard.getCard().getAlternateState().getName(); }
+            String cardName = thisCard.getCard().getOracleName();
+            if (cardName.isEmpty()) { cardName = thisCard.getCard().getAlternateState().getOracleName(); }
             
             PaperCard pc = StaticData.instance().getCommonCards().getCard(cardName);
             boolean isAftermath = pc != null && Card.getCardForUi(pc).hasKeyword(Keyword.AFTERMATH);
 
             return thisCard.getCard().isFaceDown() || isSplitRotated ? 0 : isAftermath ? 270 : 90; // rotate Aftermath splits the other way to correctly show the right split (graveyard) half
+        }
+
+        if (thisCard.getCard().isFlipped()) {
+            return 180;
         }
 
         return thisCard.getType().isPlane() || thisCard.getType().isPhenomenon() ? 90 : 0;
@@ -282,11 +280,7 @@ public enum CardZoomer {
      */
     private void createMouseWheelCoolDownTimer(final int millisecsDelay) {
         if (mouseWheelCoolDownTimer == null) {
-            mouseWheelCoolDownTimer = new Timer(millisecsDelay, new ActionListener() {
-                @Override public void actionPerformed(final ActionEvent e) {
-                    isMouseWheelEnabled = true;
-                }
-            });
+            mouseWheelCoolDownTimer = new Timer(millisecsDelay, e -> isMouseWheelEnabled = true);
         }
     }
 

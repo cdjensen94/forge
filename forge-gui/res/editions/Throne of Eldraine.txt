@@ -2,7 +2,6 @@
 Code=ELD
 Date=2019-10-04
 Name=Throne of Eldraine
-Code2=ELD
 Type=Expansion
 BoosterCovers=3
 Booster=10 Common:fromSheet("ELD cards"), 3 Uncommon:fromSheet("ELD cards"), 1 RareMythic:fromSheet("ELD cards"), 1 BasicLand
@@ -49,7 +48,7 @@ ScryfallCode=ELD
 34 C True Love's Kiss @Donato Giancola
 35 U Venerable Knight @Colin Boyer
 36 R Worthy Knight @Yongjae Choi
-37 C Youthful Knight @Heonhwa Choe
+37 C Youthful Knight @Heonhwa
 38 U Animating Faerie @Joseph Meehan
 39 M Brazen Borrower @Eric Deschamps
 40 C Charmed Sleep @Titus Lunter
@@ -71,7 +70,7 @@ ScryfallCode=ELD
 56 C Mistford River Turtle @Milivoj Ćeran
 57 C Moonlit Scavengers @Miranda Meeks
 58 U Mystical Dispute @Ekaterina Burmak
-59 C Opt @Dan Scott
+59 C Opt @Dan Murayama Scott
 60 U Overwhelmed Apprentice @Jason Rainville
 61 C Queen of Ice @Eric Deschamps
 62 C Run Away Together @Filip Burburan
@@ -146,7 +145,7 @@ ScryfallCode=ELD
 131 C Merchant of the Vale @David Gaillet
 132 C Ogre Errant @Mitchell Malloy
 133 R Opportunistic Dragon @Chris Rahn
-134 C Raging Redcap @Dan Scott
+134 C Raging Redcap @Dan Murayama Scott
 135 U Redcap Melee @Chris Rallis
 136 C Redcap Raiders @Lie Setiawan
 137 C Rimrock Knight @Chris Rallis
@@ -155,7 +154,7 @@ ScryfallCode=ELD
 140 C Searing Barrage @Allen Williams
 141 C Seven Dwarves @Jason Rainville
 142 U Skullknocker Ogre @Svetlin Velinov
-143 U Slaying Fire @Heonhwa Choe
+143 U Slaying Fire @Heonhwa
 144 R Sundering Stroke @Stanton Feng
 145 U Syr Carah, the Bold @Wisnu Tan
 146 C Thrill of Possibility @Steve Argyle
@@ -351,7 +350,7 @@ ScryfallCode=ELD
 328 R Knights' Charge @Paul Scott Canavan
 329 M Korvold, Fae-Cursed King @Wisnu Tan
 330 M Syr Gwyn, Hero of Ashvale @Lie Setiawan
-331 C Arcane Signet @Dan Scott
+331 C Arcane Signet @Dan Murayama Scott
 332 R Tome of Legends @Mila Pesic
 333 C Command Tower @Evan Shipard
 
@@ -418,31 +417,34 @@ ScryfallCode=ELD
 [promo]
 392 R Piper of the Swarm @Jesper Ejsing
 393 U Glass Casket @Anastasia Ovchinnikova
-394 U Slaying Fire @Heonhwa Choe
+394 U Slaying Fire @Heonhwa
 395 U Kenrith's Transformation @Kimonas Theodossiou
 396 U Improbable Alliance @Zoltan Boros
 397 U Inspiring Veteran @Scott Murphy
 
 [rebalanced]
-A81 U A-Cauldron Familiar @Milivoj Ćeran
-A125 R A-Fires of Invention @Stanton Feng
+A-81 U A-Cauldron Familiar @Milivoj Ćeran
 
 [tokens]
-w_0_1_goat
-w_1_1_human
-w_2_2_knight_vigilance
-w_1_1_mouse
-u_1_1_faerie_flying
-b_1_1_rat
-r_1_1_dwarf
-g_2_2_bear
-g_1_1_boar_food
-g_7_7_giant
-rw_2_1_human_cleric_lifelink_haste
-rw_1_2_human_rogue_haste_damage
-rw_3_1_human_warrior_trample_haste
-bg_2_2_wolf_garruk
-c_a_food_sac
-c_a_food_sac
-c_a_food_sac
-c_a_food_sac
+1 w_0_1_goat @Forrest Imel
+2 w_1_1_human @Ben Maier
+3 w_2_2_knight_vigilance @Dan Murayama Scott
+4 w_1_1_mouse @Stacie Pitt
+5 u_1_1_faerie_flying @Irina Nordsol
+6 b_1_1_rat @Mike Bierek
+7 r_1_1_dwarf @Kari Christensen
+8 g_2_2_bear @Forrest Imel
+9 g_1_1_boar_food @Stacie Pitt
+10 g_7_7_giant @YW Tang
+11 rw_2_1_human_cleric_lifelink_haste @Suzanne Helmigh
+12 rw_1_2_human_rogue_haste_damage @Suzanne Helmigh
+13 rw_3_1_human_warrior_trample_haste @Suzanne Helmigh
+14 bg_2_2_wolf_garruk @David Gaillet
+15 c_a_food_sac @Steven Belledin
+16 c_a_food_sac @Randy Gallegos
+17 c_a_food_sac @Donato Giancola
+18 c_a_food_sac @Lucas Graciano
+
+[other]
+19 emblem_garruk_cursed_huntsman @Eric Deschamps
+20 adventure @Adam Paquette

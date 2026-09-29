@@ -10,7 +10,6 @@ import forge.game.ability.SpellAbilityEffect;
 import forge.game.card.Card;
 import forge.game.card.CardCollectionView;
 import forge.game.card.CardLists;
-import forge.game.card.CardPredicates;
 import forge.game.card.CardZoneTable;
 import forge.game.player.Player;
 import forge.game.spellability.SpellAbility;
@@ -28,7 +27,7 @@ public class DestroyAllEffect extends SpellAbilityEffect {
 
         final StringBuilder sb = new StringBuilder();
         final boolean noRegen = sa.hasParam("NoRegen");
-        sb.append(sa.getHostCard().getName()).append(" - Destroy permanents.");
+        sb.append(sa.getHostCard().getDisplayName()).append(" - Destroy permanents.");
 
         if (noRegen) {
             sb.append(" They can't be regenerated");
@@ -42,7 +41,7 @@ public class DestroyAllEffect extends SpellAbilityEffect {
      */
     @Override
     public void resolve(SpellAbility sa) {
-        final boolean noRegen = sa.hasParam("NoRegen");
+        boolean noRegen = sa.hasParam("NoRegen");
         final Card card = sa.getHostCard();
         final boolean isOptional = sa.hasParam("Optional");
         final Game game = sa.getActivatingPlayer().getGame();
@@ -82,7 +81,7 @@ public class DestroyAllEffect extends SpellAbilityEffect {
             return;
         }
         // exclude cards that can't be destroyed at this moment
-        list = CardLists.filter(list, CardPredicates.Presets.CAN_BE_DESTROYED);
+        list = CardLists.filter(list, Card::canBeDestroyed);
 
         list = GameActionUtil.orderCardsByTheirOwners(game, list, ZoneType.Graveyard, sa);
 
@@ -90,6 +89,9 @@ public class DestroyAllEffect extends SpellAbilityEffect {
         CardZoneTable zoneMovements = AbilityKey.addCardZoneTableParams(params, sa);
 
         for (Card c : list) {
+            if (sa.hasParam("NoRegenValid")) {
+                noRegen = c.isValid(sa.getParam("NoRegenValid"), sa.getActivatingPlayer(), card, sa);
+            }
             if (game.getAction().destroy(c, sa, !noRegen, params) && remDestroyed) {
                 card.addRemembered(zoneMovements.getLastStateBattlefield().get(c));
             }

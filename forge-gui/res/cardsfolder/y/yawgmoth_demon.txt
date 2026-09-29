@@ -10,8 +10,8 @@ SVar:DBElderSpawnSacrificeMe:DB$ Tap | Defined$ Self | ConditionDefined$ Remembe
 SVar:DBElderSpawnDamage:DB$ DealDamage | Defined$ You | NumDmg$ 2 | ConditionDefined$ Remembered | ConditionPresent$ Artifact | ConditionCompare$ EQ0 | SubAbility$ DBElderSpawnCleanup
 SVar:DBElderSpawnCleanup:DB$ Cleanup | ClearRemembered$ True
 SVar:NeedsToPlayVar:Z GE3
-SVar:Z:Count$Valid Artifact.YouCtrl+inZoneBattlefield
+SVar:Z:Count$Valid Artifact.YouCtrl
 AI:RemoveDeck:Random
-DeckNeeds:Type$Artifact
 DeckHas:Ability$Sacrifice
+DeckNeeds:Type$Artifact
 Oracle:Flying (This creature can't be blocked except by creatures with flying or reach.)\nFirst strike (This creature deals combat damage before creatures without first strike.)\nAt the beginning of your upkeep, you may sacrifice an artifact. If you don't, tap Yawgmoth Demon and it deals 2 damage to you.

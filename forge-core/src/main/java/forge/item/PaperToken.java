@@ -1,21 +1,19 @@
 package forge.item;
 
-import java.util.ArrayList;
-import java.util.Locale;
-
+import forge.ImageKeys;
+import forge.card.*;
+import forge.util.MyRandom;
 import org.apache.commons.lang3.StringUtils;
 
-import forge.ImageKeys;
-import forge.card.CardEdition;
-import forge.card.CardRarity;
-import forge.card.CardRules;
-import forge.card.CardSplitType;
-import forge.card.ColorSet;
-import forge.util.MyRandom;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Locale;
 
 public class PaperToken implements InventoryItemFromSet, IPaperCard {
     private static final long serialVersionUID = 1L;
     private String name;
+    private String collectorNumber;
+    private String artist;
     private transient CardEdition edition;
     private ArrayList<String> imageFileName = new ArrayList<>();
     private transient CardRules cardRules;
@@ -58,80 +56,41 @@ public class PaperToken implements InventoryItemFromSet, IPaperCard {
         return makeTokenFileName(fileName);
     }
 
-    public static String makeTokenFileName(final CardRules rules, CardEdition edition) {
-        ArrayList<String> build = new ArrayList<>();
-
-        String subtypes = StringUtils.join(rules.getType().getSubtypes(), " ");
-        if (!rules.getName().equals(subtypes)) {
-            return makeTokenFileName(rules.getName());
-        }
-
-        ColorSet colors = rules.getColor();
-
-        if (colors.isColorless()) {
-            build.add("C");
-        } else {
-            String color = "";
-            if (colors.hasWhite()) color += "W";
-            if (colors.hasBlue()) color += "U";
-            if (colors.hasBlack()) color += "B";
-            if (colors.hasRed()) color += "R";
-            if (colors.hasGreen()) color += "G";
-
-            build.add(color);
-        }
-
-        if (rules.getPower() != null && rules.getToughness() != null) {
-            build.add(rules.getPower());
-            build.add(rules.getToughness());
-        }
-
-        String cardTypes = "";
-        if (rules.getType().isArtifact()) cardTypes += "A";
-        if (rules.getType().isEnchantment()) cardTypes += "E";
-
-        if (!cardTypes.isEmpty()) {
-            build.add(cardTypes);
-        }
-
-        build.add(subtypes);
-
-        // Are these keywords sorted?
-        for (String keyword : rules.getMainPart().getKeywords()) {
-            build.add(keyword);
-        }
-
-        if (edition != null) {
-            build.add(edition.getCode());
-        }
-
-        return StringUtils.join(build, "_").replace('*', 'x').toLowerCase();
-    }
-
-    public PaperToken(final CardRules c, CardEdition edition0, String imageFileName) {
+    public PaperToken(final CardRules c, CardEdition edition0, String imageFileName, String collectorNumber, String artist) {
         this.cardRules = c;
         this.name = c.getName();
         this.edition = edition0;
+        this.collectorNumber = collectorNumber;
+        this.artist = artist;
 
-        if (edition != null && edition.getTokens().containsKey(imageFileName)) {
-            this.artIndex = edition.getTokens().get(imageFileName);
-        }
-
-        if (imageFileName == null) {
-            // This shouldn't really happen. We can just use the normalized name again for the base image name
-            this.imageFileName.add(makeTokenFileName(c, edition0));
-        } else {
-            String formatEdition = null == edition || CardEdition.UNKNOWN == edition ? "" : "_" + edition.getCode().toLowerCase();
-
-            this.imageFileName.add(String.format("%s%s", imageFileName, formatEdition));
-            for (int idx = 2; idx <= this.artIndex; idx++) {
-                this.imageFileName.add(String.format("%s%d%s", imageFileName, idx, formatEdition));
+        if (collectorNumber != null && !collectorNumber.isEmpty() && edition != null && edition.getTokens().containsKey(imageFileName)) {
+            int idx = 0;
+            // count the one with the same collectorNumber
+            for (CardEdition.EditionEntry t : edition.getTokens().get(imageFileName)) {
+                ++idx;
+                if (!t.collectorNumber().equals(collectorNumber)) {
+                    continue;
+                }
+                // TODO make better image file names when collector number is known
+                // for the right index, we need to count the ones with wrong collector number too
+                this.imageFileName.add(String.format("%s|%s|%s|%d", imageFileName, edition.getCode(), collectorNumber, idx));
             }
+            this.artIndex = this.imageFileName.size();
+        } else if (null == edition || CardEdition.UNKNOWN == edition) {
+            this.imageFileName.add(imageFileName);
+        } else {
+            // Fallback if CollectorNumber is not used
+            this.imageFileName.add(String.format("%s|%s", imageFileName, edition.getCode()));
         }
     }
 
     @Override
     public String getName() {
+        return name;
+    }
+
+    @Override
+    public String getDisplayName() {
         return name;
     }
 
@@ -142,18 +101,25 @@ public class PaperToken implements InventoryItemFromSet, IPaperCard {
 
     @Override
     public String getEdition() {
-        return edition != null ? edition.getCode() : "???";
+        return edition != null ? edition.getCode() : CardEdition.UNKNOWN_CODE;
     }
 
     @Override
     public String getCollectorNumber() {
-        return IPaperCard.NO_COLLECTOR_NUMBER;
+        if (collectorNumber.isEmpty())
+            return IPaperCard.NO_COLLECTOR_NUMBER;
+        return collectorNumber;
     }
 
     @Override
     public String getFunctionalVariant() {
         //Tokens aren't differentiated by name, so they don't really need support for this.
         return IPaperCard.NO_FUNCTIONAL_VARIANT;
+    }
+
+    @Override
+    public ColorSet getMarkedColors() {
+        return null;
     }
 
     @Override
@@ -173,17 +139,12 @@ public class PaperToken implements InventoryItemFromSet, IPaperCard {
 
     @Override
     public CardRarity getRarity() {
-        return CardRarity.None;
+        return CardRarity.Token;
     }
 
     @Override
-    public String getArtist() { /*TODO*/
-        return "";
-    }
-
-    // Unfortunately this is a property of token, cannot move it outside of class
-    public String getImageFilename() {
-        return getImageFilename(1);
+    public String getArtist() {
+        return artist;
     }
 
     public String getImageFilename(int idx) {
@@ -201,7 +162,22 @@ public class PaperToken implements InventoryItemFromSet, IPaperCard {
             return false;
         CardSplitType cst = this.cardRules.getSplitType();
         //expand this on future for other tokens that has other backsides besides transform..
-        return cst == CardSplitType.Transform;
+        return cst == CardSplitType.Transform || cst == CardSplitType.Modal;
+    }
+
+    @Override
+    public ICardFace getMainFace() {
+        return this.getRules().getMainPart();
+    }
+
+    @Override
+    public ICardFace getOtherFace() {
+        return this.getRules().getOtherPart();
+    }
+
+    @Override
+    public List<ICardFace> getAllFaces() {
+        return this.cardRules.getAllFaces();
     }
 
     @Override
@@ -220,52 +196,24 @@ public class PaperToken implements InventoryItemFromSet, IPaperCard {
         return getImageKey(true);
     }
 
-    @Override
-    public String getCardWSpecImageKey() {
-        return getImageKey(false);
-    }
-
-    @Override
-    public String getCardUSpecImageKey() {
-        return getImageKey(false);
-    }
-
-    @Override
-    public String getCardBSpecImageKey() {
-        return getImageKey(false);
-    }
-
-    @Override
-    public String getCardRSpecImageKey() {
-        return getImageKey(false);
-    }
-
-    @Override
-    public String getCardGSpecImageKey() {
-        return getImageKey(false);
-    }
-
     // InventoryItem
     @Override
     public String getImageKey(boolean altState) {
-        if (hasBackFace()) {
-            String edCode = edition != null ? "_" + edition.getCode().toLowerCase() : "";
-            if (altState) {
-                String name = ImageKeys.TOKEN_PREFIX + cardRules.getOtherPart().getName().toLowerCase().replace(" token", "");
-                name.replace(" ", "_");
-                return name + edCode;
+        String suffix = "";
+        if (hasBackFace() && altState) {
+            if (collectorNumber != null && !collectorNumber.isEmpty() && edition != null) {
+                String name = cardRules.getOtherPart().getName().toLowerCase().replace(" token", "").replace(" ", "_");
+                return ImageKeys.getTokenKey(String.format("%s|%s|%s%s", name, edition.getCode(), collectorNumber, ImageKeys.BACKFACE_POSTFIX));
             } else {
-                String name = ImageKeys.TOKEN_PREFIX + cardRules.getMainPart().getName().toLowerCase().replace(" token", "");
-                name.replace(" ", "_");
-                return name + edCode;
+                suffix = ImageKeys.BACKFACE_POSTFIX;
             }
         }
         int idx = MyRandom.getRandom().nextInt(artIndex);
-        return getImageKey(idx);
+        return getImageKey(idx) + suffix;
     }
 
     public String getImageKey(int artIndex) {
-        return ImageKeys.TOKEN_PREFIX + imageFileName.get(artIndex).replace(" ", "_");
+        return ImageKeys.getTokenKey(imageFileName.get(artIndex).replace(" ", "_"));
     }
 
     public boolean isRebalanced() {

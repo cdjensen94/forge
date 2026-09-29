@@ -1,12 +1,12 @@
 package forge.deck;
 
+import java.util.Set;
+import java.util.HashSet;
 import java.util.Map.Entry;
 
 import forge.Forge;
 import forge.assets.FImage;
-import forge.assets.FSkin;
 import forge.assets.FSkinImage;
-import forge.assets.FTextureRegionImage;
 import forge.assets.ImageCache;
 import forge.item.PaperCard;
 import forge.itemmanager.CardManager;
@@ -16,8 +16,6 @@ import forge.menu.FMenuItem;
 import forge.menu.FPopupMenu;
 import forge.screens.FScreen;
 import forge.screens.match.MatchController;
-import forge.toolbox.FEvent;
-import forge.toolbox.FEvent.FEventHandler;
 import forge.toolbox.FOptionPane;
 
 public class FDeckViewer extends FScreen {
@@ -32,80 +30,37 @@ public class FDeckViewer extends FScreen {
                 int count = pool.countAll();
                 if (count == 0) { continue; }
 
-                final String captionPrefix;
-                final FImage icon;
-                switch (section) {
-                default:
-                case Main:
-                    captionPrefix = Forge.getLocalizer().getMessage("ttMain");
-                    icon = FDeckEditor.MAIN_DECK_ICON;
-                    break;
-                case Sideboard:
-                    captionPrefix = Forge.getLocalizer().getMessage("lblSideboard");
-                    icon = FDeckEditor.SIDEBOARD_ICON;
-                    break;
-                case Commander:
-                    captionPrefix = Forge.getLocalizer().getMessage("lblCommander");
-                    icon = FSkinImage.COMMANDER;
-                    break;
-                case Avatar:
-                    captionPrefix = Forge.getLocalizer().getMessage("lblAvatar");
-                    icon = new FTextureRegionImage(FSkin.getAvatars().get(0));
-                    break;
-                case Planes:
-                    captionPrefix = Forge.getLocalizer().getMessage("lblPlanes");
-                    icon = FSkinImage.CHAOS;
-                    break;
-                case Schemes:
-                    captionPrefix = Forge.getLocalizer().getMessage("lblSchemes");
-                    icon = FSkinImage.POISON;
-                    break;
-                }
+                final String captionPrefix = section.getLocalizedName();
+                final FImage icon = FDeckEditor.iconFromDeckSection(section);
 
-                FMenuItem item = new FMenuItem(captionPrefix + " (" + count + ")", icon, new FEventHandler() {
-                    @Override
-                    public void handleEvent(FEvent e) {
-                        deckViewer.setCurrentSection(section);
-                    }
-                });
+                FMenuItem item = new FMenuItem(captionPrefix + " (" + count + ")", icon, e -> deckViewer.setCurrentSection(section));
                 if (section == deckViewer.currentSection) {
                     item.setSelected(true);
                 }
                 addItem(item);
             }
-            addItem(new FMenuItem(Forge.getLocalizer().getMessage("btnCopyToClipboard"), Forge.hdbuttons ? FSkinImage.HDEXPORT : FSkinImage.BLANK, new FEventHandler() {
-                @Override
-                public void handleEvent(FEvent e) {
-                    copyDeckToClipboard(deckViewer.deck);
-                }
-            }));
+            addItem(new FMenuItem(Forge.getLocalizer().getMessage("btnCopyToClipboard"), Forge.hdbuttons ? FSkinImage.HDEXPORT : FSkinImage.BLANK, e -> copyDeckToClipboard(deckViewer.deck)));
         }
     };
 
     public static void copyDeckToClipboard(Deck deck) {
-        final String nl = System.getProperty("line.separator");
-        final StringBuilder deckList = new StringBuilder();
-        String dName = deck.getName();
-        //fix copying a commander netdeck then importing it again...
-        if (dName.startsWith("[Commander")||dName.contains("Commander"))
-            dName = "";
-        deckList.append(dName == null ? "" : "Deck: "+dName + nl + nl);
-
-        for (DeckSection s : DeckSection.values()){
-            CardPool cp = deck.get(s);
-            if (cp == null || cp.isEmpty()) {
-                continue;
-            }
-            deckList.append(s.toString()).append(": ");
-            deckList.append(nl);
-            for (final Entry<PaperCard, Integer> ev : cp) {
-                deckList.append(ev.getValue()).append(" ").append(ev.getKey().getCardName()).append(nl);
-            }
-            deckList.append(nl);
-        }
-
-        Forge.getClipboard().setContents(deckList.toString());
+        Forge.getClipboard().setContents(deck.generateTextExport());
         FOptionPane.showMessageDialog(Forge.getLocalizer().getMessage("lblDeckListCopiedClipboard", deck.getName()));
+    }
+
+    public static void copyCollectionToClipboard(CardPool pool) {
+        final String nl = System.lineSeparator();
+        final StringBuilder collectionList = new StringBuilder();
+        Set<String> accounted = new HashSet<>();
+        for (final Entry<PaperCard, Integer> entry : pool) {
+            String cardName = entry.getKey().getCardName();
+            if (!accounted.contains(cardName)) {
+                collectionList.append(pool.countByName(cardName)).append(" ").append(cardName).append(nl);
+                accounted.add(cardName);
+            }
+        }
+        Forge.getClipboard().setContents(collectionList.toString());
+        FOptionPane.showMessageDialog(Forge.getLocalizer().getMessage("lblCollectionCopiedClipboard"));
     }
 
     private final Deck deck;
@@ -121,9 +76,9 @@ public class FDeckViewer extends FScreen {
     public static void show(final Deck deck0, boolean noPreload, boolean showRanking) {
         if (deck0 == null) { return; }
 
-        if (!noPreload){
+        if (!noPreload) {
             /*preload deck to cache*/
-            ImageCache.preloadCache(deck0);
+            ImageCache.getInstance().preloadCache(deck0);
         }
 
         deckViewer = new FDeckViewer(deck0, showRanking);

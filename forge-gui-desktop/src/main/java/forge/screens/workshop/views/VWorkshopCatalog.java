@@ -1,11 +1,8 @@
 package forge.screens.workshop.views;
 
 import javax.swing.JPanel;
-import javax.swing.event.ListSelectionEvent;
-import javax.swing.event.ListSelectionListener;
 
 import com.google.common.collect.Iterables;
-
 import forge.gui.framework.DragCell;
 import forge.gui.framework.DragTab;
 import forge.gui.framework.EDocID;
@@ -41,17 +38,14 @@ public enum VWorkshopCatalog implements IVDoc<CWorkshopCatalog> {
     VWorkshopCatalog() {
         this.cardManager = new CardManager(cDetailPicture, true, false, false);
         this.cardManager.setCaption(localizer.getMessage("lblCatalog"));
-        final Iterable<PaperCard> allCards = Iterables.concat(FModel.getMagicDb().getCommonCards().getAllCardsNoAlt(), FModel.getMagicDb().getVariantCards().getAllCards());
+        final Iterable<PaperCard> allCards = Iterables.concat(FModel.getMagicDb().getCommonCards().getAllCards(), FModel.getMagicDb().getVariantCards().getAllCards());
         this.cardManager.setPool(ItemPool.createFrom(allCards, PaperCard.class), true);
         this.cardManagerContainer.setItemManager(this.cardManager);
 
-        this.cardManager.addSelectionListener(new ListSelectionListener() {
-            @Override
-            public void valueChanged(final ListSelectionEvent e) {
-                final PaperCard card = cardManager.getSelectedItem();
-                cDetailPicture.showItem(card);
-                CCardScript.SINGLETON_INSTANCE.showCard(card);
-            }
+        this.cardManager.addSelectionListener(e -> {
+            final PaperCard card = cardManager.getSelectedItem();
+            cDetailPicture.showItem(card);
+            CCardScript.SINGLETON_INSTANCE.showCard(card);
         });
     }
 

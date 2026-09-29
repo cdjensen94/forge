@@ -1,15 +1,11 @@
 package forge.ai.ability;
 
-import forge.ai.AiAttackController;
-import forge.ai.SpellAbilityAi;
-import forge.ai.SpellApiToAi;
+import forge.ai.*;
 import forge.game.card.Card;
 import forge.game.card.CardCollection;
-import forge.game.phase.PhaseHandler;
 import forge.game.phase.PhaseType;
 import forge.game.player.Player;
 import forge.game.player.PlayerActionConfirmMode;
-import forge.game.spellability.AbilityStatic;
 import forge.game.spellability.AbilitySub;
 import forge.game.spellability.SpellAbility;
 import forge.game.zone.ZoneType;
@@ -26,47 +22,55 @@ public class PeekAndRevealAi extends SpellAbilityAi {
      * @see forge.card.abilityfactory.SpellAiLogic#canPlayAI(forge.game.player.Player, forge.card.spellability.SpellAbility)
      */
     @Override
-    protected boolean canPlayAI(Player aiPlayer, SpellAbility sa) {
-        if (sa instanceof AbilityStatic) {
-            return false;
-        }
-
+    protected AiAbilityDecision checkApiLogic(Player aiPlayer, SpellAbility sa) {
         String logic = sa.getParamOrDefault("AILogic", "");
         if ("Main2".equals(logic)) {
             if (aiPlayer.getGame().getPhaseHandler().getPhase().isBefore(PhaseType.MAIN2)) {
-                return false;
-            }
-        } else if ("EndOfOppTurn".equals(logic)) {
-            PhaseHandler ph = aiPlayer.getGame().getPhaseHandler();
-            if (!(ph.getNextTurn() == aiPlayer && ph.is(PhaseType.END_OF_TURN))) {
-                return false;
+                return new AiAbilityDecision(0, AiPlayDecision.CantPlayAi);
             }
         }
         // So far this only appears on Triggers, but will expand
         // once things get converted from Dig + NoMove
         Player opp = AiAttackController.choosePreferredDefenderPlayer(aiPlayer);
-        final Card host = sa.getHostCard();
         Player libraryOwner = aiPlayer;
-
-        if (!willPayCosts(aiPlayer, sa, sa.getPayCosts(), host)) {
-            return false;
-        }
 
         if (sa.usesTargeting()) {
             sa.resetTargets();
             //todo: evaluate valid targets
             if (!sa.canTarget(opp)) {
-                return false;
+                return new AiAbilityDecision(0, AiPlayDecision.CantPlayAi);
             }
             sa.getTargets().add(opp);
             libraryOwner = opp;
         }
 
         if (libraryOwner.getCardsIn(ZoneType.Library).isEmpty()) {
-            return false;
+            return new AiAbilityDecision(0, AiPlayDecision.CantPlayAi);
         }
 
-        return true;
+        // if the AI may already look at its own top card (e.g. Iron Lad, Diverging Destiny),
+        // don't activate when a sub-ability conditioned on the revealed card can't pay off
+        if (libraryOwner == aiPlayer && !sa.isTrigger() && sa.hasParam("RememberRevealed")
+                && "1".equals(sa.getParamOrDefault("PeekAmount", "1"))) {
+            final Card topCard = aiPlayer.getCardsIn(ZoneType.Library).getFirst();
+            if (topCard.mayPlayerLook(aiPlayer)) {
+                for (AbilitySub sub = sa.getSubAbility(); sub != null; sub = sub.getSubAbility()) {
+                    if ("Remembered".equals(sub.getParam("ConditionDefined")) && sub.hasParam("ConditionPresent")
+                            && !topCard.isValid(sub.getParam("ConditionPresent").split(","), aiPlayer, sa.getHostCard(), sa)) {
+                        return new AiAbilityDecision(0, AiPlayDecision.CantPlayAi);
+                    }
+                }
+            }
+        }
+
+        if ("X".equals(sa.getParam("PeekAmount")) && sa.getSVar("X").equals("Count$xPaid")) {
+            int xPay = ComputerUtilCost.setMaxXValue(sa, aiPlayer, sa.isTrigger());
+            if (xPay == 0) {
+                return new AiAbilityDecision(0, AiPlayDecision.CantPlayAi);
+            }
+        }
+
+        return new AiAbilityDecision(100, AiPlayDecision.WillPlay);
     }
 
     /* (non-Javadoc)
@@ -84,7 +88,7 @@ public class PeekAndRevealAi extends SpellAbilityAi {
         }
 
         AbilitySub subAb = sa.getSubAbility();
-        return subAb != null && SpellApiToAi.Converter.get(subAb.getApi()).chkDrawbackWithSubs(player, subAb);
+        return subAb != null && SpellApiToAi.Converter.get(subAb).chkDrawbackWithSubs(player, subAb).willingToPlay();
     }
 
 }

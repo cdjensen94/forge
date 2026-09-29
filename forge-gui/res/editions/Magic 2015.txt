@@ -2,10 +2,9 @@
 Code=M15
 Date=2014-07-18
 Name=Magic 2015
-Code2=M15
 Type=Core
 BoosterCovers=5
-Booster=10 Common:!fromSheet("M15 Sample Cards"), 3 Uncommon:!fromSheet("M15 Sample Cards"), 1 RareMythic:!fromSheet("M15 Sample Cards"), 1 BasicLand
+Booster=10 Common:fromSheet("M15 cards"), 3 Uncommon:fromSheet("M15 cards"), 1 RareMythic:fromSheet("M15 cards"), 1 BasicLand
 FatPack=9
 FatPackExtraSlots=80 BasicLands
 ChaosDraftThemes=CORE_SET
@@ -55,7 +54,7 @@ ScryfallCode=M15
 41 U Wall of Essence @Adam Rex
 42 U Warden of the Beyond @Raymond Swanland
 43 C Aeronaut Tinkerer @Willian Murai
-44 R Aetherspouts @Dan Scott
+44 R Aetherspouts @Dan Murayama Scott
 45 C Amphin Pathmage @Mark Winters
 46 R Chasm Skulker @Jack Wang
 47 R Chief Engineer @Steven Belledin
@@ -199,7 +198,7 @@ ScryfallCode=M15
 185 C Naturalize @Tim Hildebrandt
 186 C Netcaster Spider @Yohann Schepacz
 187 M Nissa, Worldwaker @Peter Mohrbacher
-188 U Nissa's Expedition @Dan Scott
+188 U Nissa's Expedition @Dan Murayama Scott
 189 U Overwhelm @Wayne Reynolds
 190 U Paragon of Eternal Wilds @Winona Nelson
 191 R Phytotitan @Marco Nelor
@@ -281,6 +280,8 @@ ScryfallCode=M15
 267 L Forest @Steven Belledin
 268 L Forest @Noah Bradley
 269 L Forest @Jonas De Ro
+
+[precon product]
 270 R Aegis Angel @Aleksi Briclot
 271 C Divine Verdict @Kev Walker
 272 C Inspired Charge @Wayne Reynolds
@@ -298,16 +299,19 @@ ScryfallCode=M15
 284 R Terra Stomper @Goran Josic
 
 [tokens]
-land_mine
-c_1_1_sliver
-w_1_1_soldier
-w_1_1_spirit_flying
-u_1_1_squid_islandwalk
-u_1_1_squid_islandwalk
-b_3_3_beast_deathtouch
-b_2_2_zombie
-r_2_2_dragon_flying_firebreathing
-r_1_1_goblin_haste
-g_3_3_beast
-g_1_1_insect_flying_deathtouch
-g_x_x_treefolk_warrior_total_forests
+1 c_1_1_sliver @Igor Kieryluk
+2 w_1_1_soldier @Greg Staples
+3 w_1_1_spirit_flying @Mike Sass
+4 u_1_1_squid_islandwalk @Jack Wang
+5 b_3_3_beast_deathtouch @Dave Kendall
+6 b_2_2_zombie @Lucas Graciano
+7 r_2_2_dragon_flying_firebreathing @Jack Wang
+8 r_1_1_goblin @Karl Kopinski
+9 g_3_3_beast @John Donahue
+10 g_1_1_insect_flying_deathtouch @Martina Pilcerova
+11 g_x_x_treefolk_warrior_total_forests @Todd Lockwood
+12 land_mine @Kev Walker
+
+[other]
+13 emblem_ajani_steadfast @Chris Rahn
+14 emblem_garruk_apex_predator @Tyler Jacobson

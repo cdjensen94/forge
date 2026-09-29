@@ -2,7 +2,6 @@
 Code=ZNR
 Date=2020-09-25
 Name=Zendikar Rising
-Code2=ZNR
 Type=Expansion
 BoosterCovers=3
 Booster=10 Common:!dfc:fromSheet("ZNR cards"), 3 Uncommon:!dfc:fromSheet("ZNR cards"), 1 RareMythic:!dfc:fromSheet("ZNR cards"), 1 BasicLand
@@ -26,7 +25,7 @@ ScryfallCode=ZNR
 10 C Disenchant @Colin Boyer
 11 U Emeria Captain @Matt Stewart
 12 M Emeria's Call @Matt Stewart
-13 C Expedition Healer @Heonhwa Choe
+13 C Expedition Healer @Heonhwa
 14 C Farsight Adept @Cristi Balanescu
 15 U Fearless Fledgling @Jesper Ejsing
 16 R Felidar Retreat @Ralph Horsley
@@ -56,7 +55,7 @@ ScryfallCode=ZNR
 40 U Skyclave Cleric @Johannes Voss
 41 R Squad Commander @Ekaterina Burmak
 42 C Smite the Monstrous @Izzy
-43 C Tazeem Raptor @Dan Scott
+43 C Tazeem Raptor @Dan Murayama Scott
 44 M Tazri, Beacon of Unity @Chris Rahn
 45 C Anticognition @Igor Kieryluk
 46 U Beyeen Veil @YW Tang
@@ -70,7 +69,7 @@ ScryfallCode=ZNR
 54 R Coralhelm Chronicler @Lie Setiawan
 55 C Cunning Geysermage @Chris Rallis
 56 C Deliberate @Slawomir Maniak
-57 C Expedition Diviner @Heonhwa Choe
+57 C Expedition Diviner @Heonhwa
 58 C Field Research @PINDURSKI
 59 C Glacial Grasp @Tomasz Jedruszek
 60 R Glasspool Mimic @Johan Grenier
@@ -128,7 +127,7 @@ ScryfallCode=ZNR
 112 C Marauding Blight-Priest @Caio Monteiro
 113 U Mind Carver @Scott Murphy
 114 C Mind Drain @Grzegorz Rutkowski
-115 R Nighthawk Scavenger @Heonhwa Choe
+115 R Nighthawk Scavenger @Heonhwa
 116 C Nimana Skitter-Sneak @Campbell White
 117 C Nimana Skydancer @Bryan Sola
 118 R Nullpriest of Oblivion @Yongjae Choi
@@ -177,7 +176,7 @@ ScryfallCode=ZNR
 161 M Shatterskull Smashing @Adam Paquette
 162 C Sizzling Barrage @Johann Bodin
 163 U Skyclave Geopede @Filip Burburan
-164 C Sneaking Guide @Dan Scott
+164 C Sneaking Guide @Dan Murayama Scott
 165 U Song-Mad Treachery @Zoltan Boros
 166 U Spikefield Hazard @Tomasz Jedruszek
 167 C Spitfire Lagac @Antonio José Manzanedo
@@ -217,7 +216,7 @@ ScryfallCode=ZNR
 201 U Roiling Regrowth @Jonas De Ro
 202 C Scale the Heights @Cristi Balanescu
 203 R Scute Swarm @Alex Konstad
-204 U Skyclave Pick-Axe @Dan Scott
+204 U Skyclave Pick-Axe @Dan Murayama Scott
 205 U Springmantle Cleric @Cristi Balanescu
 206 C Strength of Solidarity @Svetlin Velinov
 207 R Swarm Shambler @Nicholas Gregory
@@ -246,7 +245,7 @@ ScryfallCode=ZNR
 230 M Nahiri, Heir of the Ancients @Anna Steinbauer
 231 M Nissa of Shadowed Boughs @Yongjae Choi
 232 M Omnath, Locus of Creation @Chris Rahn
-233 R Orah, Skyclave Hierophant @Heonhwa Choe
+233 R Orah, Skyclave Hierophant @Heonhwa
 234 R Phylath, World Sculptor @Victor Adame Minguez
 235 U Ravager's Mace @Antonio José Manzanedo
 236 U Soaring Thought-Thief @Lie Setiawan
@@ -360,7 +359,7 @@ ScryfallCode=ZNR
 338 M Drana, the Last Bloodchief @Tyler Jacobson
 339 R Hagra Mauling @Victor Adame Minguez
 340 R Inscription of Ruin @Zoltan Boros
-341 R Nighthawk Scavenger @Heonhwa Choe
+341 R Nighthawk Scavenger @Heonhwa
 342 R Nullpriest of Oblivion @Yongjae Choi
 343 M Scourge of the Skyclaves @Chase Stone
 344 R Shadows' Verdict @Lius Lasahido
@@ -388,7 +387,7 @@ ScryfallCode=ZNR
 366 R Grakmaw, Skyclave Ravager @Filip Burburan
 367 R Kaza, Roil Chaser @Ekaterina Burmak
 368 R Linvala, Shield of Sea Gate @Wayne Reynolds
-369 R Orah, Skyclave Hierophant @Heonhwa Choe
+369 R Orah, Skyclave Hierophant @Heonhwa
 370 R Verazol, the Split Current @Daarken
 371 R Yasharn, Implacable Earth @G-host Lee
 372 R Zagras, Thief of Heartbeats @Anna Steinbauer
@@ -399,6 +398,8 @@ ScryfallCode=ZNR
 377 R Skyclave Relic @Daniel Ljunggren
 378 R Crawling Barrens @Jonas De Ro
 379 R Throne of Makindi @Igor Kieryluk
+
+[precon product]
 380 L Plains @Adam Paquette
 381 L Island @Tianhua X
 382 L Swamp @Adam Paquette
@@ -417,23 +418,21 @@ ScryfallCode=ZNR
 391 U Kargan Warleader @Colin Boyer
 
 [rebalanced]
-A24 R A-Luminarch Aspirant @Mads Ahm
-A68 R A-Master of Winds @Yigit Koroglu
-A105 C A-Hagra Constrictor @Simon Dominic
-A126 U A-Skyclave Shadowcat @Simon Dominic
-A141 U A-Goma Fada Vanguard @Sean Sevestre
-A145 R A-Kargan Intimidator @Kieran Yanner
-A154 U A-Rockslide Sorcerer @Daarken
-A185 C A-Gnarlid Colony @Izzy
-A187 U A-Iridescent Hornbeetle @Simon Dominic
-A198 R A-Oran-Rief Ooze @Daarken
-A224 U A-Kargan Warleader @Colin Boyer
-A228 U A-Moss-Pit Skeleton @Bryan Sola
-A230 M A-Nahiri, Heir of the Ancients @Anna Steinbauer
-A232 M A-Omnath, Locus of Creation @Chris Rahn
-A234 R A-Phylath, World Sculptor @Victor Adame Minguez
-A238 U A-Umara Mystic @Bryan Sola
-A257 U A-Base Camp @Jokubas Uogintas
+A-68 R A-Master of Winds @Yigit Koroglu
+A-105 C A-Hagra Constrictor @Simon Dominic
+A-126 U A-Skyclave Shadowcat @Simon Dominic
+A-141 U A-Goma Fada Vanguard @Sean Sevestre
+A-145 R A-Kargan Intimidator @Kieran Yanner
+A-154 U A-Rockslide Sorcerer @Daarken
+A-185 C A-Gnarlid Colony @Izzy
+A-187 U A-Iridescent Hornbeetle @Simon Dominic
+A-198 R A-Oran-Rief Ooze @Daarken
+A-224 U A-Kargan Warleader @Colin Boyer
+A-228 U A-Moss-Pit Skeleton @Bryan Sola
+A-230 M A-Nahiri, Heir of the Ancients @Anna Steinbauer
+A-234 R A-Phylath, World Sculptor @Victor Adame Minguez
+A-238 U A-Umara Mystic @Bryan Sola
+A-257 U A-Base Camp @Jokubas Uogintas
 
 [ModalDoubleFaceCards]
 1 Agadeem's Awakening|ZNR
@@ -474,14 +473,17 @@ A257 U A-Base Camp @Jokubas Uogintas
 6 Zof Consumption|ZNR
 
 [tokens]
-w_4_4_angel_warrior_flying
-w_1_1_cat
-w_2_2_cat_beast
-w_1_1_kor_warrior
-u_2_2_drake_flying
-u_x_x_illusion
-g_1_1_insect
-g_0_1_plant
-bg_x_x_hydra
-c_1_1_a_construct
-c_0_1_a_goblin_construct_noblock_ping
+1 w_4_4_angel_warrior_flying @Zoltan Boros
+2 w_1_1_cat @Ilse Gort
+3 w_2_2_cat_beast @Bayard Wu
+4 w_1_1_kor_warrior @Randy Vargas
+5 u_2_2_drake_flying @Bayard Wu
+6 u_x_x_illusion @Jason A. Engle
+7 g_1_1_insect @Jakub Kasper
+8 g_0_1_plant @Jakub Kasper
+9 bg_x_x_hydra @Filip Burburan
+10 c_1_1_a_construct @Jokubas Uogintas
+11 c_0_1_a_goblin_construct_noblock_ping @Johan Grenier
+
+[other]
+12 copy @Jason Rainville

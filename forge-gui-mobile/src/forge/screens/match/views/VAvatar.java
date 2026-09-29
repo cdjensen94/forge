@@ -97,10 +97,18 @@ public class VAvatar extends FDisplayObject {
             player.setAvatarLifeDifference(0);
         }
     }
+
     @Override
     public boolean tap(float x, float y, int count) {
         //must invoke in game thread in case a dialog needs to be shown
         ThreadUtil.invokeInGameThread(() -> MatchController.instance.getGameController().selectPlayer(player, null));
+        return true;
+    }
+
+    @Override
+    public boolean longPress(float x, float y) {
+        //must invoke in game thread in case a dialog needs to be shown
+        ThreadUtil.invokeInGameThread(() -> MatchController.instance.showFullControl(player, x, y));
         return true;
     }
 
@@ -116,8 +124,8 @@ public class VAvatar extends FDisplayObject {
         float w = isHovered() ? getWidth()/16f+getWidth() : getWidth();
         float h = isHovered() ? getWidth()/16f+getHeight() : getHeight();
 
-        if (avatarAnimation != null && !MatchController.instance.getGameView().isMatchOver()) {
-            if (player.wasAvatarLifeChanged()) {
+        if (avatarAnimation != null && MatchController.instance.getGameView() != null && !MatchController.instance.getGameView().isMatchOver()) {
+            if (player.getAvatarLifeDifference() != 0) {
                 avatarAnimation.start();
                 avatarAnimation.drawAvatar(g, image, 0, 0, w, h);
             } else {

@@ -1,15 +1,52 @@
 [metadata]
 Code=MH3
-Date=2024-06-07
+Date=2024-06-14
 Name=Modern Horizons 3
 Type=Draft
-Booster=6 Common, 3 Uncommon, 1 RareMythic, 1 fromSheet("MH3 new to modern"), 1 Land, 1 Any, 1 Any+
-# This isn't the right ratios yet. But it's a start
-ChanceReplaceCommonWith=.0156F fromsheet("MH3 special guests")
+BoosterSlots=Common,Common-Guest,Uncommon,RareMythic,NewToModern,Common-Land,Wildcard
+Booster=5 Common, 1 Common-Guest, 3 Uncommon, 1 RareMythic, 1 NewToModern, 1 Common-Land, 1 Wildcard, 1 Wildcard+
 BoosterBox=36
-BoosterCovers=3
 ChaosDraftThemes=MASTERS_SET
 ScryfallCode=MH3
+
+#Numbers from https://mtgscribe.com/2024/05/22/play-booster-fact-sheet-modern-horizons-3/
+[Common]
+Base=Common:fromSheet("MH3 cards")
+
+[Common-Guest]
+Base=Common:fromSheet("MH3 cards")
+Replace=.015625F fromSheet("MH3 special guests")
+
+[Uncommon]
+Base=Uncommon:fromSheet("MH3 cards")
+
+[RareMythic]
+Base=RareMythic:fromSheet("MH3 cards")
+Replace=.021F RareMythic:fromSheet("MH3 retro frame")
+Replace=.051F RareMythic:fromSheet("MH3 borderless")
+
+[Common-Land]
+Base=Common:fromSheet("MH3 cards")
+Replace=.20F Land:fromSheet("MH3 cards")
+Replace=.133F Land:fromSheet("MH3 cards")+
+Replace=.10F fromSheet("MH3 full art")
+Replace=.067F fromSheet("MH3 full art")+
+
+[NewToModern]
+Base=Uncommon:fromSheet("MH3 new to modern")
+Replace=.213F Rare:fromSheet("MH3 new to modern")
+Replace=.023F Mythic:fromSheet("MH3 new to modern")
+Replace=.011F RareMythic:fromSheet("MH3 borderless")
+Replace=.001F Mythic:fromSheet("MH3 borderless")
+Replace=.002F RareMythic:fromSheet("MH3 retro frame")
+
+[Wildcard]
+Base=Common:fromSheet("MH3 cards")
+Replace=.417F Uncommon:fromSheet("MH3 cards")
+Replace=.078F RareMythic:fromSheet("MH3 cards")
+Replace=.004F RareMythic:fromSheet("MH3 borderless")
+Replace=.042F fromSheet("MH3 retro frame")
+Replace=.042F fromSheet("MH3 commanders")
 
 [cards]
 1 U Breaker of Creation @Yohann Schepacz
@@ -42,7 +79,7 @@ ScryfallCode=MH3
 28 U Guardian of the Forgotten @Ron Spears
 29 R Guide of Souls @Ryan Valle
 30 C Hexgold Slith @Michele Giorgi
-31 U Indebted Spirit @LA Draws
+31 U Indebted Spirit @L.A. Draws
 32 C Inspired Inventor @Ryan Valle
 33 C Jolted Awake @Steven Russell Black
 34 C Mandibular Kite @Bruno Biazotto
@@ -86,7 +123,7 @@ ScryfallCode=MH3
 72 U Tamiyo Meets the Story Circle @Xabi Gaztelua
 73 C Tempest Harvester @Runa I. Rosenberger
 74 U Triton Wavebreaker @Christina Kraus
-75 C Tune the Narrative @Marzena Nereida Piwowar
+75 C Tune the Narrative @Nereida
 76 M Ugin's Binding @Drew Baker
 77 C Unfathomable Truths @Drew Tucker
 78 C Utter Insignificance @Lius Lasahido
@@ -144,7 +181,7 @@ ScryfallCode=MH3
 130 U Phyrexian Ironworks @Mathias Kollros
 131 R Powerbalance @Steve Ellis
 132 U Ral and the Implicit Maze @Andrew Mar
-133 U Reckless Pyrosurfer @LA Draws
+133 U Reckless Pyrosurfer @L.A. Draws
 134 U Reiterating Bolt @G-host Lee
 135 C Sarpadian Simulacrum @Forrest Schehl
 136 C Siege Smash @Joshua Cairos
@@ -162,7 +199,7 @@ ScryfallCode=MH3
 148 C Colossal Dreadmask @Caio Monteiro
 149 M Eladamri, Korvecdal @Zoltan Boros
 150 C Eldrazi Repurposer @Daren Bader
-151 C Evolution Witness @Marzena Nereida Piwowar
+151 C Evolution Witness @Nereida
 152 R Fanatic of Rhonas @Scott Murphy
 153 U Fangs of Kalonia @Leanna Crossan
 154 R Flare of Cultivation @Billy Christian
@@ -265,7 +302,7 @@ ScryfallCode=MH3
 251 M Grist, Voracious Larva @Chris Rahn
 252 U Bloodsoaked Insight @David Álvarez
 253 U Drowner of Truth @Nicholas Gregory
-254 U Glasswing Grace @Craig Elliott
+254 U Glasswing Grace @Craig Elliott & Maxime Minard
 255 U Legion Leadership @Ryan Valle
 256 U Revitalizing Repast @Raoul Vitale
 257 U Rush of Inspiration @Jorge Jacinto
@@ -315,12 +352,6 @@ ScryfallCode=MH3
 301 R Deserted Temple @Rob Alexander
 302 U Nesting Grounds @Yeong-Hao Han
 303 M Phyrexian Tower @Martin de Diego Sádaba
-304 L Plains @Nadia Hurianova
-305 L Island @Samuele Bandini
-306 L Swamp @Yohann Schepacz
-307 L Mountain @Chuck Lukacs
-308 L Forest @Vance Kovacs
-309 U Snow-Covered Wastes @Tomáš Honz
 310 L Plains @Volkan Baǵa
 311 L Plains @Lius Lasahido
 312 L Island @Alayna Danner
@@ -331,6 +362,14 @@ ScryfallCode=MH3
 317 L Mountain @Paolo Parente
 318 L Forest @Lars Grant-West
 319 L Forest @Brian Valeza
+
+[full art]
+304 L Plains @Nadia Hurianova
+305 L Island @Samuele Bandini
+306 L Swamp @Yohann Schepacz
+307 L Mountain @Chuck Lukacs
+308 L Forest @Vance Kovacs
+309 U Snow-Covered Wastes @Tomáš Honz
 
 [borderless]
 320 R Echoes of Eternity @Clint Lockwood
@@ -408,7 +447,7 @@ ScryfallCode=MH3
 471 M Ral, Monsoon Mage @Borja Pindado
 472 M Grist, Voracious Larva @Ron Spencer
 
-[showcase]
+[retro frame]
 384 M Emrakul, the World Anew @Brent Hollowell
 385 U It That Heralds the End @Alex Konstad
 386 M Kozilek, the Broken Reality @Brent Hollowell
@@ -428,7 +467,7 @@ ScryfallCode=MH3
 400 R Flare of Denial @Jason A. Engle
 401 R Kappa Cannoneer @Jesper Ejsing
 402 M Shadow of the Second Sun @Danny Schwartz
-403 C Tune the Narrative @Marzena Nereida Piwowar
+403 C Tune the Narrative @Nereida
 404 R Volatile Stormdrake @Campbell White
 405 C Accursed Marauder @Paolo Parente
 406 R Chthonian Nightmare @Josu Solano
@@ -449,7 +488,7 @@ ScryfallCode=MH3
 421 U Unstable Amulet @José Parodi
 422 R Wheel of Potential @Drew Baker
 423 M Eladamri, Korvecdal @Zoltan Boros
-424 C Evolution Witness @Marzena Nereida Piwowar
+424 C Evolution Witness @Nereida
 425 R Flare of Cultivation @Billy Christian
 426 U Lion Umbra @Julia Metzger
 427 U Monstrous Vortex @Deruchenko Alexander
@@ -467,28 +506,8 @@ ScryfallCode=MH3
 439 U Snow-Covered Wastes @Mark Poole
 440 R Windswept Heath @Alexander Forssberg
 441 R Wooded Foothills @Chris Ostrowski
-473 M Emrakul, the World Anew @Brent Hollowell
-474 M Herigast, Erupting Nullkite @Lucas Graciano
-475 M Kozilek, the Broken Reality @Brent Hollowell
-476 M Ulamog, the Defiler @Chase Stone
-477 R Pearl-Ear, Imperial Advisor @Fajareka Setiawan
-478 R Phelia, Exuberant Shepherd @Rudy Siswanto
-479 R K'rrik, Son of Yawgmoth @Chase Stone
-480 R Shilgengar, Sire of Famine @Chris Rallis
-481 M Ashling, Flame Dancer @Michal Ivan
-482 R Laelia, the Blade Reforged @Wisnu Tan
-483 M Eladamri, Korvecdal @Zoltan Boros
-484 R Six @Andrew Mar
-485 M Arna Kennerüd, Skycaptain @Cristi Balanescu
-486 M Breya, Etherium Shaper @Tiffany Turrill
-487 R Genku, Future Shaper @Chuck Lukacs
-488 R Imskir Iron-Eater @Xavier Ribeiro
-489 M Kaalia of the Vast @Justyna Dura
-490 R Kudo, King Among Bears @Ekaterina Burmak
-491 R Nadu, Winged Wisdom @Daren Bader
-492 R The Necrobloom @Igor Krstic
-493 M Phlage, Titan of Fire's Fury @Lucas Graciano
-494 R Rosheen, Roaring Prophet @Fang Xinyu
+
+[etched]
 497 L Plains @Volkan Baǵa
 498 L Plains @Lius Lasahido
 499 L Island @Alayna Danner
@@ -514,6 +533,28 @@ ScryfallCode=MH3
 519 U Solar Transformer @Mike Bierek
 520 C Tranquil Landscape @Randy Gallegos
 521 C Twisted Landscape @Piotr Dura
+473 M Emrakul, the World Anew @Brent Hollowell
+474 M Herigast, Erupting Nullkite @Lucas Graciano
+475 M Kozilek, the Broken Reality @Brent Hollowell
+476 M Ulamog, the Defiler @Chase Stone
+477 R Pearl-Ear, Imperial Advisor @Fajareka Setiawan
+478 R Phelia, Exuberant Shepherd @Rudy Siswanto
+479 R K'rrik, Son of Yawgmoth @Chase Stone
+480 R Shilgengar, Sire of Famine @Chris Rallis
+481 M Ashling, Flame Dancer @Michal Ivan
+482 R Laelia, the Blade Reforged @Wisnu Tan
+483 M Eladamri, Korvecdal @Zoltan Boros
+484 R Six @Andrew Mar
+485 M Arna Kennerüd, Skycaptain @Cristi Balanescu
+486 M Breya, Etherium Shaper @Tiffany Turrill
+487 R Genku, Future Shaper @Chuck Lukacs
+488 R Imskir Iron-Eater @Xavier Ribeiro
+489 M Kaalia of the Vast @Justyna Dura
+490 R Kudo, King Among Bears @Ekaterina Burmak
+491 R Nadu, Winged Wisdom @Daren Bader
+492 R The Necrobloom @Igor Krstic
+493 M Phlage, Titan of Fire's Fury @Lucas Graciano
+494 R Rosheen, Roaring Prophet @Fang Xinyu
 
 [extended art]
 447 R Argent Dais @Carlos Palma Cruchaga
@@ -541,6 +582,12 @@ ScryfallCode=MH3
 [promo]
 495 R Powerbalance @Liiga Smilshkalne
 496 R Flusterstorm @Andrew Mar
+
+[rebalanced]
+A-29 R A-Guide of Souls @Ryan Valle
+A-38 M A-Ocelot Pride @Chris Seaman
+A-122 C A-Galvanic Discharge @Zoltan Boros
+A-193 R A-Nadu, Winged Wisdom @Daren Bader
 
 [new to modern]
 1 Angel of the Ruins|MH3
@@ -598,36 +645,59 @@ ScryfallCode=MH3
 1 Fury|SPG
 1 Endurance|SPG
 
+[commanders]
+1 Disa the Restless|M3C
+1 Omo, Queen of Vesuva|M3C
+1 Satya, Aetherflux Genius|M3C
+1 Ulalek, Fused Atrocity|M3C
+1 Azlask, the Swelling Scourge|M3C
+1 Cayth, Famed Mechanist|M3C
+1 Coram, the Undertaker|M3C
+1 Jyoti, Moag Ancient|M3C
+
 [tokens]
-b_0_0_phyrexian_germ
-b_0_0_zombie_army
-b_1_1_rat_lifelink
-b_1_1_snake_deathtouch
-b_1_2_a_phyrexian_wurm_deathtouch
-b_2_1_a_phyrexian_wurm_lifelink
-b_2_2_zombie
-bg_1_1_insect
-c_0_1_eldrazi_spawn_sac
-c_1_1_a_servo
-c_3_3_a_phyrexian_golem
-c_a_blood_draw
-c_a_clue_draw
-c_a_food_sac
-c_a_treasure_sac
-g_0_1_plant
-g_1_1_insect
-r_1_1_gremlin
-spellgorger_weird
-u_1_1_a_thopter_flying
-u_1_2_moonfolk_flying
-u_2_2_bird_flying
-u_3_3_fish_hatches_whale
-u_6_6_whale_hatches_kraken
-u_9_9_kraken
-w_1_1_cat
-w_1_1_soldier
-w_1_1_spirit_flying
-w_2_1_cat_warrior
-w_2_2_fox_vigilance
-w_4_4_angel_flying
-wb_1_1_spirit_flying
+2 c_0_1_eldrazi_spawn_sac @Aleksi Briclot
+3 w_4_4_angel_flying @Magali Villeneuve
+4 w_1_1_cat @Maxime Minard
+5 w_2_1_cat_warrior @Ben Wootten
+6 w_2_2_fox_vigilance @Chuck Lukacs
+7 w_1_1_soldier @Paolo Parente
+8 w_1_1_spirit_flying @Wayne Wu
+9 u_2_2_bird_flying @Carlos Palma Cruchaga
+10 u_3_3_fish_hatches_whale @Dan Murayama Scott
+11 u_9_9_kraken @Dan Murayama Scott
+12 u_1_2_moonfolk_flying @Chuck Lukacs
+13 u_1_1_a_thopter_flying @Andrew Murray
+14 u_6_6_whale_hatches_kraken @Dan Murayama Scott
+16 b_0_0_phyrexian_germ @Igor Kieryluk
+17 b_1_2_a_phyrexian_wurm_deathtouch @David Astruga
+18 b_2_1_a_phyrexian_wurm_lifelink @David Astruga
+19 b_1_1_rat_lifelink @Carlos Palma Cruchaga
+20 b_1_1_snake_deathtouch @Caroline Gariba
+21 b_2_2_zombie @Anna Steinbauer
+22 b_0_0_zombie_army @Warren Mahy
+23 r_1_1_gremlin @Tony Foti
+25 g_1_1_insect @Madeline Boni
+26 g_0_1_plant @Daren Bader
+27 bg_1_1_insect @Kim Sokol
+28 wb_1_1_spirit_flying @Christina Kraus
+29 c_a_blood_draw @Miranda Meeks
+30 c_a_clue_draw @Michele Giorgi
+31 c_a_food_sac @Leanna Crossan
+32 c_3_3_a_phyrexian_golem @Volkan Baǵa
+33 c_1_1_a_servo @Jung Park
+34 c_a_treasure_sac @Nino Vecia
+38 c_0_1_eldrazi_spawn_sac @Aleksi Briclot
+39 b_2_2_zombie @Anna Steinbauer
+40 r_1_1_gremlin @Tony Foti
+42 g_0_1_plant @Daren Bader
+43 g_1_1_insect @Madeline Bon
+45 c_a_treasure_sac @Nino Vecia
+
+[other]
+1 copy @David Palumbo
+15 eternalize_fanatic_of_rhonas @Bartek Fedyczak
+24 spellgorger_weird @Steve Ellis
+35 emblem_tamiyo_seasoned_scholar @Magali Villeneuve
+36 energy @Liz Leo
+37 copy @David Palumbo

@@ -16,15 +16,19 @@ import forge.adventure.data.RewardData;
 import forge.adventure.util.*;
 import forge.card.CardEdition;
 import forge.card.ColorSet;
+import forge.card.CardEdition.EditionEntry;
+import forge.card.CardRarity;
 import forge.item.PaperCard;
 import forge.model.FModel;
+import forge.util.IterableUtil;
 import forge.util.MyRandom;
+import forge.util.StreamUtil;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
-import java.util.stream.StreamSupport;
 
 
 public class SpellSmithScene extends UIScene {
@@ -39,7 +43,7 @@ public class SpellSmithScene extends UIScene {
 
     private List<PaperCard> cardPool = new ArrayList<>();
     private TextraLabel playerGold, playerShards, poolSize;
-    private final TextraButton pullUsingGold, pullUsingShards;
+    private final TextraButton pullUsingGold, pullUsingShards, acceptReward, declineReward, exitSmith, reset;
     private final ScrollPane rewardDummy;
     private RewardActor rewardActor;
     SelectBox<CardEdition> editionList;
@@ -47,6 +51,7 @@ public class SpellSmithScene extends UIScene {
     final private HashMap<String, TextraButton> rarityButtons = new HashMap<>();
     final private HashMap<String, TextraButton> costButtons = new HashMap<>();
     final private HashMap<String, TextraButton> colorButtons = new HashMap<>();
+
     //Filter variables.
     private String edition = "";
     private String rarity = "";
@@ -55,22 +60,35 @@ public class SpellSmithScene extends UIScene {
     //Other
     private final float basePrice = 125f;
     private int currentPrice = 0;
+    private int lockedPrice = 0;
+
     private int currentShardPrice = 0;
+    private int lockedShardPrice = 0;
+
     private List<CardEdition> editions = null;
+    private Reward currentReward = null;
+    private boolean paidInShards = false;
 
     private SpellSmithScene() {
         super(Forge.isLandscapeMode() ? "ui/spellsmith.json" : "ui/spellsmith_portrait.json");
 
-
         editionList = ui.findActor("BSelectPlane");
+        reset = ui.findActor("BReset");
         rewardDummy = ui.findActor("RewardDummy");
         rewardDummy.setVisible(false);
-
 
         pullUsingGold = ui.findActor("pullUsingGold");
         pullUsingGold.setDisabled(true);
         pullUsingShards = ui.findActor("pullUsingShards");
         pullUsingShards.setDisabled(true);
+
+        exitSmith = ui.findActor("done");
+
+        acceptReward = ui.findActor("accept");
+        acceptReward.setVisible(false);
+        declineReward = ui.findActor("decline");
+        declineReward.setVisible(false);
+
         playerGold = Controls.newAccountingLabel(ui.findActor("playerGold"), false);
         playerShards = Controls.newAccountingLabel(ui.findActor("playerShards"), true);
         poolSize = ui.findActor("poolSize");
@@ -81,6 +99,7 @@ public class SpellSmithScene extends UIScene {
                 button.addListener(new ClickListener() {
                     @Override
                     public void clicked(InputEvent event, float x, float y) {
+                        if (button.isDisabled()) { return; }
                         selectColor(i);
                         filterResults();
                     }
@@ -94,6 +113,8 @@ public class SpellSmithScene extends UIScene {
                 button.addListener(new ClickListener() {
                     @Override
                     public void clicked(InputEvent event, float x, float y) {
+                        if (button.isDisabled()) { return; }
+
                         if (selectRarity(i)) button.setColor(Color.RED);
                         filterResults();
                     }
@@ -107,6 +128,8 @@ public class SpellSmithScene extends UIScene {
                 button.addListener(new ClickListener() {
                     @Override
                     public void clicked(InputEvent event, float x, float y) {
+                        if (button.isDisabled()) { return; }
+
                         if (selectCost(i)) button.setColor(Color.RED);
                         filterResults();
                     }
@@ -114,20 +137,26 @@ public class SpellSmithScene extends UIScene {
             }
         }
 
-        ui.onButtonPress("done", () -> SpellSmithScene.this.done());
+        ui.onButtonPress("accept", SpellSmithScene.this::acceptSmithing);
+        ui.onButtonPress("decline", SpellSmithScene.this::declineSmithing);
+        ui.onButtonPress("done", SpellSmithScene.this::done);
         ui.onButtonPress("pullUsingGold", () -> SpellSmithScene.this.pullCard(false));
         ui.onButtonPress("pullUsingShards", () -> SpellSmithScene.this.pullCard(true));
         ui.onButtonPress("BReset", () -> {
+            if (reset.isDisabled()) { return; }
             reset();
             filterResults();
         });
     }
+
     private void reset() {
         edition = "";
         cost_low = -1;
         cost_high = 9999;
         rarity = "";
         currentPrice = (int) basePrice;
+        lockedPrice = currentPrice;
+        lockedShardPrice = currentShardPrice;
         for (Map.Entry<String, TextraButton> B : colorButtons.entrySet()) B.getValue().setColor(Color.WHITE);
         for (Map.Entry<String, TextraButton> B : costButtons.entrySet()) B.getValue().setColor(Color.WHITE);
         for (Map.Entry<String, TextraButton> B : rarityButtons.entrySet()) B.getValue().setColor(Color.WHITE);
@@ -141,30 +170,29 @@ public class SpellSmithScene extends UIScene {
         editions = StaticData.instance().getSortedEditions().stream().filter(input -> {
             if (input == null)
                 return false;
-            if (input.getType() == CardEdition.Type.REPRINT || input.getType() == CardEdition.Type.PROMO || input.getType() == CardEdition.Type.COLLECTOR_EDITION)
+            if (CardEdition.Type.REPRINT_SET_TYPES.contains(input.getType()))
                 return false;
             if (input.getDate() != null) {
                 Instant now = Instant.now(); //this should filter upcoming sets from release date + 1 day..
                 if (input.getDate().after(Date.from(now.minus(1, ChronoUnit.DAYS))))
                     return false;
             }
-            List<PaperCard> it = StreamSupport.stream(RewardData.getAllCards().spliterator(), false)
-                    .filter(input2 -> input2.getEdition().equals(input.getCode())).collect(Collectors.toList());
-            if (it.size() == 0)
+            String code = input.getCode();
+            Predicate<PaperCard> test = i -> i.getEdition().equals(code);
+            if (!IterableUtil.any(RewardData.getAllCards(), test))
                 return false;
             ConfigData configData = Config.instance().getConfigData();
             if (configData.allowedEditions != null)
-                return Arrays.asList(configData.allowedEditions).contains(input.getCode());
-            return (!Arrays.asList(configData.restrictedEditions).contains(input.getCode()));
-        }).sorted(new Comparator<CardEdition>() {
-            @Override
-            public int compare(CardEdition e1, CardEdition e2) {
-                return e1.getName().compareTo(e2.getName());
-            }
-        }).collect(Collectors.toList());
+                return Arrays.asList(configData.allowedEditions).contains(code);
+            return (!Arrays.asList(configData.restrictedEditions).contains(code));
+        }).sorted(Comparator.comparing(CardEdition::getName)).collect(Collectors.toList());
     }
 
     public boolean done() {
+        if (currentReward != null) {
+            acceptSmithing();
+        }
+
         if (rewardActor != null) rewardActor.remove();
         cardPool.clear(); //Get rid of cardPool, filtering is fast enough to justify keeping it cached.
         Forge.switchToLast();
@@ -286,7 +314,7 @@ public class SpellSmithScene extends UIScene {
         loadEditions(); //just to be safe since it's preloaded, if somehow edition is null, then reload it
         editionList.clearListeners();
         editionList.clearItems();
-        editionList.setItems(editions.toArray(new CardEdition[editions.size()]));
+        editionList.setItems(editions.toArray(new CardEdition[0]));
         editionList.addListener(new ChangeListener() {
             @Override
             public void changed(ChangeEvent event, Actor actor) {
@@ -299,6 +327,10 @@ public class SpellSmithScene extends UIScene {
         editionList.addListener(new ClickListener() {
             @Override
             public void clicked(InputEvent event, float x, float y) {
+                if (editionList.isDisabled()) {
+                    return;
+                }
+
                 editionList.showScrollPane();
             }
         });
@@ -333,15 +365,21 @@ public class SpellSmithScene extends UIScene {
                     if (B.getValue().getColor().equals(Color.RED)) colorFilter.add("White");
                     break;
             }
-        P = StreamSupport.stream(P.spliterator(), false).filter(input -> {
+        P = StreamUtil.stream(P).filter(input -> {
             //L|Basic Land, C|Common, U|Uncommon, R|Rare, M|Mythic Rare, S|Special, N|None
             if (input == null) return false;
             final CardEdition cardEdition = FModel.getMagicDb().getEditions().get(edition);
 
-            if (cardEdition != null && cardEdition.getCardInSet(input.getName()).size() == 0) return false;
+            // Use the rarity of the card from the filtered set.
+            CardRarity inputRarity = input.getRarity();
+            if (cardEdition != null)  {
+                List<EditionEntry> cardsInSet = cardEdition.getCardInSet(input.getName());
+            	if (cardsInSet.size() == 0) return false;
+            	inputRarity = cardsInSet.get(0).rarity();
+            }
+            if (!rarity.isEmpty()) if (!inputRarity.toString().equals(rarity)) return false;
             if (colorFilter.size() > 0)
                 if (input.getRules().getColor() != ColorSet.fromNames(colorFilter)) return false;
-            if (!rarity.isEmpty()) if (!input.getRarity().toString().equals(rarity)) return false;
             if (cost_low > -1) {
                 if (!(input.getRules().getManaCost().getCMC() >= cost_low && input.getRules().getManaCost().getCMC() <= cost_high))
                     return false;
@@ -373,8 +411,8 @@ public class SpellSmithScene extends UIScene {
         }
         if (cost_low > -1) totalCost *= 2.5f; //And CMC cost multiplier.
 
-        cardPool = StreamSupport.stream(P.spliterator(), false).collect(Collectors.toList());
-        poolSize.setText(((cardPool.size() > 0 ? "[/][FOREST]" : "[/][RED]")) + cardPool.size() + " possible card" + (cardPool.size() != 1 ? "s" : ""));
+        cardPool = StreamUtil.stream(P).collect(Collectors.toList());
+        poolSize.setText(((cardPool.size() > 0 ? "[/][FOREST]" : "[/][RED]")) + cardPool.size() + " possible card" + (cardPool.size() > 1 ? "s" : ""));
         currentPrice = (int) totalCost;
         currentShardPrice = (int) (totalCost * 0.2f); //Intentionally rounding up via the cast to int
         pullUsingGold.setText("[+Pull][+goldcoin] "+ currentPrice);
@@ -385,29 +423,106 @@ public class SpellSmithScene extends UIScene {
     }
 
     public void pullCard(boolean usingShards) {
+        paidInShards = usingShards;
+        lockedShardPrice = currentShardPrice;
+        lockedPrice = currentPrice;
         PaperCard P = cardPool.get(MyRandom.getRandom().nextInt(cardPool.size())); //Don't use the standard RNG.
-        Reward R = null;
+        currentReward = null;
         if (Config.instance().getSettingData().useAllCardVariants) {
             if (!edition.isEmpty()) {
-                R = new Reward(CardUtil.getCardByNameAndEdition(P.getCardName(), edition));
+                currentReward = new Reward(CardUtil.getCardByNameAndEdition(P.getCardName(), edition));
             } else {
-                R = new Reward(CardUtil.getCardByName(P.getCardName())); // grab any random variant if no set preference is specified
+                currentReward = new Reward(CardUtil.getCardByName(P.getCardName())); // grab any random variant if no set preference is specified
             }
         } else {
-            R = new Reward(P);
+            currentReward = new Reward(P);
         }
-        Current.player().addReward(R);
-        if (usingShards) {
-            Current.player().takeShards(currentShardPrice);
-        } else {
-            Current.player().takeGold(currentPrice);
-        }
-        if (Current.player().getGold() < currentPrice) pullUsingGold.setDisabled(true);
-        if (Current.player().getShards() < currentShardPrice) pullUsingShards.setDisabled(true);
         if (rewardActor != null) rewardActor.remove();
-        rewardActor = new RewardActor(R, true, null, true);
-        rewardActor.flip(); //Make it flip so it draws visual attention, why not.
-        rewardActor.setBounds(rewardDummy.getX(), rewardDummy.getY(), rewardDummy.getWidth(), rewardDummy.getHeight());
+        rewardActor = new RewardActor(currentReward, true, null, true);
         stage.addActor(rewardActor);
+        rewardActor.setBounds(rewardDummy.getX(), rewardDummy.getY(), rewardDummy.getWidth(), rewardDummy.getHeight());
+        rewardActor.flip(); //Make it flip so it draws visual attention, why not.
+
+        acceptReward.setVisible(true);
+        declineReward.setVisible(true);
+
+        disableFilterAndPullButtons();
+    }
+
+    private void acceptSmithing() {
+        if (paidInShards) {
+            Current.player().takeShards(lockedShardPrice);
+        } else {
+            Current.player().takeGold(lockedPrice);
+        }
+
+        Current.player().addReward(currentReward);
+
+        clearReward();
+        updateFilterAndPullButtons();
+    }
+
+    private void declineSmithing() {
+        // Decline the smith reward for 10% of original price
+        float priceAdjustment = .10f;
+        if (paidInShards) {
+            Current.player().takeShards((int)(lockedShardPrice * priceAdjustment));
+        } else {
+            Current.player().takeGold((int)(lockedPrice * priceAdjustment));
+        }
+
+        clearReward();
+        updateFilterAndPullButtons();
+    }
+
+    private void clearReward() {
+        if (rewardActor != null) rewardActor.remove();
+        currentReward = null;
+    }
+
+
+    private void updateFilterAndPullButtons() {
+        pullUsingGold.setDisabled(Current.player().getGold() < currentPrice);
+        pullUsingShards.setDisabled(Current.player().getShards() < currentShardPrice);
+
+        acceptReward.setVisible(false);
+        declineReward.setVisible(false);
+
+        exitSmith.setDisabled(false);
+        reset.setDisabled(false);
+        editionList.setDisabled(false);
+
+        for(TextraButton button : rarityButtons.values()) {
+            button.setDisabled(false);
+        }
+
+        for(TextraButton button : colorButtons.values()) {
+            button.setDisabled(false);
+        }
+
+        for(TextraButton button : costButtons.values()) {
+            button.setDisabled(false);
+        }
+    }
+
+    private void disableFilterAndPullButtons() {
+        pullUsingGold.setDisabled(true);
+        pullUsingShards.setDisabled(true);
+
+        exitSmith.setDisabled(true);
+        reset.setDisabled(true);
+        editionList.setDisabled(true);
+
+        for(TextraButton button : rarityButtons.values()) {
+            button.setDisabled(true);
+        }
+
+        for(TextraButton button : colorButtons.values()) {
+            button.setDisabled(true);
+        }
+
+        for(TextraButton button : costButtons.values()) {
+            button.setDisabled(true);
+        }
     }
 }

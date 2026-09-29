@@ -17,14 +17,14 @@
  */
 package forge.game.cost;
 
-import java.util.Map;
-
 import forge.game.Game;
 import forge.game.ability.AbilityKey;
 import forge.game.card.Card;
 import forge.game.player.Player;
 import forge.game.player.PlayerCollection;
 import forge.game.spellability.SpellAbility;
+
+import java.util.Map;
 
 /**
  * The Class CostDraw.
@@ -64,7 +64,7 @@ public class CostDraw extends CostPart {
         int c = this.getAbilityAmount(ability);
 
         for (Player p : payer.getGame().getPlayers()) {
-            if (p.isValid(type, payer, source, ability) && p.canDrawAmount(c)) {
+            if (p.isValid(type, payer, source, ability) && p.canDraw(c)) {
                 res.add(p);
             }
         }

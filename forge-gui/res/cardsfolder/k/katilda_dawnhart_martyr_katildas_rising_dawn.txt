@@ -6,10 +6,11 @@ K:Flying
 K:Lifelink
 K:Protection:Vampire
 K:Disturb:3 W W
-S:Mode$ Continuous | EffectZone$ All | CharacteristicDefining$ True | SetPower$ X | SetToughness$ X | Description$ CARDNAME's power and toughness are each equal to the number of permanents you control that are Spirits and/or enchantments.
+S:Mode$ Continuous | CharacteristicDefining$ True | SetPower$ X | SetToughness$ X | Description$ CARDNAME's power and toughness are each equal to the number of permanents you control that are Spirits and/or enchantments.
 SVar:X:Count$Valid Spirit.YouCtrl,Enchantment.YouCtrl
 SVar:NeedsToPlayVar:X GE2
 SVar:BuffedBy:Enchantment,Spirit
+SVar:NoZeroToughnessAI:True
 DeckHints:Type$Spirit|Enchantment
 DeckHas:Ability$LifeGain|Graveyard
 AlternateMode:DoubleFaced
@@ -21,9 +22,9 @@ Name:Katilda's Rising Dawn
 ManaCost:no cost
 Colors:white
 Types:Legendary Enchantment Aura
-K:Enchant creature
-A:SP$ Attach | ValidTgts$ Creature | TgtPrompt$ Select target creature | AILogic$ Pump
-S:Mode$ Continuous | Affected$ Creature.EnchantedBy | AddPower$ X | AddToughness$ X | AddKeyword$ Flying & Lifelink & Protection:Vampire | Description$ Enchanted creature has flying, lifelink, and protection from Vampires, and it gets +X/+X, where X is the number of permanents you control that are Spirits and/or enchantments.
+K:Enchant:Creature
+SVar:AttachAILogic:Pump
+S:Mode$ Continuous | AffectedDefined$ Enchanted | Affected$ Creature | AddPower$ X | AddToughness$ X | AddKeyword$ Flying & Lifelink & Protection:Vampire | Description$ Enchanted creature has flying, lifelink, and protection from Vampires, and it gets +X/+X, where X is the number of permanents you control that are Spirits and/or enchantments.
 SVar:X:Count$Valid Spirit.YouCtrl,Enchantment.YouCtrl
 SVar:BuffedBy:Enchantment,Spirit
 R:Event$ Moved | ValidCard$ Card.Self | Destination$ Graveyard | ReplaceWith$ Exile | Description$ If CARDNAME would be put into a graveyard from anywhere, exile it instead.

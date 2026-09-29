@@ -1,7 +1,5 @@
 package forge.screens.home.puzzle;
 
-import java.awt.event.ActionEvent;
-import java.awt.event.ActionListener;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -40,9 +38,7 @@ public enum CSubmenuPuzzleCreate implements ICDoc, IMenuProvider {
 
     @Override
     public void initialize() {
-        view.getBtnStart().addActionListener(
-                new ActionListener() { @Override
-                public void actionPerformed(final ActionEvent e) { startPuzzleCreate(); } });
+        view.getBtnStart().addActionListener(e -> startPuzzleCreate());
     }
 
     @Override
@@ -65,7 +61,7 @@ public enum CSubmenuPuzzleCreate implements ICDoc, IMenuProvider {
                 "URL:http://www.cardforge.org",
                 "Goal:Win",
                 "Turns:999",
-                "Difficulty:Easy",
+                "Difficulty:Common",
                 "Description:This is a completely empty puzzle placeholder."
                 )
         );
@@ -87,22 +83,16 @@ public enum CSubmenuPuzzleCreate implements ICDoc, IMenuProvider {
 
         final Puzzle emptyPuzzle = new Puzzle(generateEmptyPuzzle(firstPlayer));
 
-        SwingUtilities.invokeLater(new Runnable() {
-            @Override
-            public void run() {
-                SOverlayUtils.startGameOverlay();
-                SOverlayUtils.showOverlay();
-            }
+        SwingUtilities.invokeLater(() -> {
+            SOverlayUtils.startGameOverlay();
+            SOverlayUtils.showOverlay();
         });
 
         final HostedMatch hostedMatch = GuiBase.getInterface().hostMatch();
-        hostedMatch.setStartGameHook(new Runnable() {
-            @Override
-            public final void run() {
-                SOptionPane.showMessageDialog(Localizer.getInstance().getMessage("lblWelcomePuzzleModeMessage"),
-                        Localizer.getInstance().getMessage("lblCreateNewPuzzle"), SOptionPane.WARNING_ICON);
-                emptyPuzzle.applyToGame(hostedMatch.getGame());
-            }
+        hostedMatch.setStartGameHook(() -> {
+            SOptionPane.showMessageDialog(Localizer.getInstance().getMessage("lblWelcomePuzzleModeMessage"),
+                    Localizer.getInstance().getMessage("lblCreateNewPuzzle"), SOptionPane.WARNING_ICON);
+            emptyPuzzle.applyToGame(hostedMatch.getGame());
         });
 
         final List<RegisteredPlayer> players = new ArrayList<>();
@@ -118,11 +108,6 @@ public enum CSubmenuPuzzleCreate implements ICDoc, IMenuProvider {
         rules.setGamesPerMatch(1);
         hostedMatch.startMatch(rules, null, players, human, GuiBase.getInterface().getNewGuiGame());
 
-        SwingUtilities.invokeLater(new Runnable() {
-            @Override
-            public void run() {
-                SOverlayUtils.hideOverlay();
-            }
-        });
+        SwingUtilities.invokeLater(SOverlayUtils::hideOverlay);
     }
 }

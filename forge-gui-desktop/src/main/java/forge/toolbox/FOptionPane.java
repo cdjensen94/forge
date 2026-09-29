@@ -3,20 +3,18 @@ package forge.toolbox;
 import java.awt.Component;
 import java.awt.Dimension;
 import java.awt.FontMetrics;
-import java.awt.event.ActionEvent;
-import java.awt.event.ActionListener;
 import java.awt.event.KeyAdapter;
 import java.awt.event.KeyEvent;
 import java.util.List;
+import java.util.concurrent.Callable;
+import java.util.concurrent.FutureTask;
 
-import javax.swing.JComponent;
-import javax.swing.JOptionPane;
-import javax.swing.SwingConstants;
-import javax.swing.SwingUtilities;
+import javax.swing.*;
 import javax.swing.text.StyleConstants;
 
 import com.google.common.collect.ImmutableList;
 
+import forge.gui.FThreads;
 import forge.localinstance.skin.FSkinProp;
 import forge.toolbox.FSkin.SkinImage;
 import forge.util.Localizer;
@@ -34,22 +32,19 @@ public class FOptionPane extends FDialog {
     public static final SkinImage WARNING_ICON = FSkin.getIcon(FSkinProp.ICO_WARNING);
     public static final SkinImage ERROR_ICON = FSkin.getIcon(FSkinProp.ICO_ERROR);
 
-    public static void showMessageDialog(final String message) {
-        showMessageDialog(message, "Forge", INFORMATION_ICON);
-    }
-
-    public static void showMessageDialog(final String message, final String title) {
-        showMessageDialog(message, title, INFORMATION_ICON);
-    }
-
     public static void showErrorDialog(final String message) {
-        showMessageDialog(message, "Forge", ERROR_ICON);
+        showErrorDialog(message, "Forge");
     }
-
     public static void showErrorDialog(final String message, final String title) {
         showMessageDialog(message, title, ERROR_ICON);
     }
 
+    public static void showMessageDialog(final String message) {
+        showMessageDialog(message, "Forge");
+    }
+    public static void showMessageDialog(final String message, final String title) {
+        showMessageDialog(message, title, INFORMATION_ICON);
+    }
     public static void showMessageDialog(final String message, final String title, final SkinImage icon) {
         showOptionDialog(message, title, icon, ImmutableList.of(Localizer.getInstance().getMessage("lblOK")), 0);
     }
@@ -57,19 +52,15 @@ public class FOptionPane extends FDialog {
     public static boolean showConfirmDialog(final String message) {
         return showConfirmDialog(message, "Forge");
     }
-
     public static boolean showConfirmDialog(final String message, final String title) {
         return showConfirmDialog(message, title, Localizer.getInstance().getMessage("lblYes"), Localizer.getInstance().getMessage("lblNo"), true);
     }
-
     public static boolean showConfirmDialog(final String message, final String title, final boolean defaultYes) {
         return showConfirmDialog(message, title, Localizer.getInstance().getMessage("lblYes"), Localizer.getInstance().getMessage("lblNo"), defaultYes);
     }
-
     public static boolean showConfirmDialog(final String message, final String title, final String yesButtonText, final String noButtonText) {
         return showConfirmDialog(message, title, yesButtonText, noButtonText, true);
     }
-
     public static boolean showConfirmDialog(final String message, final String title, final String yesButtonText, final String noButtonText, final boolean defaultYes) {
         final List<String> options = ImmutableList.of(yesButtonText, noButtonText);
         final int reply = FOptionPane.showOptionDialog(message, title, QUESTION_ICON, options, defaultYes ? 0 : 1);
@@ -79,85 +70,96 @@ public class FOptionPane extends FDialog {
     public static int showOptionDialog(final String message, final String title, final SkinImage icon, final List<String> options) {
         return showOptionDialog(message, title, icon, options, 0);
     }
-
     public static int showOptionDialog(final String message, final String title, final SkinImage icon, Component comp, final List<String> options) {
         return showOptionDialog(message, title, icon, comp, options, 0);
     }
-    
     public static int showOptionDialog(final String message, final String title, final SkinImage icon, final List<String> options, final int defaultOption) {
         // not fully done loading yet, avoid crash when called by colorCheck for random decks (as each item gets selected after another)
         if (FView.SINGLETON_INSTANCE.getSplash() != null) {
             return 0;
         }
-
-        final FOptionPane optionPane = new FOptionPane(message, title, icon, null, options, defaultOption);
-        optionPane.setVisible(true);
-        final int dialogResult = optionPane.result;
-        optionPane.dispose();
-        return dialogResult;
+        return showOptionDialog(message, title, icon, null, options, defaultOption);
     }
-
     public static int showOptionDialog(final String message, final String title, final SkinImage icon, final Component comp, final List<String> options, final int defaultOption) {
-        final FOptionPane optionPane = new FOptionPane(message, title, icon, comp, options, defaultOption);
-        optionPane.setVisible(true);
-        final int dialogResult = optionPane.result;
-        optionPane.dispose();
-        return dialogResult;
+        final Callable<Integer> showChoice = () -> {
+            final FOptionPane optionPane = new FOptionPane(message, title, icon, comp, options, defaultOption);
+            optionPane.setVisible(true);
+            final int dialogResult = optionPane.result;
+            optionPane.dispose();
+            return dialogResult;
+        };
+        final FutureTask<Integer> future = new FutureTask<>(showChoice);
+        FThreads.invokeInEdtAndWait(future);
+        try {
+            return future.get();
+        } catch (final Exception e) { // should be no exception here
+            e.printStackTrace();
+            throw new RuntimeException(e);
+        }
     }
     
     public static String showInputDialog(final String message, final String title) {
         return showInputDialog(message, title, null, "", null);
     }
-
     public static String showInputDialog(final String message, final String title, final SkinImage icon) {
         return showInputDialog(message, title, icon, "", null);
     }
-
     public static String showInputDialog(final String message, final String title, final SkinImage icon, final String initialInput) {
         return showInputDialog(message, title, icon, initialInput, null);
     }
-
     @SuppressWarnings("unchecked")
     public static <T> T showInputDialog(final String message, final String title, final SkinImage icon, final String initialInput, final List<T> inputOptions) {
-        final JComponent inputField;
-        FTextField txtInput = null;
-        FComboBox<T> cbInput = null;
-        if (inputOptions == null) {
-            txtInput = new FTextField.Builder().text(initialInput).build();
-            inputField = txtInput;
-        } else {
-            cbInput = new FComboBox<>(inputOptions);
-            cbInput.setSelectedItem(initialInput);
-            inputField = cbInput;
-        }
+        final Callable<T> showChoice = () -> {
+            final JComponent inputField;
+            FTextField txtInput = null;
+            FComboBox<T> cbInput = null;
+            if (inputOptions == null) {
+                txtInput = new FTextField.Builder().text(initialInput).build();
+                inputField = txtInput;
+            } else {
+                cbInput = new FComboBox<>(inputOptions);
+                cbInput.setSelectedItem(initialInput);
+                inputField = cbInput;
+            }
 
-        final FOptionPane optionPane = new FOptionPane(message, title, icon, inputField, ImmutableList.of(Localizer.getInstance().getMessage("lblOK"), Localizer.getInstance().getMessage("lblCancel")), -1);
-        optionPane.setDefaultFocus(inputField);
-        inputField.addKeyListener(new KeyAdapter() { //hook so pressing Enter on field accepts dialog
-            @Override
-            public void keyPressed(final KeyEvent e) {
-                if (e.getKeyCode() == KeyEvent.VK_ENTER) {
-                    optionPane.setResult(0);
+            final FOptionPane optionPane = new FOptionPane(message, title, icon, inputField, ImmutableList.of(Localizer.getInstance().getMessage("lblOK"), Localizer.getInstance().getMessage("lblCancel")), -1);
+            optionPane.setDefaultFocus(inputField);
+            inputField.addKeyListener(new KeyAdapter() { //hook so pressing Enter on field accepts dialog
+                @Override
+                public void keyPressed(final KeyEvent e) {
+                    if (e.getKeyCode() == KeyEvent.VK_ENTER) {
+                        optionPane.setResult(0);
+                    }
+                }
+            });
+            optionPane.setVisible(true);
+            final int dialogResult = optionPane.result;
+            optionPane.dispose();
+            if (dialogResult == 0) {
+                if (inputOptions == null) {
+                    return (T)txtInput.getText();
+                } else {
+                    return cbInput.getSelectedItem();
                 }
             }
-        });
-        optionPane.setVisible(true);
-        final int dialogResult = optionPane.result;
-        optionPane.dispose();
-        if (dialogResult == 0) {
-            if (inputOptions == null) {
-                return (T)txtInput.getText();
-            } else {
-                return cbInput.getSelectedItem();
-            }
+            return null;
+        };
+        final FutureTask<T> future = new FutureTask<>(showChoice);
+        FThreads.invokeInEdtAndWait(future);
+        try {
+            return future.get();
+        } catch (final Exception e) { // should be no exception here
+            e.printStackTrace();
+            throw new RuntimeException(e);
         }
-        return null;
     }
 
     private int result = -1; //default result to -1, indicating dialog closed without choosing option
     private final FButton[] buttons;
+    private FTextPane prompt;
 
     public FOptionPane(final String message, final String title, final SkinImage icon, final Component comp, final List<String> options, final int defaultOption) {
+        FThreads.assertExecutedByEdt(true);
         this.setTitle(title);
 
         final int padding = 10;
@@ -165,7 +167,6 @@ public class FOptionPane extends FDialog {
         final int gapAboveButtons = padding * 3 / 2;
         final int gapBottom = comp == null ? gapAboveButtons : padding;
         FLabel centeredLabel = null;
-        FTextPane centeredPrompt = null;
 
         if (icon != null) {
             if (icon.getWidth() < 100) {
@@ -181,23 +182,16 @@ public class FOptionPane extends FDialog {
             }
         }
         if (message != null) {
-            if (centeredLabel == null) {
-                final FTextArea prompt = new FTextArea(message);
-                prompt.setFont(FSkin.getFont(14));
-                prompt.setAutoSize(true);
-                final Dimension parentSize = JOptionPane.getRootFrame().getSize();
-                prompt.setMaximumSize(new Dimension(parentSize.width / 2, parentSize.height - 100));
-                this.add(prompt, "x " + x + ", ay top, wrap, gaptop " + (icon == null ? 0 : 7) + ", gapbottom " + gapBottom);
-            }
-            else {
-                final FTextPane prompt = new FTextPane(message);
-                prompt.setFont(FSkin.getFont(14));
+            prompt = new FTextPane();
+            prompt.setContentType("text/html");
+            prompt.putClientProperty(JEditorPane.HONOR_DISPLAY_PROPERTIES, Boolean.TRUE);
+            prompt.setText(renderMessageHtml(message));
+            prompt.setFont(FSkin.getFont(14));
+            if(centeredLabel != null)
                 prompt.setTextAlignment(StyleConstants.ALIGN_CENTER);
-                final Dimension parentSize = JOptionPane.getRootFrame().getSize();
-                prompt.setMaximumSize(new Dimension(parentSize.width / 2, parentSize.height - 100));
-                this.add(prompt, "x " + x + ", ay top, wrap, gapbottom " + gapBottom);
-                centeredPrompt = prompt;
-            }
+            final Dimension parentSize = JOptionPane.getRootFrame().getSize();
+            prompt.setMaximumSize(new Dimension(parentSize.width / 2, parentSize.height - 100));
+            this.add(prompt, "x " + x + ", ay top, wrap, gaptop " + (icon == null ? 0 : 7) + ", gapbottom " + gapBottom);
             x = padding;
         }
         if (comp != null) {
@@ -239,12 +233,9 @@ public class FOptionPane extends FDialog {
         for (int i = 0; i < optionCount; i++) {
             final int option = i;
             final FButton btn = buttons[i];
-            btn.addActionListener(new ActionListener() {
-                @Override
-                public void actionPerformed(final ActionEvent arg0) {
-                    FOptionPane.this.result = option;
-                    FOptionPane.this.setVisible(false);
-                }
+            btn.addActionListener(arg0 -> {
+                FOptionPane.this.result = option;
+                FOptionPane.this.setVisible(false);
             });
             btn.addKeyListener(new KeyAdapter() { //hook certain keys to move focus between buttons
                 @Override
@@ -282,7 +273,8 @@ public class FOptionPane extends FDialog {
 
         if (centeredLabel != null) {
             centeredLabel.setPreferredSize(new Dimension(width - 2 * padding, centeredLabel.getMinimumSize().height));
-            centeredPrompt.setPreferredSize(new Dimension(width - 2 * padding, centeredPrompt.getPreferredSize().height));
+            if(prompt != null)
+                prompt.setPreferredSize(new Dimension(width - 2 * padding, prompt.getPreferredSize().height));
         }
 
         this.setSize(width, this.getHeight() + buttonHeight); //resize dialog again to account for buttons
@@ -304,12 +296,21 @@ public class FOptionPane extends FDialog {
 
     public void setResult(final int result0) {
         this.result = result0;
-        SwingUtilities.invokeLater(new Runnable() { //delay hiding so action can finish first
-            @Override
-            public void run() {
-                setVisible(false);
+        //delay hiding so action can finish first
+        SwingUtilities.invokeLater(() -> setVisible(false));
+    }
+
+    /** Update the dialog body after it has been shown. Safe to call from any thread. */
+    public void setMessage(final String message) {
+        SwingUtilities.invokeLater(() -> {
+            if (prompt != null) {
+                prompt.setText(renderMessageHtml(message));
             }
         });
+    }
+
+    private static String renderMessageHtml(final String message) {
+        return FSkin.encodeSymbols(message, false).replace("\n", "<br>");
     }
 
     public boolean isButtonEnabled(final int index) {

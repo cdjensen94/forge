@@ -1,15 +1,6 @@
 package forge.ai.ability;
 
-import java.util.List;
-
-import com.google.common.base.Predicate;
-import com.google.common.collect.Iterables;
-
-import forge.ai.AiAttackController;
-import forge.ai.ComputerUtil;
-import forge.ai.ComputerUtilAbility;
-import forge.ai.ComputerUtilCard;
-import forge.ai.SpellAbilityAi;
+import forge.ai.*;
 import forge.game.Game;
 import forge.game.ability.AbilityUtils;
 import forge.game.ability.ApiType;
@@ -17,13 +8,15 @@ import forge.game.card.Card;
 import forge.game.card.CardCollection;
 import forge.game.card.CardLists;
 import forge.game.card.CardPredicates;
-import forge.game.card.CardPredicates.Presets;
 import forge.game.combat.CombatUtil;
 import forge.game.phase.PhaseHandler;
 import forge.game.phase.PhaseType;
 import forge.game.player.Player;
 import forge.game.spellability.SpellAbility;
 import forge.game.zone.ZoneType;
+
+import java.util.List;
+import java.util.function.Predicate;
 
 public abstract class TapAiBase extends SpellAbilityAi {
 
@@ -51,7 +44,7 @@ public abstract class TapAiBase extends SpellAbilityAi {
         }
 
         while (sa.canAddMoreTarget()) {
-            Card choice = null;
+            Card choice;
 
             if (tapList.isEmpty()) {
                 if (!sa.isMinTargetChosen() || sa.isZeroTargets()) {
@@ -84,7 +77,9 @@ public abstract class TapAiBase extends SpellAbilityAi {
             }
 
             tapList.remove(choice);
-            sa.getTargets().add(choice);
+            if (sa.canTarget(choice)) {
+                sa.getTargets().add(choice);
+            }
         }
 
         return true;
@@ -97,8 +92,6 @@ public abstract class TapAiBase extends SpellAbilityAi {
      * 
      * @param source
      *            a {@link forge.game.card.Card} object.
-     * @param tgt
-     *            a {@link forge.game.spellability.TargetRestrictions} object.
      * @param sa
      *            a {@link forge.game.spellability.SpellAbility} object.
      * @param mandatory
@@ -108,41 +101,14 @@ public abstract class TapAiBase extends SpellAbilityAi {
     protected boolean tapPrefTargeting(final Player ai, final Card source, final SpellAbility sa, final boolean mandatory) {
         final Game game = ai.getGame();
         CardCollection tapList = CardLists.getTargetableCards(ai.getOpponents().getCardsIn(ZoneType.Battlefield), sa);
-        tapList = CardLists.filter(tapList, Presets.CAN_TAP);
-        tapList = CardLists.filter(tapList, new Predicate<Card>() {
-            @Override
-            public boolean apply(final Card c) {
-                if (c.isCreature()) {
-                    return true;
-                }
-
-                for (final SpellAbility sa : c.getSpellAbilities()) {
-                    if (sa.isAbility() && sa.getPayCosts().hasTapCost()) {
-                        return true;
-                    }
-                }
-                return false;
-            }
-        });
+        tapList = ComputerUtil.filterAITgts(sa, ai, tapList, false);
+        tapList = CardLists.filter(tapList, CardPredicates.CAN_TAP);
+        tapList = CardLists.filter(tapList, CREATURE_OR_TAP_ABILITY);
 
         //use broader approach when the cost is a positive thing
         if (tapList.isEmpty() && ComputerUtil.activateForCost(sa, ai)) { 
             tapList = CardLists.getTargetableCards(ai.getOpponents().getCardsIn(ZoneType.Battlefield), sa);
-            tapList = CardLists.filter(tapList, new Predicate<Card>() {
-                @Override
-                public boolean apply(final Card c) {
-                    if (c.isCreature()) {
-                        return true;
-                    }
-
-                    for (final SpellAbility sa : c.getSpellAbilities()) {
-                        if (sa.isAbility() && sa.getPayCosts().hasTapCost()) {
-                            return true;
-                        }
-                    }
-                    return false;
-                }
-            });
+            tapList = CardLists.filter(tapList, CREATURE_OR_TAP_ABILITY);
         }
 
         //try to exclude things that will already be tapped due to something on stack or because something is
@@ -187,12 +153,7 @@ public abstract class TapAiBase extends SpellAbilityAi {
                     //Combat has already started
                     attackers = game.getCombat().getAttackers();
                 } else {
-                    attackers = CardLists.filter(ai.getCreaturesInPlay(), new Predicate<Card>() {
-                        @Override
-                        public boolean apply(final Card c) {
-                            return CombatUtil.canAttack(c, opp);
-                        }
-                    });
+                    attackers = CardLists.filter(ai.getCreaturesInPlay(), c -> CombatUtil.canAttack(c, opp));
                     attackers.remove(source);
                 }
                 Predicate<Card> findBlockers = CardPredicates.possibleBlockerForAtLeastOne(attackers);
@@ -208,13 +169,8 @@ public abstract class TapAiBase extends SpellAbilityAi {
             } else if (phase.isPlayerTurn(opp)
                     && phase.getPhase().isBefore(PhaseType.COMBAT_DECLARE_ATTACKERS)) {
                 // Tap creatures possible blockers before combat during AI's turn.
-                if (Iterables.any(tapList, CardPredicates.Presets.CREATURES)) {
-                    List<Card> creatureList = CardLists.filter(tapList, new Predicate<Card>() {
-                        @Override
-                        public boolean apply(final Card c) {
-                            return c.isCreature() && CombatUtil.canAttack(c, opp);
-                        }
-                    });
+                if (tapList.anyMatch(CardPredicates.CREATURES)) {
+                    List<Card> creatureList = CardLists.filter(tapList, c -> c.isCreature() && CombatUtil.canAttack(c, opp));
                     choice = ComputerUtilCard.getBestCreatureAI(creatureList);
                 } else { // no creatures available
                     choice = ComputerUtilCard.getMostExpensivePermanentAI(tapList);
@@ -238,11 +194,13 @@ public abstract class TapAiBase extends SpellAbilityAi {
             }
 
             tapList.remove(choice);
-            sa.getTargets().add(choice);
+            if (sa.canTarget(choice)) {
+                sa.getTargets().add(choice);
+            }
         }
 
         // Nothing was ever targeted, so we need to bail.
-        return sa.getTargets().size() != 0;
+        return !sa.getTargets().isEmpty();
     }
 
     /**
@@ -281,7 +239,7 @@ public abstract class TapAiBase extends SpellAbilityAi {
         }
 
         // try to just tap already tapped things
-        tapList = CardLists.filter(list, Presets.TAPPED);
+        tapList = CardLists.filter(list, CardPredicates.TAPPED);
 
         if (tapTargetList(ai, sa, tapList, mandatory)) {
             return true;
@@ -298,54 +256,55 @@ public abstract class TapAiBase extends SpellAbilityAi {
     }
 
     @Override
-    protected boolean doTriggerAINoCost(Player ai, SpellAbility sa, boolean mandatory) {
+    protected AiAbilityDecision doTriggerNoCost(Player ai, SpellAbility sa, boolean mandatory) {
         final Card source = sa.getHostCard();
 
-        if (!sa.usesTargeting()) {
+        if (sa.usesTargeting()) {
+            sa.resetTargets();
+            if (tapPrefTargeting(ai, source, sa, mandatory)) {
+                return new AiAbilityDecision(100, AiPlayDecision.WillPlay);
+            }
+            if (mandatory && tapUnpreferredTargeting(ai, sa, mandatory)) {
+                // not enough preferred targets, but mandatory so keep going:
+                return new AiAbilityDecision(50, AiPlayDecision.MandatoryPlay);
+            }
+        } else {
             if (mandatory) {
-                return true;
+                return new AiAbilityDecision(50, AiPlayDecision.MandatoryPlay);
             }
 
             final List<Card> pDefined = AbilityUtils.getDefinedCards(sa.getHostCard(), sa.getParam("Defined"), sa);
             // might be from ETBreplacement
-            return pDefined.isEmpty() || !pDefined.get(0).isInPlay() || (pDefined.get(0).isUntapped() && pDefined.get(0).getController() != ai);
-        } else {
-            sa.resetTargets();
-            if (tapPrefTargeting(ai, source, sa, mandatory)) {
-                return true;
-            } else if (mandatory) {
-                // not enough preferred targets, but mandatory so keep going:
-                return tapUnpreferredTargeting(ai, sa, mandatory);
+            if (pDefined.isEmpty() || !pDefined.get(0).isInPlay() || (pDefined.get(0).isUntapped() && pDefined.get(0).getController() != ai)) {
+                return new AiAbilityDecision(100, AiPlayDecision.WillPlay);
             }
         }
 
-        return false;
+        return new AiAbilityDecision(0, AiPlayDecision.CantPlayAi);
     }
 
     @Override
-    public boolean chkAIDrawback(SpellAbility sa, Player ai) {
+    public AiAbilityDecision chkDrawback(Player ai, SpellAbility sa) {
         final Card source = sa.getHostCard();
-        final boolean oppTargetsChoice = sa.hasParam("TargetingPlayer");
 
-        if (oppTargetsChoice && sa.getActivatingPlayer().equals(ai) && !sa.isTrigger()) {
+        if (sa.hasParam("TargetingPlayer") && sa.getActivatingPlayer().equals(ai) && !sa.isTrigger()) {
             // canPlayAI (sa activated by ai)
             Player targetingPlayer = AbilityUtils.getDefinedPlayers(source, sa.getParam("TargetingPlayer"), sa).get(0);
             sa.setTargetingPlayer(targetingPlayer);
-            sa.getTargets().clear();
-            return targetingPlayer.getController().chooseTargetsFor(sa);
+            if (CardLists.getTargetableCards(ai.getGame().getCardsIn(sa.getTargetRestrictions().getZone()), sa).isEmpty()) {
+                return new AiAbilityDecision(0, AiPlayDecision.TargetingFailed);
+            }
+            return new AiAbilityDecision(100, AiPlayDecision.WillPlay);
         }
-
-        boolean randomReturn = true;
 
         if (sa.usesTargeting()) {
             // target section, maybe pull this out?
             sa.resetTargets();
             if (!tapPrefTargeting(ai, source, sa, false)) {
-                return false;
+                return new AiAbilityDecision(0, AiPlayDecision.CantPlayAi);
             }
         }
 
-        return randomReturn;
+        return new AiAbilityDecision(100, AiPlayDecision.WillPlay);
     }
-
 }

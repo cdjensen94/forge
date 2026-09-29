@@ -1,24 +1,20 @@
 package forge.ai.ability;
 
 import java.util.Iterator;
+import java.util.List;
 
-import forge.game.ability.effects.CounterEffect;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.commons.lang3.tuple.Pair;
 
-import forge.ai.AiController;
-import forge.ai.AiProps;
-import forge.ai.ComputerUtilAbility;
-import forge.ai.ComputerUtilCost;
-import forge.ai.ComputerUtilMana;
-import forge.ai.PlayerControllerAi;
-import forge.ai.SpecialCardAi;
-import forge.ai.SpellAbilityAi;
+import forge.ai.*;
 import forge.game.Game;
 import forge.game.ability.AbilityUtils;
 import forge.game.ability.ApiType;
+import forge.game.ability.effects.CounterEffect;
 import forge.game.card.Card;
+import forge.game.card.CardCollectionView;
+import forge.game.card.CardPredicates;
 import forge.game.cost.Cost;
 import forge.game.cost.CostDiscard;
 import forge.game.cost.CostExile;
@@ -28,13 +24,12 @@ import forge.game.spellability.SpellAbility;
 import forge.game.spellability.SpellAbilityStackInstance;
 import forge.game.zone.ZoneType;
 import forge.util.MyRandom;
+import forge.util.collect.FCollectionView;
 
 public class CounterAi extends SpellAbilityAi {
 
     @Override
-    protected boolean canPlayAI(Player ai, SpellAbility sa) {
-        boolean toReturn = true;
-        final Cost abCost = sa.getPayCosts();
+    protected AiAbilityDecision checkApiLogic(Player ai, SpellAbility sa) {
         final Card source = sa.getHostCard();
         final String sourceName = ComputerUtilAbility.getAbilitySourceName(sa);
         final Game game = ai.getGame();
@@ -42,22 +37,12 @@ public class CounterAi extends SpellAbilityAi {
         SpellAbility tgtSA = null;
 
         if (game.getStack().isEmpty()) {
-            return false;
-        }
-
-        if (abCost != null) {
-            // AI currently disabled for these costs
-            if (!ComputerUtilCost.checkSacrificeCost(ai, abCost, source, sa)) {
-                return false;
-            }
-            if (!ComputerUtilCost.checkLifeCost(ai, abCost, source, 4, sa)) {
-                return false;
-            }
+            return new AiAbilityDecision(0, AiPlayDecision.TargetingFailed);
         }
 
         if ("Force of Will".equals(sourceName)) {
             if (!SpecialCardAi.ForceOfWill.consider(ai, sa)) {
-                return false;
+                return new AiAbilityDecision(0, AiPlayDecision.CantPlayAi);
             }
         }
 
@@ -65,25 +50,29 @@ public class CounterAi extends SpellAbilityAi {
             final SpellAbility topSA = ComputerUtilAbility.getTopSpellAbilityOnStack(game, sa);
             if ((topSA.isSpell() && !topSA.isCounterableBy(sa)) || ai.getYourTeam().contains(topSA.getActivatingPlayer())) {
                 // might as well check for player's friendliness
-                return false;
-            } else if (sa.hasParam("ConditionWouldDestroy") && !CounterEffect.checkForConditionWouldDestroy(sa, topSA)) {
-                return false;
+                return new AiAbilityDecision(0, AiPlayDecision.CantPlayAi);
+            }
+            if (sa.hasParam("ConditionWouldDestroy") && !CounterEffect.checkForConditionWouldDestroy(sa, topSA)) {
+                return new AiAbilityDecision(0, AiPlayDecision.CantPlaySa);
             }
 
             // check if the top ability on the stack corresponds to the AI-specific targeting declaration, if provided
             if (sa.hasParam("AITgts") && (topSA.getHostCard() == null
                     || !topSA.getHostCard().isValid(sa.getParam("AITgts"), sa.getActivatingPlayer(), source, sa))) {
-                return false;
+                return new AiAbilityDecision(0, AiPlayDecision.TargetingFailed);
             }
 
-            if (sa.hasParam("CounterNoManaSpell") && topSA.getTotalManaSpent() > 0) {
-                return false;
-            }
-
-            if ("OppDiscardsHand".equals(sa.getParam("AILogic"))) {
-                if (topSA.getActivatingPlayer().getCardsIn(ZoneType.Hand).size() < 2) {
-                    return false;
+            if (sa.hasParam("UnlessCost") && "TargetedController".equals(sa.getParamOrDefault("UnlessPayer", "TargetedController"))) {
+                Cost unlessCost = AbilityUtils.calculateUnlessCost(sa, sa.getParam("UnlessCost"), false);
+                if (unlessCost.hasSpecificCostType(CostDiscard.class)) {
+                    CostDiscard discardCost = unlessCost.getCostPartByType(CostDiscard.class);
+                    if ("Hand".equals(discardCost.getType())) {
+                        if (topSA.getActivatingPlayer().getCardsIn(ZoneType.Hand).size() < 2) {
+                            return new AiAbilityDecision(0, AiPlayDecision.CantPlayAi);
+                        }
+                    }
                 }
+                // TODO check if Player can pay the unless cost?
             }
 
             sa.resetTargets();
@@ -95,10 +84,11 @@ public class CounterAi extends SpellAbilityAi {
                     tgtCMC += topSA.getPayCosts().getTotalMana().countX() > 0 ? 3 : 0; // TODO: somehow determine the value of X paid and account for it?
                 }
             } else {
-                return false;
+                return new AiAbilityDecision(0, AiPlayDecision.TargetingFailed);
             }
         } else {
-            return false;
+            // This spell doesn't target. Must be a "Counter All" or "Counter trigger" type of ability.
+            return new AiAbilityDecision(0, AiPlayDecision.CantPlayAi);
         }
 
         String unlessCost = sa.hasParam("UnlessCost") ? sa.getParam("UnlessCost").trim() : null;
@@ -111,19 +101,19 @@ public class CounterAi extends SpellAbilityAi {
             boolean setPayX = false;
             if (unlessCost.equals("X") && sa.getSVar(unlessCost).equals("Count$xPaid")) {
                 setPayX = true;
-                toPay = Math.min(ComputerUtilCost.getMaxXValue(sa, ai, true), usableManaSources + 1);
+                toPay = Math.min(ComputerUtilCost.setMaxXValue(sa, ai, true), usableManaSources + 1);
             } else {
                 toPay = AbilityUtils.calculateAmount(source, unlessCost, sa);
             }
 
             if (toPay == 0) {
-                return false;
+                return new AiAbilityDecision(0, AiPlayDecision.CantAffordX);
             }
 
             if (toPay <= usableManaSources) {
                 // If this is a reusable Resource, feel free to play it most of the time
                 if (!playReusable(ai, sa)) {
-                    return false;
+                    return new AiAbilityDecision(0, AiPlayDecision.CantAfford);
                 }
             }
 
@@ -141,33 +131,29 @@ public class CounterAi extends SpellAbilityAi {
 
         if (sa.hasParam("AILogic")) {
             String logic = sa.getParam("AILogic");
-            if ("Never".equals(logic)) {
-                return false;
-            } else if (logic.startsWith("MinCMC.")) { // TODO fix Daze and fold into AITgts
+            if (logic.startsWith("MinCMC.")) { // TODO fix Daze and fold into AITgts
                 int minCMC = Integer.parseInt(logic.substring(7));
                 if (tgtCMC < minCMC) {
-                    return false;
+                    return new AiAbilityDecision(0, AiPlayDecision.CantPlayAi);
                 }
             } else if ("NullBrooch".equals(logic)) {
                 if (!SpecialCardAi.NullBrooch.consider(ai, sa)) {
-                    return false;
+                    return new AiAbilityDecision(0, AiPlayDecision.CantPlayAi);
                 }
             }
         }
 
         // Specific constraints for the AI to use/not use counterspells against specific groups of spells
-        // (specified in the AI profile)
-        AiController aic = ((PlayerControllerAi)ai.getController()).getAi();
-        boolean ctrCmc0ManaPerms = aic.getBooleanProperty(AiProps.ALWAYS_COUNTER_CMC_0_MANA_MAKING_PERMS);
-        boolean ctrDamageSpells = aic.getBooleanProperty(AiProps.ALWAYS_COUNTER_DAMAGE_SPELLS);
-        boolean ctrRemovalSpells = aic.getBooleanProperty(AiProps.ALWAYS_COUNTER_REMOVAL_SPELLS);
-        boolean ctrPumpSpells = aic.getBooleanProperty(AiProps.ALWAYS_COUNTER_PUMP_SPELLS);
-        boolean ctrAuraSpells = aic.getBooleanProperty(AiProps.ALWAYS_COUNTER_AURAS);
-        boolean ctrOtherCounters = aic.getBooleanProperty(AiProps.ALWAYS_COUNTER_OTHER_COUNTERSPELLS);
-        int ctrChanceCMC1 = aic.getIntProperty(AiProps.CHANCE_TO_COUNTER_CMC_1);
-        int ctrChanceCMC2 = aic.getIntProperty(AiProps.CHANCE_TO_COUNTER_CMC_2);
-        int ctrChanceCMC3 = aic.getIntProperty(AiProps.CHANCE_TO_COUNTER_CMC_3);
-        String ctrNamed = aic.getProperty(AiProps.ALWAYS_COUNTER_SPELLS_FROM_NAMED_CARDS);
+        boolean ctrCmc0ManaPerms = AiProfileUtil.getBoolProperty(ai, AiProps.ALWAYS_COUNTER_CMC_0_MANA_MAKING_PERMS);
+        boolean ctrDamageSpells = AiProfileUtil.getBoolProperty(ai, AiProps.ALWAYS_COUNTER_DAMAGE_SPELLS);
+        boolean ctrRemovalSpells = AiProfileUtil.getBoolProperty(ai, AiProps.ALWAYS_COUNTER_REMOVAL_SPELLS);
+        boolean ctrPumpSpells = AiProfileUtil.getBoolProperty(ai, AiProps.ALWAYS_COUNTER_PUMP_SPELLS);
+        boolean ctrAuraSpells = AiProfileUtil.getBoolProperty(ai, AiProps.ALWAYS_COUNTER_AURAS);
+        boolean ctrOtherCounters = AiProfileUtil.getBoolProperty(ai, AiProps.ALWAYS_COUNTER_OTHER_COUNTERSPELLS);
+        int ctrChanceCMC1 = AiProfileUtil.getIntProperty(ai, AiProps.CHANCE_TO_COUNTER_CMC_1);
+        int ctrChanceCMC2 = AiProfileUtil.getIntProperty(ai, AiProps.CHANCE_TO_COUNTER_CMC_2);
+        int ctrChanceCMC3 = AiProfileUtil.getIntProperty(ai, AiProps.CHANCE_TO_COUNTER_CMC_3);
+        String ctrNamed = AiProfileUtil.getProperty(ai, AiProps.ALWAYS_COUNTER_SPELLS_FROM_NAMED_CARDS);
         boolean dontCounter = false;
 
         if (tgtCMC == 1 && !MyRandom.percentTrue(ctrChanceCMC1)) {
@@ -178,7 +164,9 @@ public class CounterAi extends SpellAbilityAi {
             dontCounter = true;
         }
 
-        if (tgtSA != null && tgtCMC < aic.getIntProperty(AiProps.MIN_SPELL_CMC_TO_COUNTER)) {
+        // TODO check against game changers
+
+        if (tgtSA != null && tgtCMC < AiProfileUtil.getIntProperty(ai, AiProps.MIN_SPELL_CMC_TO_COUNTER)) {
             dontCounter = true;
             Card tgtSource = tgtSA.getHostCard();
             if ((tgtSource != null && tgtCMC == 0 && tgtSource.isPermanent() && !tgtSource.getManaAbilities().isEmpty() && ctrCmc0ManaPerms)
@@ -229,37 +217,40 @@ public class CounterAi extends SpellAbilityAi {
         }
 
         if (dontCounter) {
-            return false;
+            return new AiAbilityDecision(0, AiPlayDecision.CantPlayAi);
         }
 
-        return toReturn;
+        return new AiAbilityDecision(100, AiPlayDecision.WillPlay);
     }
 
     @Override
-    public boolean chkAIDrawback(SpellAbility sa, Player aiPlayer) {
-        return doTriggerAINoCost(aiPlayer, sa, true);
+    public AiAbilityDecision chkDrawback(Player aiPlayer, SpellAbility sa) {
+        return doTriggerNoCost(aiPlayer, sa, true);
     }
 
     @Override
-    protected boolean doTriggerAINoCost(Player ai, SpellAbility sa, boolean mandatory) {
+    protected AiAbilityDecision doTriggerNoCost(Player ai, SpellAbility sa, boolean mandatory) {
         final Game game = ai.getGame();
 
         if (sa.usesTargeting()) {
             if (game.getStack().isEmpty()) {
-                return false;
+                return new AiAbilityDecision(0, AiPlayDecision.TargetingFailed);
             }
 
             sa.resetTargets();
+            if (mandatory && !sa.canAddMoreTarget()) {
+                return new AiAbilityDecision(100, AiPlayDecision.WillPlay);
+            }
             Pair<SpellAbility, Boolean> pair = chooseTargetSpellAbility(game, sa, ai, mandatory);
             SpellAbility tgtSA = pair.getLeft();
 
             if (tgtSA == null) {
-                return false;
+                return new AiAbilityDecision(0, AiPlayDecision.TargetingFailed);
             }
             sa.getTargets().add(tgtSA);
             if (!mandatory && !pair.getRight()) {
                 // If not mandatory and not preferred, bail out after setting target
-                return false;
+                return new AiAbilityDecision(0, AiPlayDecision.CantPlayAi);
             }
 
             String unlessCost = sa.hasParam("UnlessCost") ? sa.getParam("UnlessCost").trim() : null;
@@ -273,21 +264,20 @@ public class CounterAi extends SpellAbilityAi {
                 boolean setPayX = false;
                 if (unlessCost.equals("X") && sa.getSVar(unlessCost).equals("Count$xPaid")) {
                     setPayX = true;
-                    toPay = ComputerUtilCost.getMaxXValue(sa, ai, true);
+                    toPay = ComputerUtilCost.setMaxXValue(sa, ai, true);
                 } else {
                     toPay = AbilityUtils.calculateAmount(source, unlessCost, sa);
                 }
 
                 if (!mandatory) {
                     if (toPay == 0) {
-                        return false;
+                        return new AiAbilityDecision(0, AiPlayDecision.CantAffordX);
                     }
 
                     if (toPay <= usableManaSources) {
-                        // If this is a reusable Resource, feel free to play it most
-                        // of the time
+                        // If this is a reusable Resource, feel free to play it most of the time
                         if (!playReusable(ai,sa) || (MyRandom.getRandom().nextFloat() < .4)) {
-                            return false;
+                            return new AiAbilityDecision(0, AiPlayDecision.CantAfford);
                         }
                     }
                 }
@@ -304,7 +294,7 @@ public class CounterAi extends SpellAbilityAi {
         // force the Human into making decisions)
 
         // But really it should be more picky about how it counters things
-        return true;
+        return new AiAbilityDecision(100, AiPlayDecision.WillPlay);
     }
 
     public Pair<SpellAbility, Boolean> chooseTargetSpellAbility(Game game, SpellAbility sa, Player ai, boolean mandatory) {
@@ -350,5 +340,52 @@ public class CounterAi extends SpellAbilityAi {
         }
 
         return new ImmutablePair<>(bestOption != null ? bestOption : leastBadOption, bestOption != null);
+    }
+
+    @Override
+    public boolean willPayUnlessCost(Player payer, SpellAbility sa, Cost cost, boolean alreadyPaid, FCollectionView<Player> payers) {
+        final Card source = sa.getHostCard();
+        final Game game = source.getGame();
+        List<SpellAbility> spells = AbilityUtils.getDefinedSpellAbilities(source, sa.getParamOrDefault("Defined", "Targeted"), sa);
+        for (SpellAbility toBeCountered : spells) {
+            // ward or human misplay
+            if (!toBeCountered.isCounterableBy(sa)) {
+                return false;
+            }
+
+            if (toBeCountered.isSpell()) {
+                Card spellHost = toBeCountered.getHostCard();
+                Card gameCard = game.getCardState(spellHost, null);
+                // Spell Host already left the Stack Zone
+                if (gameCard == null || !gameCard.isInZone(ZoneType.Stack) || !gameCard.equalsWithGameTimestamp(spellHost)) {
+                    return false;
+                }
+            }
+
+            // no reason to pay if we don't plan to confirm
+            if (toBeCountered.isOptionalTrigger() && !SpellApiToAi.Converter.get(toBeCountered).doTriggerNoCostWithSubs(payer, toBeCountered, false).willingToPlay()) {
+                return false;
+            }
+            // TODO check hasFizzled
+        }
+        CardCollectionView hand = payer.getCardsIn(ZoneType.Hand);
+        if (cost.hasSpecificCostType(CostDiscard.class)) {
+            CostDiscard discard = cost.getCostPartByType(CostDiscard.class);
+            String type = discard.getType();
+            if (type.equals("Hand")) {
+                if (hand.isEmpty()) {
+                    return true;
+                }
+
+                // TODO how to check if the Spell on the Stack is more valuable than the Cards in Hand?
+                int spellSum = spells.stream().map(SpellAbility::getHostCard).filter(CardPredicates.CREATURES).mapToInt(ComputerUtilCard::evaluateCreature).sum();
+                int handSum = hand.stream().filter(CardPredicates.CREATURES).mapToInt(ComputerUtilCard::evaluateCreature).sum();
+                if (spellSum <= handSum) {
+                    return false;
+                }
+            }
+        }
+
+        return super.willPayUnlessCost(payer, sa, cost, alreadyPaid, payers);
     }
 }

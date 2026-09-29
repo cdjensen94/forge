@@ -3,13 +3,12 @@ package forge.game.ability.effects;
 import java.util.List;
 
 import com.google.common.collect.ImmutableMap;
-import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 
 import forge.game.ability.AbilityUtils;
 import forge.game.ability.SpellAbilityEffect;
 import forge.game.card.Card;
-import forge.game.card.CardDamageMap;
+import forge.game.card.CardDamageTable;
 import forge.game.card.CardZoneTable;
 import forge.game.cost.Cost;
 import forge.game.event.GameEventCardModeChosen;
@@ -17,9 +16,7 @@ import forge.game.Game;
 import forge.game.GameEntityCounterTable;
 import forge.game.player.Player;
 import forge.game.spellability.SpellAbility;
-import forge.util.Aggregates;
-import forge.util.Lang;
-import forge.util.Localizer;
+import forge.util.*;
 
 public class ChooseGenericEffect extends SpellAbilityEffect {
 
@@ -57,31 +54,30 @@ public class ChooseGenericEffect extends SpellAbilityEffect {
         final boolean damageMap = sa.hasParam("DamageMap");
 
         if (damageMap) {
-            sa.setDamageMap(new CardDamageMap());
-            sa.setPreventMap(new CardDamageMap());
+            sa.setDamageMap(new CardDamageTable());
+            sa.setPreventMap(new CardDamageTable());
             sa.setCounterTable(new GameEntityCounterTable());
         }
         if (changeZoneTable) sa.setChangeZoneTable(new CardZoneTable());
 
         for (Player p : getDefinedPlayersOrTargeted(sa)) {
             if (!p.isInGame()) {
-                p = getNewChooser(sa, sa.getActivatingPlayer(), p);
+                p = getNewChooser(sa, p);
             }
-            // determine if any of the choices are not valid
-            List<SpellAbility> saToRemove = Lists.newArrayList();
 
+            // determine if any of the choices are not valid
+            List<SpellAbility> availableSA = Lists.newArrayList(abilities);
             for (SpellAbility saChoice : abilities) {
                 if (saChoice.getRestrictions() != null && !saChoice.getRestrictions().checkOtherRestrictions(host, saChoice, sa.getActivatingPlayer())) {
-                    saToRemove.add(saChoice);
+                    availableSA.remove(saChoice);
                 } else if (saChoice.hasParam("UnlessCost")) {
                     // generic check for if the cost can be paid
                     Cost unlessCost = new Cost(saChoice.getParam("UnlessCost"), false);
                     if (!unlessCost.canPay(sa, p, true)) {
-                        saToRemove.add(saChoice);
+                        availableSA.remove(saChoice);
                     }
                 }
             }
-            abilities.removeAll(saToRemove);
 
             List<SpellAbility> chosenSAs = Lists.newArrayList();
             String prompt = sa.getParamOrDefault("ChoicePrompt", "Choose");
@@ -89,7 +85,7 @@ public class ChooseGenericEffect extends SpellAbilityEffect {
 
             if (sa.hasParam("AtRandom")) {
                 random = true;
-                chosenSAs = Aggregates.random(abilities, amount);
+                chosenSAs = Aggregates.random(availableSA, amount);
 
                 int i = 0;
                 while (sa.getParam("AtRandom").equals("Urza") && i < chosenSAs.size()) {
@@ -102,11 +98,11 @@ public class ChooseGenericEffect extends SpellAbilityEffect {
                         chosenSAs.set(i, Aggregates.random(abilities));
                     }
                 }
-            } else if (!abilities.isEmpty()) {
-                chosenSAs = p.getController().chooseSpellAbilitiesForEffect(abilities, sa, prompt, amount, ImmutableMap.of());
+            } else if (!availableSA.isEmpty()) {
+                chosenSAs = p.getController().chooseSpellAbilitiesForEffect(availableSA, sa, prompt, amount, ImmutableMap.of());
             }
 
-            List<Object> oldRem = Lists.newArrayList(Iterables.filter(host.getRemembered(), Player.class));
+            List<Object> oldRem = Lists.newArrayList(IterableUtil.filter(host.getRemembered(), Player.class));
             if (tempRem) {
                 host.removeRemembered(oldRem);
                 host.addRemembered(p); // currently we only ever need the Chooser, may need more support later
@@ -120,7 +116,6 @@ public class ChooseGenericEffect extends SpellAbilityEffect {
                     } else if (secretly) {
                         if (record.length() > 0) record.append("\r\n");
                         record.append(Localizer.getInstance().getMessage("lblPlayerChooseValue", p, chosenValue));
-
                     }
                     if (sa.hasParam("SetChosenMode")) {
                         sa.getHostCard().setChosenMode(chosenValue);

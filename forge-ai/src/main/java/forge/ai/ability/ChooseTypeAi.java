@@ -1,24 +1,11 @@
 package forge.ai.ability;
 
-import java.util.Arrays;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
-
 import com.google.common.collect.Iterables;
-import forge.ai.AiCardMemory;
-import forge.ai.ComputerUtilAbility;
-import forge.ai.ComputerUtilCard;
-import forge.ai.ComputerUtilMana;
-import forge.ai.SpellAbilityAi;
+import forge.ai.*;
 import forge.card.CardType;
 import forge.game.ability.AbilityUtils;
 import forge.game.ability.ApiType;
-import forge.game.card.Card;
-import forge.game.card.CardCollection;
-import forge.game.card.CardCollectionView;
-import forge.game.card.CardLists;
-import forge.game.card.CardPredicates;
+import forge.game.card.*;
 import forge.game.keyword.Keyword;
 import forge.game.phase.PhaseType;
 import forge.game.player.Player;
@@ -27,25 +14,43 @@ import forge.game.spellability.SpellAbility;
 import forge.game.zone.ZoneType;
 import forge.util.Aggregates;
 
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+
 public class ChooseTypeAi extends SpellAbilityAi {
     @Override
-    protected boolean canPlayAI(Player aiPlayer, SpellAbility sa) {
+    protected AiAbilityDecision canPlay(Player aiPlayer, SpellAbility sa) {
         String aiLogic = sa.getParamOrDefault("AILogic", "");
 
         if (aiLogic.isEmpty()) {
-            return false;
+            return new AiAbilityDecision(0, AiPlayDecision.MissingLogic);
         } else if ("MostProminentComputerControls".equals(aiLogic)) {
             if (ComputerUtilAbility.getAbilitySourceName(sa).equals("Mirror Entity Avatar")) {
-                return doMirrorEntityLogic(aiPlayer, sa);
+                if (doMirrorEntityLogic(aiPlayer, sa)) {
+                    return new AiAbilityDecision(100, AiPlayDecision.WillPlay);
+                } else {
+                    return new AiAbilityDecision(0, AiPlayDecision.CantPlayAi);
+                }
             }
-            return !chooseType(sa, aiPlayer.getCardsIn(ZoneType.Battlefield)).isEmpty();
+
+
+            if (!chooseType(sa, aiPlayer.getCardsIn(ZoneType.Battlefield)).isEmpty()) {
+                return new AiAbilityDecision(100, AiPlayDecision.WillPlay);
+            } else {
+                return new AiAbilityDecision(0, AiPlayDecision.CantPlayAi);
+            }
         } else if ("MostProminentComputerControlsOrOwns".equals(aiLogic)) {
-            return !chooseType(sa, aiPlayer.getCardsIn(Arrays.asList(ZoneType.Hand, ZoneType.Battlefield))).isEmpty();
+            return !chooseType(sa, aiPlayer.getCardsIn(ZoneType.Hand, ZoneType.Battlefield)).isEmpty()
+                    ? new AiAbilityDecision(100, AiPlayDecision.WillPlay)
+                    : new AiAbilityDecision(0, AiPlayDecision.CantPlayAi);
         } else if ("MostProminentOppControls".equals(aiLogic)) {
-            return !chooseType(sa, aiPlayer.getOpponents().getCardsIn(ZoneType.Battlefield)).isEmpty();
+            return !chooseType(sa, aiPlayer.getOpponents().getCardsIn(ZoneType.Battlefield)).isEmpty()
+                    ? new AiAbilityDecision(100, AiPlayDecision.WillPlay)
+                    : new AiAbilityDecision(0, AiPlayDecision.CantPlayAi);
         }
 
-        return doTriggerAINoCost(aiPlayer, sa, false);
+        return doTriggerNoCost(aiPlayer, sa, false);
     }
 
     private boolean doMirrorEntityLogic(Player aiPlayer, SpellAbility sa) {
@@ -65,7 +70,7 @@ public class ChooseTypeAi extends SpellAbilityAi {
         int avgPower = 0;
         
         // predict the opposition
-        CardCollection oppCreatures = CardLists.filter(aiPlayer.getOpponents().getCreaturesInPlay(), CardPredicates.Presets.UNTAPPED);
+        CardCollection oppCreatures = CardLists.filter(aiPlayer.getOpponents().getCreaturesInPlay(), CardPredicates.UNTAPPED);
         int maxOppPower = 0;
         int maxOppToughness = 0;
         int oppUsefulCreatures = 0;
@@ -85,7 +90,7 @@ public class ChooseTypeAi extends SpellAbilityAi {
 
         if (maxX > 1) {
             CardCollection cre = CardLists.filter(aiPlayer.getCardsIn(ZoneType.Battlefield),
-                    CardPredicates.isType(chosenType), CardPredicates.Presets.UNTAPPED);
+                    CardPredicates.isType(chosenType), CardPredicates.UNTAPPED);
             if (!cre.isEmpty()) {
                 for (Card c: cre) {
                     avgPower += c.getNetPower();
@@ -109,7 +114,7 @@ public class ChooseTypeAi extends SpellAbilityAi {
     }
 
     @Override
-    protected boolean doTriggerAINoCost(Player ai, SpellAbility sa, boolean mandatory) {
+    protected AiAbilityDecision doTriggerNoCost(Player ai, SpellAbility sa, boolean mandatory) {
         boolean isCurse = sa.isCurse();
 
         if (sa.usesTargeting()) {
@@ -141,16 +146,16 @@ public class ChooseTypeAi extends SpellAbilityAi {
             }
 
             if (!sa.isTargetNumberValid()) {
-                return false; // nothing to target?
+                return new AiAbilityDecision(0, AiPlayDecision.TargetingFailed);
             }
         } else {
             for (final Player p : AbilityUtils.getDefinedPlayers(sa.getHostCard(), sa.getParam("Defined"), sa)) {
                 if (p.isOpponentOf(ai) && !mandatory && !isCurse) {
-                    return false;
+                    return new AiAbilityDecision(0, AiPlayDecision.CantPlayAi);
                 }
             }
         }
-        return true;
+        return new AiAbilityDecision(100, AiPlayDecision.WillPlay);
     }
 
     private String chooseType(SpellAbility sa, CardCollectionView cards) {

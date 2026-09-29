@@ -22,16 +22,20 @@ import forge.StaticData;
 import forge.card.CardDb;
 import forge.card.CardEdition;
 import forge.card.CardType;
+import forge.card.ColorSet;
 import forge.card.MagicColor;
 import forge.item.IPaperCard;
 import forge.item.PaperCard;
 import forge.util.Localizer;
 import org.apache.commons.lang3.StringUtils;
+
+import java.util.Locale;
 import org.apache.commons.lang3.tuple.Pair;
 
 import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.regex.PatternSyntaxException;
 
 /**
  * <p>
@@ -40,6 +44,9 @@ import java.util.regex.Pattern;
  * 
  */
 public class DeckRecognizer {
+    private static final Map<Pattern, Map<String, Integer>> PORTABLE_PATTERN_GROUPS =
+            Collections.synchronizedMap(new IdentityHashMap<>());
+
     /**
      * The Enum TokenType.
      */
@@ -49,6 +56,16 @@ public class DeckRecognizer {
         LIMITED_CARD,
         CARD_FROM_NOT_ALLOWED_SET,
         CARD_FROM_INVALID_SET,
+        /**
+         * Valid card request, but can't be imported because the player does not have enough copies.
+         * Should be replaced with a different printing if possible.
+         */
+        CARD_NOT_IN_INVENTORY,
+        /**
+         * Valid card request for a card that isn't in the player's inventory, but new copies can be acquired freely.
+         * Usually used for basic lands. Should be supplied to the import controller by the editor.
+         */
+        FREE_CARD_NOT_IN_INVENTORY,
         // Warning messages
         WARNING_MESSAGE,
         UNKNOWN_CARD,
@@ -63,10 +80,14 @@ public class DeckRecognizer {
         CARD_TYPE,
         CARD_RARITY,
         CARD_CMC,
-        MANA_COLOUR
+        MANA_COLOUR;
+
+        public static final EnumSet<TokenType> CARD_TOKEN_TYPES = EnumSet.of(LEGAL_CARD, LIMITED_CARD, CARD_FROM_NOT_ALLOWED_SET, CARD_FROM_INVALID_SET, CARD_NOT_IN_INVENTORY, FREE_CARD_NOT_IN_INVENTORY);
+        public static final EnumSet<TokenType> IN_DECK_TOKEN_TYPES = EnumSet.of(LEGAL_CARD, LIMITED_CARD, DECK_NAME, FREE_CARD_NOT_IN_INVENTORY);
+        public static final EnumSet<TokenType> CARD_PLACEHOLDER_TOKEN_TYPES = EnumSet.of(CARD_TYPE, CARD_RARITY, CARD_CMC, MANA_COLOUR);
     }
 
-    public enum LimitedCardType{
+    public enum LimitedCardType {
         BANNED,
         RESTRICTED,
     }
@@ -108,22 +129,30 @@ public class DeckRecognizer {
             return new Token(TokenType.CARD_FROM_INVALID_SET, count, card, cardRequestHasSetCode);
         }
 
+        public static Token NotInInventoryFree(final PaperCard card, final int count, final DeckSection section) {
+            return new Token(TokenType.FREE_CARD_NOT_IN_INVENTORY, count, card, section, true);
+        }
+
         // WARNING MESSAGES
         // ================
         public static Token UnknownCard(final String cardName, final String setCode, final int count) {
-            String ttext = setCode == null || setCode.equals("") ? cardName :
+            String ttext = setCode == null || setCode.isEmpty() ? cardName :
                     String.format("%s [%s]", cardName, setCode);
             return new Token(TokenType.UNKNOWN_CARD, count, ttext);
         }
 
         public static Token UnsupportedCard(final String cardName, final String setCode, final int count) {
-            String ttext = setCode == null || setCode.equals("") ? cardName :
+            String ttext = setCode == null || setCode.isEmpty() ? cardName :
                     String.format("%s [%s]", cardName, setCode);
             return new Token(TokenType.UNSUPPORTED_CARD, count, ttext);
         }
 
         public static Token WarningMessage(String msg) {
            return new Token(TokenType.WARNING_MESSAGE, msg);
+        }
+
+        public static Token NotInInventory(final PaperCard card, final int count, final DeckSection section) {
+            return new Token(TokenType.CARD_NOT_IN_INVENTORY, count, card, section, false);
         }
 
         /* =================================
@@ -153,6 +182,8 @@ public class DeckRecognizer {
                 matchedSection = DeckSection.Planes;
             else if (sectionName.equals("attractions"))
                 matchedSection = DeckSection.Attractions;
+            else if (sectionName.equals("contraptions"))
+                matchedSection = DeckSection.Contraptions;
 
             if (matchedSection == null)  // no match found
                 return null;
@@ -237,14 +268,11 @@ public class DeckRecognizer {
         /**
          * Filters all token types that have a PaperCard instance set (not null)
          * @return true for tokens of type:
-         * LEGAL_CARD, LIMITED_CARD, CARD_FROM_NOT_ALLOWED_SET and CARD_FROM_INVALID_SET.
+         * LEGAL_CARD, LIMITED_CARD, CARD_FROM_NOT_ALLOWED_SET and CARD_FROM_INVALID_SET, CARD_NOT_IN_INVENTORY, FREE_CARD_NOT_IN_INVENTORY.
          * False otherwise.
          */
         public boolean isCardToken() {
-            return (this.type == TokenType.LEGAL_CARD ||
-                    this.type == TokenType.LIMITED_CARD ||
-                    this.type == TokenType.CARD_FROM_NOT_ALLOWED_SET ||
-                    this.type == TokenType.CARD_FROM_INVALID_SET);
+            return TokenType.CARD_TOKEN_TYPES.contains(this.type);
         }
 
         /**
@@ -253,9 +281,7 @@ public class DeckRecognizer {
          * LEGAL_CARD, LIMITED_CARD, DECK_NAME; false otherwise.
          */
         public boolean isTokenForDeck() {
-            return (this.type == TokenType.LEGAL_CARD ||
-                    this.type == TokenType.LIMITED_CARD ||
-                    this.type == TokenType.DECK_NAME);
+            return TokenType.IN_DECK_TOKEN_TYPES.contains(this.type);
         }
 
         /**
@@ -264,7 +290,7 @@ public class DeckRecognizer {
          * False otherwise.
          */
         public boolean isCardTokenForDeck() {
-            return (this.type == TokenType.LEGAL_CARD || this.type == TokenType.LIMITED_CARD);
+            return isCardToken() && isTokenForDeck();
         }
 
         /**
@@ -274,10 +300,7 @@ public class DeckRecognizer {
          * CARD_RARITY, CARD_CMC, CARD_TYPE, MANA_COLOUR
          */
         public boolean isCardPlaceholder(){
-            return (this.type == TokenType.CARD_RARITY ||
-                    this.type == TokenType.CARD_CMC ||
-                    this.type == TokenType.MANA_COLOUR ||
-                    this.type == TokenType.CARD_TYPE);
+            return TokenType.CARD_PLACEHOLDER_TOKEN_TYPES.contains(this.type);
         }
 
         /** Determines if current token is a Deck Section token
@@ -386,12 +409,78 @@ public class DeckRecognizer {
     private static final String LINE_COMMENT_DELIMITER_OR_MD_HEADER = "#";
     private static final String ASTERISK = "* ";  // Note the blank space after asterisk!
 
+    private static Pattern compilePattern(String regex, int flags) {
+        try {
+            return Pattern.compile(regex, flags);
+        } catch (PatternSyntaxException ignored) {
+            // RoboVM's regex implementation does not support Java named capture groups.
+            return compilePortablePattern(regex, flags);
+        }
+    }
+
+    static Pattern compilePortablePattern(String regex, int flags) {
+        PortablePattern portablePattern = makePortablePattern(regex);
+        Pattern pattern = Pattern.compile(portablePattern.regex, flags);
+        PORTABLE_PATTERN_GROUPS.put(pattern, portablePattern.groupIndexes);
+        return pattern;
+    }
+
+    private static PortablePattern makePortablePattern(String regex) {
+        StringBuilder portableRegex = new StringBuilder(regex.length());
+        Map<String, Integer> groupIndexes = new HashMap<>();
+        int groupIndex = 0;
+        boolean inCharacterClass = false;
+
+        for (int i = 0; i < regex.length(); i++) {
+            char current = regex.charAt(i);
+            if (current == '\\' && i + 1 < regex.length()) {
+                portableRegex.append(current).append(regex.charAt(++i));
+                continue;
+            }
+            if (current == '[') {
+                inCharacterClass = true;
+            } else if (current == ']') {
+                inCharacterClass = false;
+            } else if (current == '(' && !inCharacterClass) {
+                boolean isSpecialGroup = i + 1 < regex.length() && regex.charAt(i + 1) == '?';
+                boolean isNamedGroup = isSpecialGroup && i + 3 < regex.length()
+                        && regex.charAt(i + 2) == '<'
+                        && regex.charAt(i + 3) != '=' && regex.charAt(i + 3) != '!';
+                if (isNamedGroup) {
+                    int nameEnd = regex.indexOf('>', i + 3);
+                    if (nameEnd < 0) {
+                        throw new PatternSyntaxException("Unclosed named capture group", regex, i);
+                    }
+                    groupIndexes.put(regex.substring(i + 3, nameEnd), ++groupIndex);
+                    portableRegex.append('(');
+                    i = nameEnd;
+                    continue;
+                }
+                if (!isSpecialGroup) {
+                    groupIndex++;
+                }
+            }
+            portableRegex.append(current);
+        }
+        return new PortablePattern(portableRegex.toString(), groupIndexes);
+    }
+
+    private static final class PortablePattern {
+        private final String regex;
+        private final Map<String, Integer> groupIndexes;
+
+        private PortablePattern(String regex, Map<String, Integer> groupIndexes) {
+            this.regex = regex;
+            this.groupIndexes = groupIndexes;
+        }
+    }
+
     // Core Matching Patterns (initialised in Constructor)
     public static final String REGRP_DECKNAME = "deckName";
     public static final String REX_DECK_NAME =
             String.format("^(\\/\\/\\s*)?(?<pre>(deck|name(\\s)?))(\\:|=)\\s*(?<%s>([a-zA-Z0-9',\\/\\-\\s\\)\\]\\(\\[\\#]+))\\s*(.*)$",
                     REGRP_DECKNAME);
-    public static final Pattern DECK_NAME_PATTERN = Pattern.compile(REX_DECK_NAME, Pattern.CASE_INSENSITIVE);
+    public static final Pattern DECK_NAME_PATTERN = compilePattern(REX_DECK_NAME, Pattern.CASE_INSENSITIVE);
 
     public static final String REGRP_TOKEN = "token";
     public static final String REGRP_COLR1 = "colr1";
@@ -405,25 +494,41 @@ public class DeckRecognizer {
     public static final String REX_MANA_COLOURS = String.format("(\\{(%s)\\})|(white|blue|black|red|green|colo(u)?rless|multicolo(u)?r)", MANA_SYMBOLS);
     public static final String REX_MANA = String.format("^(?<pre>[^a-zA-Z]*)\\s*(?<%s>(%s))((\\s|-|\\|)(?<%s>(%s)))?(?<post>[^a-zA-Z]*)?$",
             REGRP_COLR1, REX_MANA_COLOURS, REGRP_COLR2, REX_MANA_COLOURS);
-    public static final Pattern NONCARD_PATTERN = Pattern.compile(REX_NOCARD, Pattern.CASE_INSENSITIVE);
-    public static final Pattern CMC_PATTERN = Pattern.compile(REX_CMC, Pattern.CASE_INSENSITIVE);
-    public static final Pattern CARD_RARITY_PATTERN = Pattern.compile(REX_RARITY, Pattern.CASE_INSENSITIVE);
-    public static final Pattern MANA_PATTERN = Pattern.compile(REX_MANA, Pattern.CASE_INSENSITIVE);
-    public static final Pattern MANA_SYMBOL_PATTERN = Pattern.compile(REX_MANA_SYMBOLS, Pattern.CASE_INSENSITIVE);
+    public static final Pattern NONCARD_PATTERN = compilePattern(REX_NOCARD, Pattern.CASE_INSENSITIVE);
+    public static final Pattern CMC_PATTERN = compilePattern(REX_CMC, Pattern.CASE_INSENSITIVE);
+    public static final Pattern CARD_RARITY_PATTERN = compilePattern(REX_RARITY, Pattern.CASE_INSENSITIVE);
+    public static final Pattern MANA_PATTERN = compilePattern(REX_MANA, Pattern.CASE_INSENSITIVE);
+    public static final Pattern MANA_SYMBOL_PATTERN = compilePattern(REX_MANA_SYMBOLS, Pattern.CASE_INSENSITIVE);
 
     public static final String REGRP_SET = "setcode";
     public static final String REGRP_COLLNR = "collnr";
     public static final String REGRP_CARD = "cardname";
     public static final String REGRP_CARDNO = "count";
 
-    public static final String REX_CARD_NAME = String.format("(\\[)?(?<%s>[a-zA-Z0-9à-ÿÀ-Ÿ&',\\.:!\\+\\\"\\/\\-\\s]+)(\\])?", REGRP_CARD);
+    // "?" is part of several card names, e.g. "Continue?", "When Will You Learn?" and
+    // "Which of You Burns Brightest?", none of which could be imported before.
+    public static final String REX_CARD_NAME = String.format("(\\[)?(?<%s>[a-zA-Z0-9à-ÿÀ-Ÿ&',\\.:!\\?\\+\\\"\\/\\-\\s]+)(\\])?", REGRP_CARD);
     public static final String REX_SET_CODE = String.format("(?<%s>[a-zA-Z0-9_]{2,7})", REGRP_SET);
-    public static final String REX_COLL_NUMBER = String.format("(?<%s>\\*?[0-9A-Z]+\\S?[A-Z]*)", REGRP_COLLNR);
+    /**
+     * One segment of a collector number: either it contains a digit, or it is uppercase
+     * and digits with at most one trailing lowercase letter.
+     *
+     * The second shape is what keeps a card name out. "CAa" and "TMP" are real collector
+     * numbers, but "Sink" must not be one, or "1 TMP Power Sink" parses as a card plus a
+     * set plus a collector number. An unrestricted lowercase run cannot tell those apart.
+     */
+    private static final String REX_COLLNR_SEGMENT = "(?:[0-9A-Za-z]*[0-9][0-9A-Za-z]*|[0-9A-Z]+[a-z]?)";
+    // Only the leading segment has to be strict. Once a separator has been seen the token
+    // can no longer be confused with a card name, so anything alphanumeric is allowed after
+    // one, which is what "118†s" and "2J-b" need.
+    public static final String REX_COLL_NUMBER = String.format("(?<%s>\\*?%s(?:[-_★☇†Φ][0-9A-Za-z]*)*)",
+            REGRP_COLLNR, REX_COLLNR_SEGMENT);
     public static final String REX_CARD_COUNT = String.format("(?<%s>[\\d]{1,2})(?<mult>x)?", REGRP_CARDNO);
     // EXTRA
+    // Foil markers: (F) MTGGoldfish; *F* foil and *E* etched foil, Moxfield/MTGA style
     public static final String REGRP_FOIL_GFISH = "foil";
     private static final String REX_FOIL_MTGGOLDFISH = String.format(
-            "(?<%s>\\(F\\))?", REGRP_FOIL_GFISH);
+            "(?<%s>\\(F\\)|\\*[FE]\\*)?", REGRP_FOIL_GFISH);
     // XMage Sideboard indicator - pushed a bit further with deck section indication
     public static final String REGRP_DECK_SEC_XMAGE_STYLE = "decsec";
     private static final String REX_DECKSEC_XMAGE = String.format(
@@ -433,36 +538,36 @@ public class DeckRecognizer {
     public static final String REX_CARD_SET_REQUEST = String.format(
             "(%s\\s*:\\s*)?(%s\\s)?\\s*%s\\s*(\\s|\\||\\(|\\[|\\{)\\s?%s(\\s|\\)|\\]|\\})?\\s*%s",
             REX_DECKSEC_XMAGE, REX_CARD_COUNT, REX_CARD_NAME, REX_SET_CODE, REX_FOIL_MTGGOLDFISH);
-    public static final Pattern CARD_SET_PATTERN = Pattern.compile(REX_CARD_SET_REQUEST);
+    public static final Pattern CARD_SET_PATTERN = compilePattern(REX_CARD_SET_REQUEST, 0);
     // 2. Set-Card Request (Amount?, Set, CardName)
     public static final String REX_SET_CARD_REQUEST = String.format(
             "(%s\\s*:\\s*)?(%s\\s)?\\s*(\\(|\\[|\\{)?%s(\\s+|\\)|\\]|\\}|\\|)\\s*%s\\s*%s\\s*",
             REX_DECKSEC_XMAGE, REX_CARD_COUNT, REX_SET_CODE, REX_CARD_NAME, REX_FOIL_MTGGOLDFISH);
-    public static final Pattern SET_CARD_PATTERN = Pattern.compile(REX_SET_CARD_REQUEST);
+    public static final Pattern SET_CARD_PATTERN = compilePattern(REX_SET_CARD_REQUEST, 0);
     // 3. Full-Request (Amount?, CardName, Set, Collector Number|Art Index) - MTGArena Format
     public static final String REX_FULL_REQUEST_CARD_SET = String.format(
             "(%s\\s*:\\s*)?(%s\\s)?\\s*%s\\s*(\\||\\(|\\[|\\{|\\s)%s(\\s|\\)|\\]|\\})?(\\s+|\\|\\s*)%s\\s*%s\\s*",
             REX_DECKSEC_XMAGE, REX_CARD_COUNT, REX_CARD_NAME, REX_SET_CODE, REX_COLL_NUMBER, REX_FOIL_MTGGOLDFISH);
-    public static final Pattern CARD_SET_COLLNO_PATTERN = Pattern.compile(REX_FULL_REQUEST_CARD_SET);
+    public static final Pattern CARD_SET_COLLNO_PATTERN = compilePattern(REX_FULL_REQUEST_CARD_SET, 0);
     // 4. Full-Request (Amount?, Set, CardName, Collector Number|Art Index) - Alternative for flexibility
     public static final String REX_FULL_REQUEST_SET_CARD = String.format(
             "^(%s\\s*:\\s*)?(%s\\s)?\\s*(\\(|\\[|\\{)?%s(\\s+|\\)|\\]|\\}|\\|)\\s*%s(\\s+|\\|\\s*)%s\\s*%s$",
             REX_DECKSEC_XMAGE, REX_CARD_COUNT, REX_SET_CODE, REX_CARD_NAME, REX_COLL_NUMBER, REX_FOIL_MTGGOLDFISH);
-    public static final Pattern SET_CARD_COLLNO_PATTERN = Pattern.compile(REX_FULL_REQUEST_SET_CARD);
+    public static final Pattern SET_CARD_COLLNO_PATTERN = compilePattern(REX_FULL_REQUEST_SET_CARD, 0);
     // 5. (MTGGoldfish mostly) (Amount?, Card Name, <Collector Number>, Set)
     public static final String REX_FULL_REQUEST_CARD_COLLNO_SET = String.format(
             "^(%s\\s*:\\s*)?(%s\\s)?\\s*%s\\s+(\\<%s\\>)\\s*(\\(|\\[|\\{)?%s(\\s+|\\)|\\]|\\}|\\|)\\s*%s$",
             REX_DECKSEC_XMAGE, REX_CARD_COUNT, REX_CARD_NAME, REX_COLL_NUMBER, REX_SET_CODE, REX_FOIL_MTGGOLDFISH);
-    public static final Pattern CARD_COLLNO_SET_PATTERN = Pattern.compile(REX_FULL_REQUEST_CARD_COLLNO_SET);
+    public static final Pattern CARD_COLLNO_SET_PATTERN = compilePattern(REX_FULL_REQUEST_CARD_COLLNO_SET, 0);
     // 6. XMage format (Amount?, [Set:Collector Number] Card Name)
     public static final String REX_FULL_REQUEST_XMAGE = String.format(
             "^(%s\\s*:\\s*)?(%s\\s)?\\s*(\\[)?%s:%s(\\])\\s+%s\\s*%s$",
             REX_DECKSEC_XMAGE, REX_CARD_COUNT, REX_SET_CODE, REX_COLL_NUMBER, REX_CARD_NAME, REX_FOIL_MTGGOLDFISH);
-    public static final Pattern SET_COLLNO_CARD_XMAGE_PATTERN = Pattern.compile(REX_FULL_REQUEST_XMAGE);
+    public static final Pattern SET_COLLNO_CARD_XMAGE_PATTERN = compilePattern(REX_FULL_REQUEST_XMAGE, 0);
     // 7. Card-Only Request (Amount?)
     public static final String REX_CARDONLY = String.format(
             "(%s\\s*:\\s*)?(%s\\s)?\\s*%s\\s*%s", REX_DECKSEC_XMAGE, REX_CARD_COUNT, REX_CARD_NAME, REX_FOIL_MTGGOLDFISH);
-    public static final Pattern CARD_ONLY_PATTERN = Pattern.compile(REX_CARDONLY);
+    public static final Pattern CARD_ONLY_PATTERN = compilePattern(REX_CARDONLY, 0);
 
     // CoreTypes (to recognise Tokens of type CardType
     private static final CharSequence[] CARD_TYPES = allCardTypes();
@@ -470,7 +575,8 @@ public class DeckRecognizer {
             "side", "sideboard", "sb",
             "main", "card", "mainboard",
             "avatar", "commander", "schemes",
-            "conspiracy", "planes", "deck", "dungeon"};
+            "conspiracy", "planes", "deck", "dungeon",
+            "attractions", "contraptions"};
 
     private static CharSequence[] allCardTypes(){
         List<String> cardTypesList = new ArrayList<>();
@@ -533,7 +639,7 @@ public class DeckRecognizer {
             PaperCard tokenCard = token.getCard();
 
             if (isAllowed(tokenSection)) {
-                if (!tokenSection.equals(referenceDeckSectionInParsing)) {
+                if (tokenSection != referenceDeckSectionInParsing) {
                     Token sectionToken = Token.DeckSection(tokenSection.name(), this.allowedDeckSections);
                     // just check that last token is stack is a card placeholder.
                     // In that case, add the new section token before the placeholder
@@ -572,14 +678,16 @@ public class DeckRecognizer {
         refLine = purgeAllLinks(refLine);
 
         String line;
-        if (StringUtils.startsWith(refLine, LINE_COMMENT_DELIMITER_OR_MD_HEADER))
+        if (refLine.startsWith(LINE_COMMENT_DELIMITER_OR_MD_HEADER))
             line = refLine.replaceAll(LINE_COMMENT_DELIMITER_OR_MD_HEADER, "");
         else
             line = refLine.trim();  // Remove any trailing formatting
 
         // Some websites export split card names with a single slash. Replace with double slash.
-        line = SEARCH_SINGLE_SLASH.matcher(line).replaceFirst(" // ");
-        if (StringUtils.startsWith(line, ASTERISK))  // markdown lists (tappedout md export)
+        // Final fantasy cards like Summon: Choco/Mog should be omitted to be recognized. TODO: fix maybe for future cards
+        if (!line.contains("Summon:"))
+            line = SEARCH_SINGLE_SLASH.matcher(line).replaceFirst(" // ");
+        if (line.startsWith(ASTERISK))  // Markdown lists (tappedout md export)
             line = line.substring(2);
 
         // == Patches to Corner Cases
@@ -595,20 +703,20 @@ public class DeckRecognizer {
         Token result = recogniseCardToken(line, referenceSection);
         if (result == null)
             result = recogniseNonCardToken(line);
-        return result != null ? result : StringUtils.startsWith(refLine, DOUBLE_SLASH) ||
-                StringUtils.startsWith(refLine, LINE_COMMENT_DELIMITER_OR_MD_HEADER) ?
+        return result != null ? result : refLine.startsWith(DOUBLE_SLASH) ||
+                refLine.startsWith(LINE_COMMENT_DELIMITER_OR_MD_HEADER) ?
                 new Token(TokenType.COMMENT, 0, refLine) : new Token(TokenType.UNKNOWN_TEXT, 0, refLine);
     }
 
     public static String purgeAllLinks(String line){
-        String urlPattern = "(?<protocol>((https|ftp|file|http):))(?<sep>((//|\\\\)+))(?<url>([\\w\\d:#@%/;$~_?+-=\\\\.&]*))";
+        String urlPattern = "(?:(?:https|ftp|file|http):)(?:(?://|\\\\)+)(?:[\\w\\d:#@%/;$~_?+-=\\\\.&]*)";
         Pattern p = Pattern.compile(urlPattern, Pattern.CASE_INSENSITIVE);
         Matcher m = p.matcher(line);
 
         while (m.find()) {
             line = line.replaceAll(m.group(), "").trim();
         }
-        if (StringUtils.endsWith(line, "()"))
+        if (line.endsWith("()"))
             return line.substring(0, line.length()-2);
         return line;
     }
@@ -669,7 +777,8 @@ public class DeckRecognizer {
                     return checkAndSetCardToken(pc, edition, cardCount, deckSecFromCardLine,
                                                 currentDeckSection, true);
                 // UNKNOWN card as in the Counterspell|FEM case
-                return Token.UnknownCard(cardName, setCode, cardCount);
+                unknownCardToken = Token.UnknownCard(cardName, setCode, cardCount);
+                continue;
             }
             // ok so we can simply ignore everything but card name - as set code does not exist
             // At this stage, we know the card name exists in the DB so a Card MUST be found
@@ -735,21 +844,12 @@ public class DeckRecognizer {
     // This would save tons of time in parsing Input + would also allow to return UnsupportedCardTokens beforehand
     private DeckSection getTokenSection(String deckSec, DeckSection currentDeckSection, PaperCard card){
         if (deckSec != null) {
-            DeckSection cardSection;
-            switch (deckSec.toUpperCase().trim()) {
-                case "MB":
-                    cardSection = DeckSection.Main;
-                    break;
-                case "SB":
-                    cardSection = DeckSection.Sideboard;
-                    break;
-                case "CM":
-                    cardSection = DeckSection.Commander;
-                    break;
-                default:
-                    cardSection = DeckSection.matchingSection(card);
-                    break;
-            }
+            DeckSection cardSection = switch (deckSec.toUpperCase().trim()) {
+                case "MB" -> DeckSection.Main;
+                case "SB" -> DeckSection.Sideboard;
+                case "CM" -> DeckSection.Commander;
+                default -> DeckSection.matchingSection(card);
+            };
             if (cardSection.validate(card))
                 return cardSection;
         }
@@ -780,14 +880,17 @@ public class DeckRecognizer {
                 (this.gameFormatRestrictedCards != null && !this.gameFormatRestrictedCards.isEmpty());
     }
 
-    private String getRexGroup(Matcher matcher, String groupName){
-        String rexGroup;
-        try{
-            rexGroup = matcher.group(groupName);
-        } catch (IllegalArgumentException ex) {
-            rexGroup = null;
+    static String getRexGroup(Matcher matcher, String groupName){
+        Map<String, Integer> groupIndexes = PORTABLE_PATTERN_GROUPS.get(matcher.pattern());
+        if (groupIndexes != null) {
+            Integer groupIndex = groupIndexes.get(groupName);
+            return groupIndex == null ? null : matcher.group(groupIndex);
         }
-        return rexGroup;
+        try{
+            return matcher.group(groupName);
+        } catch (IllegalArgumentException ex) {
+            return null;
+        }
     }
 
     private boolean isBannedInFormat(PaperCard pc) {
@@ -846,7 +949,7 @@ public class DeckRecognizer {
         }
         if (isCardRarity(text)){
             String tokenText = cardRarityTokenMatch(text);
-            if (tokenText != null && !tokenText.trim().equals(""))
+            if (tokenText != null && !tokenText.trim().isEmpty())
                 return new Token(TokenType.CARD_RARITY, tokenText);
             return null;
         }
@@ -903,7 +1006,7 @@ public class DeckRecognizer {
         Matcher noncardMatcher = NONCARD_PATTERN.matcher(line);
         if (!noncardMatcher.matches())
             return null;
-        return noncardMatcher.group(REGRP_TOKEN);
+        return getRexGroup(noncardMatcher, REGRP_TOKEN);
     }
 
     private static String cardRarityTokenMatch(final String lineAsIs){
@@ -913,7 +1016,7 @@ public class DeckRecognizer {
         Matcher cardRarityMatcher = CARD_RARITY_PATTERN.matcher(line);
         if (!cardRarityMatcher.matches())
             return null;
-        return cardRarityMatcher.group(REGRP_TOKEN);
+        return getRexGroup(cardRarityMatcher, REGRP_TOKEN);
     }
 
     private static String cardCMCTokenMatch(final String lineAsIs){
@@ -923,7 +1026,7 @@ public class DeckRecognizer {
         Matcher cardCMCmatcher = CMC_PATTERN.matcher(line);
         if (!cardCMCmatcher.matches())
             return null;
-        return cardCMCmatcher.group(REGRP_TOKEN);
+        return getRexGroup(cardCMCmatcher, REGRP_TOKEN);
     }
 
     private String getCardCMCMatch(String lineAsIs) {
@@ -943,8 +1046,8 @@ public class DeckRecognizer {
         Matcher manaMatcher = MANA_PATTERN.matcher(line);
         if (!manaMatcher.matches())
             return null;
-        String firstMana = manaMatcher.group(REGRP_COLR1);
-        String secondMana = manaMatcher.group(REGRP_COLR2);
+        String firstMana = getRexGroup(manaMatcher, REGRP_COLR1);
+        String secondMana = getRexGroup(manaMatcher, REGRP_COLR2);
         firstMana = matchAnyManaSymbolIn(firstMana);
         secondMana = matchAnyManaSymbolIn(secondMana);
         return Pair.of(firstMana, secondMana);
@@ -955,7 +1058,7 @@ public class DeckRecognizer {
             return null;
         Matcher matchManaSymbol = MANA_SYMBOL_PATTERN.matcher(manaToken);
         if (matchManaSymbol.matches())
-            return matchManaSymbol.group(REGRP_MANA);
+            return getRexGroup(matchManaSymbol, REGRP_MANA);
         return manaToken;
     }
 
@@ -982,127 +1085,56 @@ public class DeckRecognizer {
 
     private static String getMagicColourLabel(MagicColor.Color magicColor) {
         if (magicColor == null) // Multicolour
-            return String.format("%s {W}{U}{B}{R}{G}", getLocalisedMagicColorName("Multicolour"));
-        return String.format("%s %s", getLocalisedMagicColorName(magicColor.getName()), magicColor.getSymbol());
+            return String.format("%s {W}{U}{B}{R}{G}", Localizer.getInstance().getMessage("lblMulticolor"));
+        return String.format("%s %s", magicColor.getTranslatedName(), magicColor.getSymbol());
     }
 
-    private static final HashMap<Integer, String> manaSymbolsMap = new HashMap<Integer, String>() {{
-        put(MagicColor.WHITE | MagicColor.BLUE, "WU");
-        put(MagicColor.BLUE | MagicColor.BLACK, "UB");
-        put(MagicColor.BLACK | MagicColor.RED, "BR");
-        put(MagicColor.RED | MagicColor.GREEN, "RG");
-        put(MagicColor.GREEN | MagicColor.WHITE, "GW");
-        put(MagicColor.WHITE | MagicColor.BLACK, "WB");
-        put(MagicColor.BLUE | MagicColor.RED, "UR");
-        put(MagicColor.BLACK | MagicColor.GREEN, "BG");
-        put(MagicColor.RED | MagicColor.WHITE, "RW");
-        put(MagicColor.GREEN | MagicColor.BLUE, "GU");
-    }};
-    private static String getMagicColourLabel(MagicColor.Color magicColor1, MagicColor.Color magicColor2){
+    private static String getMagicColourLabel(MagicColor.Color magicColor1, MagicColor.Color magicColor2) {
         if (magicColor2 == null || magicColor2 == MagicColor.Color.COLORLESS
                 || magicColor1 == MagicColor.Color.COLORLESS)
             return String.format("%s // %s", getMagicColourLabel(magicColor1), getMagicColourLabel(magicColor2));
-        String localisedName1 = getLocalisedMagicColorName(magicColor1.getName());
-        String localisedName2 = getLocalisedMagicColorName(magicColor2.getName());
-        String comboManaSymbol = manaSymbolsMap.get(magicColor1.getColormask() | magicColor2.getColormask());
-        return String.format("%s/%s {%s}", localisedName1, localisedName2, comboManaSymbol);
+        String localisedName1 = magicColor1.getTranslatedName();
+        String localisedName2 = magicColor2.getTranslatedName();
+        return String.format("%s/%s {%s}", localisedName1, localisedName2, ColorSet.fromEnums(magicColor1, magicColor2));
     }
 
     private static MagicColor.Color getMagicColor(String colorName){
         if (colorName.toLowerCase().startsWith("multi") || colorName.equalsIgnoreCase("m"))
             return null;  // will be handled separately
-
-        byte color = MagicColor.fromName(colorName.toLowerCase());
-        switch (color) {
-            case MagicColor.WHITE:
-                return MagicColor.Color.WHITE;
-            case MagicColor.BLUE:
-                return MagicColor.Color.BLUE;
-            case MagicColor.BLACK:
-                return MagicColor.Color.BLACK;
-            case MagicColor.RED:
-                return MagicColor.Color.RED;
-            case MagicColor.GREEN:
-                return MagicColor.Color.GREEN;
-            default:
-                return MagicColor.Color.COLORLESS;
-
-        }
-    }
-
-    public static String getLocalisedMagicColorName(String colorName){
-        Localizer localizer = Localizer.getInstance();
-        switch(colorName.toLowerCase()){
-            case MagicColor.Constant.WHITE:
-                return localizer.getMessage("lblWhite");
-
-            case MagicColor.Constant.BLUE:
-                return localizer.getMessage("lblBlue");
-
-            case MagicColor.Constant.BLACK:
-                return localizer.getMessage("lblBlack");
-
-            case MagicColor.Constant.RED:
-                return localizer.getMessage("lblRed");
-
-            case MagicColor.Constant.GREEN:
-                return localizer.getMessage("lblGreen");
-
-            case MagicColor.Constant.COLORLESS:
-                return localizer.getMessage("lblColorless");
-            case "multicolour":
-            case "multicolor":
-                return localizer.getMessage("lblMulticolor");
-            default:
-                return "";
-        }
+        return MagicColor.Color.fromName(toLongColourName(colorName));
     }
 
     /**
-     * Get the magic color by the localised/translated name.
-     * @param localisedName String of localised color name.
-     * @return The string of the magic color.
+     * Maps what {@link #REX_MANA_COLOURS} and {@link #manaTokenMatch} can produce onto the
+     * names {@link MagicColor.Color#fromName} understands.
+     *
+     * <p>
+     * Two shapes need translating. A mana symbol has already been reduced to its bare
+     * letter by {@link #matchAnyManaSymbolIn}, so "{U}" arrives here as "U". And the regex
+     * deliberately accepts British spellings, so "colourless" arrives here too. Neither is
+     * in that switch, so both resolved to null and were reported as multicolour: "{U} {W}"
+     * came out as {W}{U}{B}{R}{G} instead of {WU}, and "Colourless" as colourless //
+     * multicolour.
+     * </p>
+     *
+     * <p>
+     * The normalisation lives here rather than in {@code MagicColor.Color.fromName}
+     * because {@code ImageUtil.specFaceToCollectorSuffix} relies on a single letter NOT
+     * resolving to a colour when it builds Scryfall collector-number suffixes for
+     * Specialize faces. Only this parser accepts these shapes, so only this parser widens.
+     * </p>
      */
-    public static String getColorNameByLocalisedName(String localisedName) {
-        Localizer localizer = Localizer.getInstance();
-
-        if(localisedName.equals(localizer.getMessage("lblWhite"))) return MagicColor.Constant.WHITE;
-        if(localisedName.equals(localizer.getMessage("lblBlue"))) return MagicColor.Constant.BLUE;
-        if(localisedName.equals(localizer.getMessage("lblBlack"))) return MagicColor.Constant.BLACK;
-        if(localisedName.equals(localizer.getMessage("lblRed"))) return MagicColor.Constant.RED;
-        if(localisedName.equals(localizer.getMessage("lblGreen"))) return MagicColor.Constant.GREEN;
-
-        return "";
-    }
-
-
-    private static Pair<String, String> getManaNameAndSymbol(String matchedMana) {
-        if (matchedMana == null)
-            return null;
-
-        Localizer localizer = Localizer.getInstance();
-        switch (matchedMana.toLowerCase()) {
-            case MagicColor.Constant.WHITE:
-            case "w":
-                return Pair.of(localizer.getMessage("lblWhite"), MagicColor.Color.WHITE.getSymbol());
-            case MagicColor.Constant.BLUE:
-            case "u":
-                return Pair.of(localizer.getMessage("lblBlue"), MagicColor.Color.BLUE.getSymbol());
-            case MagicColor.Constant.BLACK:
-            case "b":
-                return Pair.of(localizer.getMessage("lblBlack"), MagicColor.Color.BLACK.getSymbol());
-            case MagicColor.Constant.RED:
-            case "r":
-                return Pair.of(localizer.getMessage("lblRed"), MagicColor.Color.RED.getSymbol());
-            case MagicColor.Constant.GREEN:
-            case "g":
-                return Pair.of(localizer.getMessage("lblGreen"), MagicColor.Color.GREEN.getSymbol());
-            case MagicColor.Constant.COLORLESS:
-            case "c":
-                return Pair.of(localizer.getMessage("lblColorless"), MagicColor.Color.COLORLESS.getSymbol());
-            default: // Multicolour
-                return Pair.of(localizer.getMessage("lblMulticolor"), "");
-        }
+    private static String toLongColourName(String colorName) {
+        String name = colorName.toLowerCase(Locale.ROOT);
+        return switch (name) {
+            case "w" -> MagicColor.Constant.WHITE;
+            case "u" -> MagicColor.Constant.BLUE;
+            case "b" -> MagicColor.Constant.BLACK;
+            case "r" -> MagicColor.Constant.RED;
+            case "g" -> MagicColor.Constant.GREEN;
+            case "c", "colourless" -> MagicColor.Constant.COLORLESS;
+            default -> name;
+        };
     }
 
     public static boolean isDeckName(final String lineAsIs) {
@@ -1119,7 +1151,7 @@ public class DeckRecognizer {
         String line = text.trim();
         final Matcher deckNamePattern = DECK_NAME_PATTERN.matcher(line);
         if (deckNamePattern.matches())
-            return deckNamePattern.group(REGRP_DECKNAME);  // Deck name is at match 7
+            return getRexGroup(deckNamePattern, REGRP_DECKNAME);
         return "";
     }
 

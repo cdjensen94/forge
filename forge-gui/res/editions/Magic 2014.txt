@@ -2,7 +2,6 @@
 Code=M14
 Date=2013-07-19
 Name=Magic 2014
-Code2=M14
 Type=Core
 BoosterCovers=5
 Booster=10 Common, 3 Uncommon, 1 RareMythic, 1 BasicLand
@@ -173,7 +172,7 @@ ScryfallCode=M14
 159 C Thunder Strike @Wayne Reynolds
 160 U Volcanic Geyser @Clint Cearley
 161 C Wild Guess @Lucas Graciano
-162 R Wild Ricochet @Dan Scott
+162 R Wild Ricochet @Dan Murayama Scott
 163 U Young Pyromancer @Cynthia Sheppard
 164 C Advocate of the Beast @Jesper Ejsing
 165 U Bramblecrush @Drew Baker
@@ -198,7 +197,7 @@ ScryfallCode=M14
 184 U Manaweft Sliver @Trevor Claxton
 185 R Megantic Sliver @Ryan Barger
 186 C Naturalize @Tim Hildebrandt
-187 R Oath of the Ancient Wood @Dan Scott
+187 R Oath of the Ancient Wood @Dan Murayama Scott
 188 C Plummet @Pete Venters
 189 C Predatory Sliver @Mathias Kollros
 190 M Primeval Bounty @Christine Choi
@@ -263,15 +262,18 @@ ScryfallCode=M14
 249 L Forest @Andreas Rocha
 
 [tokens]
-c_1_1_sliver
-c_1_1_sliver
-w_4_4_angel_flying
-w_2_2_cat
-w_0_1_goat
-b_2_2_zombie
-r_2_2_dragon_flying_firebreathing
-r_1_1_elemental
-r_1_1_elemental
-g_3_3_beast
-g_1_1_saproling
-g_2_2_wolf
+1 c_1_1_sliver @Igor Kieryluk
+2 w_4_4_angel_flying @James Ryman
+3 w_2_2_cat @Jesper Ejsing
+4 w_0_1_goat @Adam Paquette
+5 b_2_2_zombie @Lucas Graciano
+6 r_2_2_dragon_flying_firebreathing @Jack Wang
+7 r_1_1_elemental @Jaime Jones
+8 r_1_1_elemental @Winona Nelson
+9 g_3_3_beast @John Donahue
+10 g_1_1_saproling @Brad Rigney
+11 g_2_2_wolf @Lars Grant-West
+
+[other]
+12 emblem_liliana_of_the_dark_realms @D. Alexander Gregory
+13 emblem_garruk_caller_of_beasts @Karl Kopinski

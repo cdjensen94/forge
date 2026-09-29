@@ -4,6 +4,7 @@ Date=2014-09-05
 Name=Duel Decks: Speed vs. Cunning
 Type=Duel_Deck
 ScryfallCode=DDN
+TokensCode=DDN
 
 [cards]
 1 M Zurgo Helmsmasher @Ryan Alexander Lee
@@ -79,7 +80,7 @@ ScryfallCode=DDN
 71 U Arrow Volley Trap @Steve Argyle
 72 C Repeal @Anthony Palumbo
 73 U Mystic Monastery @Florian de Gesincourt
-74 C Terramorphic Expanse @Dan Scott
+74 C Terramorphic Expanse @Dan Murayama Scott
 75 L Island @Rob Alexander
 76 L Island @Rob Alexander
 77 L Island @Andreas Rocha
@@ -89,4 +90,4 @@ ScryfallCode=DDN
 81 L Plains @Andreas Rocha
 
 [tokens]
-r_1_1_goblin
+82 r_1_1_goblin @Karl Kopinski

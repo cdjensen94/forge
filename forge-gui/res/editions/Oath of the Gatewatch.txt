@@ -2,15 +2,15 @@
 Code=OGW
 Date=2016-01-22
 Name=Oath of the Gatewatch
-Code2=OGW
 Type=Expansion
 BoosterCovers=4
 Booster=10 Common, 3 Uncommon, 1 RareMythic, 1 BasicLand BFZ
 FatPack=9
 FatPackExtraSlots=66 BasicLands BFZ, 14 name("Wastes")
-AdditionalSheetForFoils=fromSheet("EXP Lands 2")
+AdditionalSheetForFoils=fromSheet("EXP special slot")
 AdditionalSetUnlockedInQuest=EXP
 ScryfallCode=OGW
+TokenFallbackCode=BFZ
 
 [cards]
 1 R Deceiver of Form @Viktor Titov
@@ -47,7 +47,7 @@ ScryfallCode=OGW
 32 U Relief Captain @Anastasia Ovchinnikova
 33 C Searing Light @Marco Nelor
 34 C Shoulder to Shoulder @Chris Rallis
-35 C Spawnbinder Mage @Dan Scott
+35 C Spawnbinder Mage @Dan Murayama Scott
 36 U Steppe Glider @John Severin Brassell
 37 R Stone Haven Outfitter @Jason Rainville
 38 U Stoneforge Acolyte @Chris Rallis
@@ -91,7 +91,7 @@ ScryfallCode=OGW
 76 U Reaver Drone @Chris Rallis
 77 R Sifter of Skulls @Slawomir Maniak
 78 C Sky Scourer @Winona Nelson
-79 C Slaughter Drone @Dan Scott
+79 C Slaughter Drone @Dan Murayama Scott
 80 C Unnatural Endurance @Mathias Kollros
 81 U Visions of Brutality @Jama Jurabaev
 82 C Witness the End @Igor Kieryluk
@@ -158,7 +158,7 @@ ScryfallCode=OGW
 143 U Seed Guardian @Vincent Proce
 144 R Sylvan Advocate @Volkan Baǵa
 145 C Tajuru Pathwarden @Victor Adame Minguez
-146 C Vines of the Recluse @Dan Scott
+146 C Vines of the Recluse @Dan Murayama Scott
 147 R Zendikar Resurgent @Chris Rallis
 148 U Flayer Drone @Lius Lasahido
 149 U Mindmelter @Jason Felix
@@ -196,22 +196,19 @@ ScryfallCode=OGW
 181 C Unknown Shores @Jung Park
 182 R Wandering Fumarole @Florian de Gesincourt
 183 C Wastes @Jason Felix
-183 C Wastes @Jason Felix
+183a C Wastes @Jason Felix
 184 C Wastes @Raymond Swanland
-184 C Wastes @Raymond Swanland
+184a C Wastes @Raymond Swanland
 
 [tokens]
-c_1_1_eldrazi_scion_sac
-c_1_1_eldrazi_scion_sac
-c_1_1_eldrazi_scion_sac
-c_1_1_eldrazi_scion_sac
-c_1_1_eldrazi_scion_sac
-c_1_1_eldrazi_scion_sac
-w_3_3_angel_flying
-w_2_2_knight_ally
-w_1_1_kor_ally
-u_8_8_octopus
-b_2_2_zombie
-r_3_1_elemental_haste
-g_x_x_elemental
-g_0_1_plant
+1 c_1_1_eldrazi_scion_sac @Izzy
+2 c_1_1_eldrazi_scion_sac @Craig J Spearing
+3 c_1_1_eldrazi_scion_sac @Svetlin Velinov
+4 c_1_1_eldrazi_scion_sac @Izzy
+5 c_1_1_eldrazi_scion_sac @Winona Nelson
+6 c_1_1_eldrazi_scion_sac @Svetlin Velinov
+7 w_3_3_angel_flying @Anastasia Ovchinnikova
+8 b_2_2_zombie @Kev Walker
+9 r_3_1_elemental @Raymond Swanland
+10 g_x_x_elemental @Vincent Proce
+11 g_0_1_plant @Daren Bader

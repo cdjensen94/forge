@@ -2,7 +2,6 @@
 Code=C14
 Date=2014-11-07
 Name=Commander 2014
-Code2=C14
 Type=Commander
 ScryfallCode=C14
 
@@ -22,7 +21,7 @@ ScryfallCode=C14
 13 R Domineering Will @Mike Sass
 14 R Dulcet Sirens @Magali Villeneuve
 15 R Intellectual Offering @Mark Winters
-16 R Reef Worm @Dan Scott
+16 R Reef Worm @Dan Murayama Scott
 17 M Stitcher Geralf @Karla Ortiz
 18 R Stormsurge Kraken @Svetlin Velinov
 19 M Teferi, Temporal Archmage @Tyler Jacobson
@@ -39,12 +38,12 @@ ScryfallCode=C14
 30 R Spoils of Blood @Erica Yang
 31 R Wake the Dead @Christopher Moeller
 32 R Bitter Feud @Aaron Miller
-33 M Daretti, Scrap Savant @Dan Scott
+33 M Daretti, Scrap Savant @Dan Murayama Scott
 34 R Dualcaster Mage @Matt Stewart
 35 M Feldon of the Third Path @Chase Stone
 36 R Impact Resonance @Jesper Ejsing
 37 R Incite Rebellion @Alex Horley-Orlandelli
-38 R Scrap Mastery @Dan Scott
+38 R Scrap Mastery @Dan Murayama Scott
 39 R Tyrant's Familiar @Todd Lockwood
 40 R Volcanic Offering @Eric Velhagen
 41 R Warmonger Hellkite @Trevor Claxton
@@ -82,7 +81,7 @@ ScryfallCode=C14
 73 U Gift of Estates @Hugh Jamieson
 74 R Grand Abolisher @Eric Deschamps
 75 R Kemba, Kha Regent @Todd Lockwood
-76 C Kor Sanctifiers @Dan Scott
+76 C Kor Sanctifiers @Dan Murayama Scott
 77 R Marshal's Anthem @Matt Stewart
 78 R Martial Coup @Greg Staples
 79 R Mentor of the Meek @Jana Schirmer & Johannes Voss
@@ -268,7 +267,7 @@ ScryfallCode=C14
 259 C Panic Spellbomb @Franz Vohwinkel
 260 R Pearl Medallion @Daniel Ljunggren
 261 R Pentavus @Greg Staples
-262 C Pilgrim's Eye @Dan Scott
+262 C Pilgrim's Eye @Dan Murayama Scott
 263 R Predator, Flagship @Mark Tedin
 264 C Pristine Talisman @Matt Cavotta
 265 R Ruby Medallion @Daniel Ljunggren
@@ -277,12 +276,12 @@ ScryfallCode=C14
 268 U Skullclamp @Daniel Ljunggren
 269 U Sky Diamond @Lindsey Look
 270 U Sol Ring @Mike Bierek
-271 R Solemn Simulacrum @Dan Scott
+271 R Solemn Simulacrum @Dan Murayama Scott
 272 R Spine of Ish Sah @Daniel Ljunggren
 273 R Steel Hellkite @James Paick
 274 R Strata Scythe @Scott Chou
 275 U Swiftfoot Boots @Svetlin Velinov
-276 R Sword of Vengeance @Dan Scott
+276 R Sword of Vengeance @Dan Murayama Scott
 277 U Thran Dynamo @Ron Spears
 278 U Tormod's Crypt @Lars Grant-West
 279 R Trading Post @Adam Paquette
@@ -321,7 +320,7 @@ ScryfallCode=C14
 312 C Smoldering Crater @Mark Tedin
 313 U Tectonic Edge @Vincent Proce
 314 U Temple of the False God @Brian Snõddy
-315 C Terramorphic Expanse @Dan Scott
+315 C Terramorphic Expanse @Dan Murayama Scott
 316 C Tranquil Thicket @Heather Hudson
 317 U Zoetic Cavern @Lars Grant-West
 318 L Plains @John Avon
@@ -346,37 +345,41 @@ ScryfallCode=C14
 337 L Forest @Stephen Tappin
 
 [tokens]
-stoneforged_blade
-tuktuk_the_returned
-w_4_4_angel_flying
-w_2_2_cat
-w_0_1_goat
-w_1_1_kor_soldier
-w_1_1_pegasus_flying
-w_1_1_soldier
-w_1_1_spirit_flying
-u_3_3_fish_hatches_whale
-u_9_9_kraken
-u_6_6_whale_hatches_kraken
-u_x_x_zombie
-b_5_5_demon_flying
-b_x_x_demon_flying
-b_0_0_phyrexian_germ
-b_x_x_horror
-b_2_2_zombie
-r_1_1_goblin
-g_3_3_ape
-g_3_3_beast
-g_4_4_beast
-g_5_3_elemental
-g_3_3_elephant
-g_1_1_elf_druid_g
-g_1_1_elf_warrior
-g_x_x_treefolk
-g_2_2_wolf
-c_3_4_a_gargoyle_flying
-c_1_1_a_myr
-c_1_1_a_phyrexian_myr
-c_1_1_a_pentavite_flying
-c_3_3_a_phyrexian_wurm_deathtouch
-c_3_3_a_phyrexian_wurm_lifelink
+1 w_4_4_angel_flying @Anthony Palumbo
+2 w_2_2_cat @Scott Chou
+3 w_0_1_goat @Adam Paquette
+4 w_1_1_kor_soldier @Daren Bader
+5 w_1_1_pegasus_flying @Greg Hildebrandt
+6 w_1_1_soldier @Goran Josic
+7 w_1_1_spirit_flying @Ryan Yee
+8 u_3_3_fish_hatches_whale @Dan Murayama Scott
+9 u_9_9_kraken @Dan Murayama Scott
+10 u_6_6_whale_hatches_kraken @Dan Murayama Scott
+11 u_x_x_zombie @Dave Kendall
+12 b_x_x_demon_flying @Pete Venters
+13 b_5_5_demon_flying @Kev Walker
+14 b_0_0_germ @Igor Kieryluk
+15 b_x_x_horror @Jason Felix
+16 b_2_2_zombie @Lucas Graciano
+17 r_1_1_goblin @Dave Kendall
+18 g_3_3_ape @Lars Grant-West
+19 g_3_3_beast @Dave Allsop
+20 g_4_4_beast @Steve Prescott
+21 g_5_3_elemental @Nils Hamm
+22 g_3_3_elephant @Lars Grant-West
+23 g_1_1_elf_druid_g @Raymond Swanland
+24 g_1_1_elf_warrior @William O'Connor
+25 g_x_x_treefolk @Filip Burburan
+26 g_2_2_wolf @Daren Bader
+27 c_3_4_a_gargoyle_flying @Paul Bonner
+28 c_1_1_a_myr @Ryan Pancoast
+29 c_1_1_a_pentavite_flying @Greg Staples
+30 stoneforged_blade @Eric Deschamps
+31 tuktuk_the_returned @Franz Vohwinkel
+32 c_3_3_a_phyrexian_wurm_deathtouch @Raymond Swanland
+33 c_3_3_a_phyrexian_wurm_lifelink @Raymond Swanland
+
+[other]
+34 emblem_teferi_temporal_archmage @Tyler Jacobson
+35 emblem_ob_nixilis_of_the_black_oath @Daarken
+36 emblem_daretti_scrap_savant @Dan Murayama Scott

@@ -1,18 +1,12 @@
 package forge.deck;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-
-import org.apache.commons.lang3.tuple.Pair;
-
 import forge.StaticData;
 import forge.deck.io.Archetype;
 import forge.deck.io.CardThemedLDAIO;
 import forge.model.FModel;
+import org.apache.commons.lang3.tuple.Pair;
+
+import java.util.*;
 
 /**
  * Created by maustin on 09/05/2017.
@@ -42,7 +36,6 @@ public final class CardArchetypeLDAGenerator {
         return true;
     }
 
-    /** Try to load matrix .dat files, otherwise check for deck folders and build .dat, otherwise return false **/
     public static boolean initializeFormat(String format){
         List<Archetype> lda = CardThemedLDAIO.loadRawLDA(format);
         Map<String,List<List<Pair<String, Double>>>> formatMap = CardThemedLDAIO.loadLDA(format);
@@ -76,7 +69,6 @@ public final class CardArchetypeLDAGenerator {
     }
 
     public static Map<String,List<List<Pair<String, Double>>>> loadFormat(List<Archetype> lda) throws Exception{
-
         List<List<Pair<String, Double>>> topics = new ArrayList<>();
         Set<String> cards = new HashSet<>();
         for (int t = 0; t < lda.size(); ++t) {
@@ -90,7 +82,7 @@ public final class CardArchetypeLDAGenerator {
             int i = 0;
             while (topic.size()<=40&&i<highRankVocabs.size()) {
                 String cardName = highRankVocabs.get(i).getLeft();
-                if(!StaticData.instance().getCommonCards().getUniqueByName(cardName).getRules().getType().isBasicLand()){
+                if(!StaticData.instance().getCommonCards().getRules(cardName, true).getType().isBasicLand()){
                     if(highRankVocabs.get(i).getRight()>=0.005d) {
                         topicCards.add(cardName);
                     }

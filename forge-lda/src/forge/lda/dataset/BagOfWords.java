@@ -24,7 +24,9 @@ import forge.localinstance.properties.ForgeConstants;
 import forge.util.storage.IStorage;
 import forge.util.storage.StorageImmediatelySerialized;
 
-import java.io.*;
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.IOException;
 import java.util.*;
 
 /**
@@ -69,9 +71,7 @@ public final class BagOfWords {
             try {
                 if (format.isDeckLegal(deck) && deck.getMain().toFlatList().size() == 60) {
                     legalDecks.add(deck);
-                    for (PaperCard card : deck.getMain().toFlatList()) {
-                        cardSet.add(card);
-                    }
+                    cardSet.addAll(deck.getMain().toFlatList());
                 }
             }catch(Exception e){
                 System.out.println("Skipping deck "+deck.getName());

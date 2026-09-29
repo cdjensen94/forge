@@ -29,7 +29,7 @@ public class RestartGameEffect extends SpellAbilityEffect {
         List<ZoneType> restartZones = new ArrayList<>(Arrays.asList(ZoneType.Battlefield,
                 ZoneType.Library, ZoneType.Graveyard, ZoneType.Hand, ZoneType.Exile));
 
-        ZoneType leaveZone = ZoneType.smartValueOf(sa.hasParam("RestrictFromZone") ? sa.getParam("RestrictFromZone") : null);
+        ZoneType leaveZone = ZoneType.smartValueOf(sa.getParam("RestrictFromZone"));
         restartZones.remove(leaveZone);
         String leaveRestriction = sa.getParamOrDefault("RestrictFromValid", "Card");
 
@@ -51,8 +51,7 @@ public class RestartGameEffect extends SpellAbilityEffect {
         game.getCleanup().clearCommands();
 
         game.getStack().reset();
-        game.clearCounterAddedThisTurn();
-        game.clearCounterRemovedThisTurn();
+        game.clearCountersThisTurn();
         game.setMonarch(null);
         game.setHasInitiative(null);
         game.setDayTime(null);
@@ -71,13 +70,12 @@ public class RestartGameEffect extends SpellAbilityEffect {
             p.resetRingTemptedYou();
             p.clearRingBearer();
             p.clearTheRing();
-            p.setBlessing(false);
+            p.setBlessing(false, null);
             p.clearController();
 
             CardCollection newLibrary = new CardCollection(p.getCardsIn(restartZones, false));
-            List<Card> filteredCards = null;
             if (leaveZone != null) {
-                filteredCards = CardLists.getValidCards(p.getCardsIn(leaveZone), leaveRestriction, p, sa.getHostCard(), sa);
+                List<Card> filteredCards = CardLists.getValidCards(p.getCardsIn(leaveZone), leaveRestriction, p, sa.getHostCard(), sa);
                 newLibrary.addAll(filteredCards);
             }
 

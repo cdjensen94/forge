@@ -17,16 +17,14 @@
  */
 package forge.util.storage;
 
+import forge.util.FileUtil;
+import org.apache.commons.lang3.StringUtils;
+
 import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-
-import org.apache.commons.lang3.StringUtils;
-
-import com.google.common.base.Function;
-
-import forge.util.FileUtil;
+import java.util.function.Function;
 
 /**
  * This class treats every line of a given file as a source for a named object.
@@ -101,7 +99,7 @@ public abstract class StorageReaderFileSections<T> extends StorageReaderBase<T> 
         return result;
     }
 
-    private final T readItem(String header, Iterable<String> accumulator, int idx) {
+    private T readItem(String header, Iterable<String> accumulator, int idx) {
         final T item = read(header, accumulator, idx);
         if (null != item) return item;
 

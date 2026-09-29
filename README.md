@@ -1,50 +1,104 @@
-# Forge
+# ⚔️  Forge: The Magic: The Gathering Rules Engine
 
-Join the [Discord](https://discord.gg/HcPJNyD66a)
+Join the **Forge community** on [Discord](https://discord.gg/HcPJNyD66a)!
 
 [![Test build](https://github.com/Card-Forge/forge/actions/workflows/test-build.yaml/badge.svg)](https://github.com/Card-Forge/forge/actions/workflows/test-build.yaml)
 
-## Introduction
+---
 
-Forge is a "Rules Engine" for the game Magic: the Gathering.
-Forge is not related in any way with Wizards of the Coast.
-Forge is open source software released under the GNU Public License.
-Forge is developed by a community of programmers who love trading card games.
+## ✨ Introduction
+**Forge** is a dynamic and open-source **Rules Engine** tailored for **Magic: The Gathering** enthusiasts. Developed by a community of passionate programmers, Forge allows players to explore the rich universe of MTG through a flexible, engaging platform. 
 
-Forge is a cross-platform application and can be run on Windows, Mac, Linux and Android. It is written in Java. The engine is written in Java. The engine is designed to be extensible, so any interested programmer can join and help add new features and cards to the game. Any tech savvy user could read out card scripting system to create cards to be used inside Forge.
-The engine allows you to play in a handful of different single player environments or online against other players.
+**Note:** Forge operates independently and is not affiliated with Wizards of the Coast.
 
+---
 
-## Installation
+## 🌟 Key Features
+- **🌐 Cross-Platform Support:** Play on **Windows, Mac, Linux,** and **Android**.
+- **🔧 Extensible Architecture:** Built in **Java**, Forge encourages developers to contribute by adding features and cards.
+- **🎮 Versatile Gameplay:** Dive into single-player modes or challenge opponents online!
 
-For a more in depth User Guide, please visit the [User Guide](https://github.com/Card-Forge/forge/wiki/User-Guide)
+---
 
-For Desktop users, download the [Latest Releases](https://github.com/Card-Forge/forge/releases/latest) which are typically based around Set releases.
-Or download the [Snapshot Build](https://downloads.cardforge.org/dailysnapshots/) the file that starts with "forge-gui-desktop". 
-This file is tarball, and may need to be extracted twice depending on which program is being used to extract it. 
-We recommend extracting to a new folder rather than on top of an existing installation.
-**For users who have played Forge before all of your user data is stored separately so you don't have to worry about losing it on upgrade.**
+## 🛠️ Installation Steps
 
-Java 8 or later is required to run Forge. Please make sure is the right version is installed in your enviroment. Check the user guide for more info.
+### 📥 Desktop
+1. **Latest Releases:** Download the latest version [here](https://github.com/Card-Forge/forge/releases/latest).
+2. **Snapshot Build:** For the latest development version, grab the `forge-gui-desktop` tarball from our [Snapshot Build](https://github.com/Card-Forge/forge/releases/tag/daily-snapshots).
+   - **Tip:** Extract to a new folder to prevent version conflicts.
+3. **User Data Management:** Previous players’ data is preserved during upgrades.
+4. **Java Requirement:** Ensure you have **Java 17 or later** installed.
 
-For Android users, download the APK file from [Snapshot Build](https://downloads.cardforge.org/dailysnapshots/) to your device. 
-On first run, Forge will download all needed data.
+### 📱 Android
+- _(Note: **Android 11** is the minimum requirement with at least **6GB RAM** to run smoothly. You need to enable **"Install unknown apps"** for Forge to initialize and update itself)_
+- Download the **APK** from the [Snapshot Build](https://github.com/Card-Forge/forge/releases/tag/daily-snapshots). On the first launch, Forge will automatically download all necessary assets.
 
-## Modes of Play
+### 📱 iOS (early stage)
+- Build the **IPA** according to Wiki
+- No jailbreak needed, only developer mode and iOS 16-26
+- Connect your device to a PC to self-sign and upload the app file, multiple tools exist e.g. [Sideloadly](https://sideloadly.io)
 
-Forge has a variety of ways to play the game. The most popular way is our Adventure mode, which is a single player campaign that allows you to play against a variety of AI opponents. 
-You walk around an overworld map, and can challenge opponents to games of Magic. As you play, you'll collect more cards and items to improve your abilities.
+---
 
-Check the [Gameplay Guide](https://github.com/Card-Forge/forge/wiki/Gameplay-Guide) for more info.
+## 🎮 Modes of Play
+Forge offers various exciting gameplay options:
 
-![Adventure Mode](https://downloads.cardforge.org/images/site/adventure-mode.png "Adventure Mode")
+### 🌍 Adventure Mode
+Embark on a thrilling single-player journey where you can:
+- Explore an overworld map.
+- Challenge diverse AI opponents.
+- Collect cards and items to boost your abilities.
 
+<img width="1282" height="752" alt="Shandalar World" src="https://github.com/user-attachments/assets/9af31471-d688-442f-9418-9807d8635b72" />
 
-Forge has several Quest modes, which is similar but without the overworld map. 
+### 🔍 Quest Mode
+Engage in focused gameplay without the overworld exploration—perfect for quick sessions!
 
-You can also play against the AI in a variety of formats, such as Sealed, Draft, Commander and Cube.
+<img width="1282" height="752" alt="Quest Duels" src="https://github.com/user-attachments/assets/b9613b1c-e8c3-4320-8044-6922c519aad4" />
 
-## Questions
+### 🤖 AI Formats
+Test your skills against AI in multiple formats:
+- **Sealed**
+- **Draft**
+- **Commander**
+- **Cube**
 
-If you have any questions, please join the Discord channel. Read the #rules and the frequently-asked-questions. 
-If your question is not answered there, feel free to ask in the #help channel.
+For comprehensive gameplay instructions, visit our [User Guide](https://github.com/Card-Forge/forge/wiki/User-Guide).
+
+<img width="1282" height="752" alt="Sealed" src="https://github.com/user-attachments/assets/ae603dbd-4421-4753-a333-87cb0a28d772" />
+
+---
+
+## 💬 Support & Community
+Need help? Join our vibrant Discord community! 
+- 📜 Read the **#rules** and explore the **FAQ**.
+- ❓ Ask your questions in the **#help** channel for assistance.
+
+---
+
+## 🤝 Contributing to Forge
+We love community contributions! Interested in helping? Check out our [Contributing Guidelines](CONTRIBUTING.md) for details on how to get started.
+
+---
+
+## ℹ️ About Forge
+Forge aims to deliver an immersive and customizable Magic: The Gathering experience for fans around the world. 
+
+### 📊 Repository Statistics
+
+| Metric         | Count                                                       |
+|----------------|-------------------------------------------------------------|
+| **⭐ Stars:**   | [![GitHub stars](https://img.shields.io/github/stars/Card-Forge/forge?style=flat-square)](https://github.com/Card-Forge/forge/stargazers) |
+| **🍴 Forks:**   | [![GitHub forks](https://img.shields.io/github/forks/Card-Forge/forge?style=flat-square)](https://github.com/Card-Forge/forge/network) |
+| **👥 Contributors:** | [![GitHub contributors](https://img.shields.io/github/contributors/Card-Forge/forge?style=flat-square)](https://github.com/Card-Forge/forge/graphs/contributors) |
+
+---
+
+**📄 License:** [GPL-3.0](LICENSE)
+<div align="center" style="display: flex; align-items: center; justify-content: center;">
+    <div style="margin-left: auto;">
+        <a href="#top">
+            <img src="https://img.shields.io/badge/Back%20to%20Top-000000?style=for-the-badge&logo=github&logoColor=white" alt="Back to Top">
+        </a>
+    </div>
+</div>

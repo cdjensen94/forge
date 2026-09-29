@@ -4,9 +4,7 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-
-import com.google.common.base.Predicate;
-import com.google.common.base.Predicates;
+import java.util.function.Predicate;
 
 import forge.card.CardRulesPredicates;
 import forge.card.ColorSet;
@@ -14,6 +12,7 @@ import forge.deck.generation.DeckGenPool;
 import forge.game.card.Card;
 import forge.gui.GuiBase;
 import forge.item.PaperCard;
+import forge.item.PaperCardPredicates;
 import forge.localinstance.skin.ISkinImage;
 import forge.model.FModel;
 import forge.util.collect.FCollection;
@@ -50,7 +49,7 @@ public class ConquestRegion {
     }
 
     public ISkinImage getArt() {
-        clearArt(); //force clear this so it will be redrawn since loadingcache invalidates the cache every screen change
+        clearArt(); // Force clear this so it will be redrawn since loadingcache invalidates the cache every screen change
         if (art == null) {
             PaperCard pc = cardPool.getCard(artCardName);
 
@@ -85,7 +84,7 @@ public class ConquestRegion {
             }
         }
         if (commanders.isEmpty()) {
-            return plane.getCommanders(); //return all commanders for plane if none found in this region
+            return plane.getCommanders(); // Return all commanders for plane if none found in this region
         }
         return commanders;
     }
@@ -106,8 +105,8 @@ public class ConquestRegion {
         protected ConquestRegion read(String line) {
             String name = null;
             String artCardName = null;
-            ColorSet colorSet = ColorSet.ALL_COLORS;
-            Predicate<PaperCard> pred = Predicates.alwaysTrue();
+            ColorSet colorSet = ColorSet.WUBRG;
+            Predicate<PaperCard> pred = x -> true;
 
             String key, value;
             String[] pieces = line.split("\\|");
@@ -131,23 +130,20 @@ public class ConquestRegion {
                     break;
                 case "colors":
                     colorSet = ColorSet.fromNames(value.toCharArray());
-                    pred = Predicates.compose(CardRulesPredicates.hasColorIdentity(colorSet.getColor()), PaperCard.FN_GET_RULES);
+                    pred = PaperCardPredicates.fromRules(CardRulesPredicates.hasColorIdentity(colorSet.getColor()));
                     break;
                 case "sets":
                     final String[] sets = value.split(",");
                     for (int i = 0; i < sets.length; i++) {
                         sets[i] = sets[i].trim();
                     }
-                    pred = new Predicate<PaperCard>() {
-                        @Override
-                        public boolean apply(PaperCard pc) {
-                            for (String set : sets) {
-                                if (pc.getEdition().equals(set)) {
-                                    return true;
-                                }
+                    pred = pc -> {
+                        for (String set : sets) {
+                            if (pc.getEdition().equals(set)) {
+                                return true;
                             }
-                            return false;
                         }
+                        return false;
                     };
                     break;
                 default:
@@ -162,7 +158,7 @@ public class ConquestRegion {
     static void addCard(PaperCard pc, Iterable<ConquestRegion> regions) {
         boolean foundRegion = false;
         for (ConquestRegion region : regions) {
-            if (region.pred.apply(pc)) {
+            if (region.pred.test(pc)) {
                 region.cardPool.add(pc);
                 foundRegion = true;
             }
@@ -170,7 +166,7 @@ public class ConquestRegion {
 
         if (foundRegion) { return; }
 
-        //if card doesn't match any region's predicate, make card available to all regions
+        // If a card doesn't match any region's predicate, make it available to all regions
         for (ConquestRegion region : regions) {
             region.cardPool.add(pc);
         }

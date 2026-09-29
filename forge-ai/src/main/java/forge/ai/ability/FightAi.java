@@ -18,19 +18,15 @@ import forge.util.MyRandom;
 import java.util.List;
 
 public class FightAi extends SpellAbilityAi {
-    @Override
-    protected boolean checkAiLogic(final Player ai, final SpellAbility sa, final String aiLogic) {
-        return super.checkAiLogic(ai, sa, aiLogic);
-    }
 
     @Override
-    protected boolean checkApiLogic(final Player ai, final SpellAbility sa) {
+    protected AiAbilityDecision checkApiLogic(final Player ai, final SpellAbility sa) {
         sa.resetTargets();
         final Card source = sa.getHostCard();
 
         // everything is defined or targeted above, can't do anything there unless a specific logic is set
         if (sa.hasParam("Defined") && !sa.usesTargeting()) {
-            return true;
+            return new AiAbilityDecision(100, AiPlayDecision.WillPlay);
         }
 
         // Get creature lists
@@ -38,12 +34,14 @@ public class FightAi extends SpellAbilityAi {
         aiCreatures = CardLists.getTargetableCards(aiCreatures, sa);
         aiCreatures = ComputerUtil.getSafeTargets(ai, sa, aiCreatures);
         List<Card> humCreatures = ai.getOpponents().getCreaturesInPlay();
-        humCreatures = CardLists.getTargetableCards(humCreatures, sa);
+        humCreatures = filterDoomed(ai, CardLists.getTargetableCards(humCreatures, sa));
         // Filter MustTarget requirements
         StaticAbilityMustTarget.filterMustTargetCards(ai, humCreatures, sa);
 
-        if (humCreatures.isEmpty())
-            return false; //prevent IndexOutOfBoundsException on MOJHOSTO variant
+        //prevent IndexOutOfBoundsException on MOJHOSTO variant
+        if (humCreatures.isEmpty()) {
+            return new AiAbilityDecision(0, AiPlayDecision.MissingNeededCards);
+        }
 
         // assumes the triggered card belongs to the ai
         if (sa.hasParam("Defined")) {
@@ -54,7 +52,7 @@ public class FightAi extends SpellAbilityAi {
                 }
             }
             if (fighter1List.isEmpty()) {
-                return false;
+                return new AiAbilityDecision(0, AiPlayDecision.MissingNeededCards);
             }
             Card fighter1 = fighter1List.get(0);
             for (Card humanCreature : humCreatures) {
@@ -62,10 +60,11 @@ public class FightAi extends SpellAbilityAi {
                         && !canKill(humanCreature, fighter1, 0)) {
                     // todo: check min/max targets; see if we picked the best matchup
                     sa.getTargets().add(humanCreature);
-                    return true;
+                    return new AiAbilityDecision(100, AiPlayDecision.WillPlay);
                 }
             }
-            return false; // bail at this point, otherwise the AI will overtarget and waste the activation
+            // bail at this point, otherwise the AI will overtarget and waste the activation
+            return new AiAbilityDecision(0, AiPlayDecision.TargetingFailed);
         }
 
         if (sa.hasParam("TargetsFromDifferentZone")) {
@@ -77,12 +76,12 @@ public class FightAi extends SpellAbilityAi {
                             // todo: check min/max targets; see if we picked the best matchup
                             sa.getTargets().add(humanCreature);
                             sa.getTargets().add(aiCreature);
-                            return true;
+                            return new AiAbilityDecision(100, AiPlayDecision.WillPlay);
                         }
                     }
                 }
             }
-            return false;
+            return new AiAbilityDecision(0, AiPlayDecision.TargetingFailed);
         }
         for (Card creature1 : humCreatures) {
             for (Card creature2 : humCreatures) {
@@ -97,63 +96,76 @@ public class FightAi extends SpellAbilityAi {
                     // todo: check min/max targets; see if we picked the best matchup
                     sa.getTargets().add(creature1);
                     sa.getTargets().add(creature2);
-                    return true;
+                    return new AiAbilityDecision(100, AiPlayDecision.WillPlay);
                 }
             }
         }
-        return false;
+        return new AiAbilityDecision(0, AiPlayDecision.TargetingFailed);
     }
 
     @Override
-    public boolean chkAIDrawback(final SpellAbility sa, final Player aiPlayer) {
+    public AiAbilityDecision chkDrawback(final Player aiPlayer, final SpellAbility sa) {
         if ("Always".equals(sa.getParam("AILogic"))) {
-            return true; // e.g. Hunt the Weak, the AI logic was already checked through canFightAi
+            return new AiAbilityDecision(100, AiPlayDecision.WillPlay); // e.g. Hunt the Weak, the AI logic was already checked through canFightAi
         }
 
         return checkApiLogic(aiPlayer, sa);
     }
 
     @Override
-    protected boolean doTriggerAINoCost(Player ai, SpellAbility sa, boolean mandatory) {
+    protected AiAbilityDecision doTriggerNoCost(Player ai, SpellAbility sa, boolean mandatory) {
         final String aiLogic = sa.getParamOrDefault("AILogic", "");
         if (aiLogic.equals("Grothama")) {
-            return mandatory ? true : SpecialCardAi.GrothamaAllDevouring.consider(ai, sa);
+            if (mandatory) {
+                return new AiAbilityDecision(100, AiPlayDecision.WillPlay);
+            }
+
+            if (SpecialCardAi.GrothamaAllDevouring.consider(ai, sa)) {
+                return new AiAbilityDecision(100, AiPlayDecision.WillPlay);
+            }
+            return new AiAbilityDecision(0, AiPlayDecision.CantPlayAi);
         }
 
-        if (checkApiLogic(ai, sa)) {
-            return true;
+        AiAbilityDecision decision = checkApiLogic(ai, sa);
+        if (decision.willingToPlay()) {
+            return decision;
         }
         if (!mandatory) {
-            return false;
+            return decision;
         }
+        // if mandatory, we have to play it, so we will try to make a good trade or no trade
 
         //try to make a good trade or no trade
         final Card source = sa.getHostCard();
         List<Card> humCreatures = ai.getOpponents().getCreaturesInPlay();
         humCreatures = CardLists.getTargetableCards(humCreatures, sa);
         if (humCreatures.isEmpty()) {
-            return false;
+            return new AiAbilityDecision(0, AiPlayDecision.CantPlayAi);
         }
         //assumes the triggered card belongs to the ai
         if (sa.hasParam("Defined")) {
-            Card aiCreature = AbilityUtils.getDefinedCards(source, sa.getParam("Defined"), sa).get(0);
+            CardCollection definedCards = AbilityUtils.getDefinedCards(source, sa.getParam("Defined"), sa);
+            if (definedCards.isEmpty()) {
+                return new AiAbilityDecision(0, AiPlayDecision.CantPlayAi);
+            }
+            Card aiCreature = definedCards.get(0);
             for (Card humanCreature : humCreatures) {
                 if (canKill(aiCreature, humanCreature, 0)
                         && ComputerUtilCard.evaluateCreature(humanCreature) > ComputerUtilCard.evaluateCreature(aiCreature)) {
                     sa.getTargets().add(humanCreature);
-                    return true;
+                    return new AiAbilityDecision(100, AiPlayDecision.MandatoryPlay);
                 }
             }
             for (Card humanCreature : humCreatures) {
                 if (!canKill(humanCreature, aiCreature, 0)) {
                     sa.getTargets().add(humanCreature);
-                    return true;
+                    return new AiAbilityDecision(50, AiPlayDecision.MandatoryPlay);
                 }
             }
             sa.getTargets().add(humCreatures.get(0));
-            return true;
+            return new AiAbilityDecision(50, AiPlayDecision.MandatoryPlay);
         }
-        return true;
+        return new AiAbilityDecision(50, AiPlayDecision.MandatoryPlay);
     }
     
     /**
@@ -164,7 +176,7 @@ public class FightAi extends SpellAbilityAi {
      * @param power	bonus to power
      * @return true if fight effect should be played, false otherwise
      */
-    public static boolean canFightAi(final Player ai, final SpellAbility sa, int power, int toughness) {
+    public static AiAbilityDecision canFight(final Player ai, final SpellAbility sa, int power, int toughness) {
     	final Card source = sa.getHostCard();
         final String sourceName = ComputerUtilAbility.getAbilitySourceName(sa);
         AbilitySub tgtFight = sa.getSubAbility();
@@ -193,11 +205,12 @@ public class FightAi extends SpellAbilityAi {
             aiCreatures = ComputerUtil.getSafeTargets(ai, sa, aiCreatures);
             humCreatures = CardLists.getTargetableCards(humCreatures, tgtFight);
         }
+        humCreatures = filterDoomed(ai, humCreatures);
+        if (humCreatures.isEmpty() || aiCreatures.isEmpty()) {
+            return new AiAbilityDecision(0, AiPlayDecision.MissingNeededCards);
+        }
         ComputerUtilCard.sortByEvaluateCreature(aiCreatures);
         ComputerUtilCard.sortByEvaluateCreature(humCreatures);
-        if (humCreatures.isEmpty() || aiCreatures.isEmpty()) {
-            return false;
-        }
         // Evaluate creature pairs
         for (Card humanCreature : humCreatures) {
             for (Card aiCreature : aiCreatures) {
@@ -212,6 +225,7 @@ public class FightAi extends SpellAbilityAi {
                         // TODO: Generalize this so that other TargetMax values can be properly accounted for
                         CardCollection aiCreaturesByPower = new CardCollection(aiCreatures);
                         CardLists.sortByPowerDesc(aiCreaturesByPower);
+                        // try to prefer any creatures with deals damage triggers?
                         Card maxPower = aiCreaturesByPower.getFirst();
                         if (maxPower != aiCreature) {
                             power += maxPower.getNetPower(); // potential bonus from adding a second target
@@ -226,35 +240,36 @@ public class FightAi extends SpellAbilityAi {
                                 tgtFight.resetTargets();
                                 tgtFight.getTargets().add(humanCreature);
                             }
-                            return true;
+                            return new AiAbilityDecision(100, AiPlayDecision.WillPlay);
                         }
-                    } else {
-                        // Other cards that use AILogic PowerDmg and a single target
-                        if (canKill(aiCreature, humanCreature, power)) {
-                            sa.getTargets().add(aiCreature);
-                            if (!isChandrasIgnition) {
-                                tgtFight.resetTargets();
-                                tgtFight.getTargets().add(humanCreature);
-                            }
-                            return true;
-                        }
-                    }
-                } else {
-                    if (shouldFight(aiCreature, humanCreature, power, toughness)) {
-                    	if ("Time to Feed".equals(sourceName)) { // flip targets
-                    		final Card tmp = aiCreature;
-                    		aiCreature = humanCreature;
-                    		humanCreature = tmp;
-                    	}
+                    } else if (canKill(aiCreature, humanCreature, power)) {
                         sa.getTargets().add(aiCreature);
-                        tgtFight.resetTargets();
-                        tgtFight.getTargets().add(humanCreature);
-                        return true;
+                        if (!isChandrasIgnition) {
+                            tgtFight.resetTargets();
+                            tgtFight.getTargets().add(humanCreature);
+                        }
+                        return new AiAbilityDecision(100, AiPlayDecision.WillPlay);
                     }
+                } else if (shouldFight(aiCreature, humanCreature, power, toughness)) {
+                    if ("Time to Feed".equals(sourceName)) { // flip targets
+                        final Card tmp = aiCreature;
+                        aiCreature = humanCreature;
+                        humanCreature = tmp;
+                    }
+                    sa.getTargets().add(aiCreature);
+                    tgtFight.resetTargets();
+                    tgtFight.getTargets().add(humanCreature);
+                    return new AiAbilityDecision(100, AiPlayDecision.WillPlay);
                 }
             }
         }
-        return false;
+        return new AiAbilityDecision(0, AiPlayDecision.TargetingFailed);
+    }
+
+    private static CardCollection filterDoomed(final Player ai, final CardCollection list) {
+        CardCollection result = ComputerUtil.filterCreaturesThatWillDieThisTurn(ai, list);
+        result.removeAll(ComputerUtilAbility.getCardsTargetedWithApi(ai, result, null, ApiType.Fight));
+        return result;
     }
 
     /**

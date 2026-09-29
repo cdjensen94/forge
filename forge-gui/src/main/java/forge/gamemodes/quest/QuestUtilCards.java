@@ -17,25 +17,9 @@
  */
 package forge.gamemodes.quest;
 
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map.Entry;
-
-import org.apache.commons.lang3.tuple.Pair;
-
-import com.google.common.base.Function;
-import com.google.common.base.Predicate;
-import com.google.common.base.Predicates;
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
-
-import forge.card.CardEdition;
-import forge.card.CardRarity;
-import forge.card.ICardDatabase;
-import forge.card.MagicColor;
+import forge.card.*;
 import forge.deck.Deck;
 import forge.deck.DeckSection;
 import forge.game.GameFormat;
@@ -45,35 +29,28 @@ import forge.gamemodes.quest.data.QuestAssets;
 import forge.gamemodes.quest.data.QuestPreferences;
 import forge.gamemodes.quest.data.QuestPreferences.DifficultyPrefs;
 import forge.gamemodes.quest.data.QuestPreferences.QPref;
-import forge.item.BoosterBox;
-import forge.item.BoosterPack;
-import forge.item.FatPack;
-import forge.item.IPaperCard;
-import forge.item.InventoryItem;
-import forge.item.PaperCard;
-import forge.item.PreconDeck;
-import forge.item.SealedProduct;
-import forge.item.SealedProduct.Template;
-import forge.item.TournamentPack;
+import forge.item.*;
 import forge.item.generation.BoosterSlots;
 import forge.item.generation.UnOpenedProduct;
 import forge.localinstance.properties.ForgePreferences.FPref;
 import forge.model.FModel;
-import forge.util.Aggregates;
-import forge.util.ItemPool;
-import forge.util.MyRandom;
+import forge.util.*;
+import org.apache.commons.lang3.tuple.Pair;
+
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map.Entry;
+import java.util.function.Function;
+import java.util.function.Predicate;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 /**
  * This is a helper class to execute operations on QuestData. It has been
  * created to decrease complexity of questData class
  */
 public final class QuestUtilCards {
-
-	private static final Predicate<PaperCard> COMMON_PREDICATE = IPaperCard.Predicates.Presets.IS_COMMON;
-	private static final Predicate<PaperCard> UNCOMMON_PREDICATE = IPaperCard.Predicates.Presets.IS_UNCOMMON;
-	private static final Predicate<PaperCard> RARE_PREDICATE = IPaperCard.Predicates.Presets.IS_RARE_OR_MYTHIC;
-	private static final Predicate<PaperCard> ONLY_RARE_PREDICATE = IPaperCard.Predicates.Presets.IS_RARE;
-	private static final Predicate<PaperCard> MYTHIC_PREDICATE = IPaperCard.Predicates.Presets.IS_MYTHIC_RARE;
 
     private final QuestController  questController;
     private final QuestPreferences questPreferences;
@@ -94,7 +71,6 @@ public final class QuestUtilCards {
      * @return the item pool view
      */
     public static ItemPool<PaperCard> generateBasicLands(final int nBasic, final int nSnow, final GameFormatQuest usedFormat) {
-
         final ICardDatabase db = FModel.getMagicDb().getCommonCards();
         final ItemPool<PaperCard> pool = new ItemPool<>(PaperCard.class);
 
@@ -108,7 +84,7 @@ public final class QuestUtilCards {
             for (String edCode : availableEditions) {
                 CardEdition ed = FModel.getMagicDb().getEditions().get(edCode);
                 // Duel decks might have only 2 types of basic lands
-                if (CardEdition.Predicates.hasBasicLands.apply(ed)) {
+                if (CardEdition.Predicates.hasBasicLands.test(ed)) {
                     landCodes.add(edCode);
                 }
             }
@@ -126,10 +102,10 @@ public final class QuestUtilCards {
                 wastesCodes.add("OGW");
             }
         } else {
-            Iterable<CardEdition> allEditions = FModel.getMagicDb().getEditions();
-            for (CardEdition edition : Iterables.filter(allEditions, CardEdition.Predicates.hasBasicLands)) {
-                landCodes.add(edition.getCode());
-            }
+            FModel.getMagicDb().getEditions().stream()
+                    .filter(CardEdition.Predicates.hasBasicLands)
+                    .map(CardEdition::getCode)
+                    .forEach(landCodes::add);
             snowLandCodes.add("ICE");
             snowLandCodes.add("CSP");
             snowLandCodes.add("KHM");
@@ -158,7 +134,6 @@ public final class QuestUtilCards {
             }
         }
 
-
         if (!snowLandCodes.isEmpty()) {
             String snowLandCode = Aggregates.random(snowLandCodes);
             for (String landName : MagicColor.Constant.SNOW_LANDS) {
@@ -172,7 +147,6 @@ public final class QuestUtilCards {
         }
 
         return pool;
-
     }
 
     /**
@@ -222,7 +196,19 @@ public final class QuestUtilCards {
      * @return the composite predicate.
      */
     public Predicate<PaperCard> applyFormatFilter(Predicate<PaperCard> source) {
-       return questController.getFormat() == null ? source : Predicates.and(source, questController.getFormat().getFilterPrinted());
+        return questController.getFormat() == null ? source : source.and(questController.getFormat().getFilterPrinted());
+    }
+
+    /**
+     * @return a stream of cards that can be rewarded according to the quest format and preferences.
+     */
+    private Stream<PaperCard> getQuestCardPool() {
+        Stream<PaperCard> pool = FModel.getMagicDb().getCommonCards().streamAllCards();
+        if(!(questPreferences.getPrefInt(QPref.EXCLUDE_PROMOS_FROM_POOL) == 0))
+            pool = pool.filter(CardDb.EDITION_NON_PROMO);
+        if(questController.getFormat() != null)
+            pool = pool.filter(questController.getFormat().getFilterPrinted());
+        return pool;
     }
 
     /**
@@ -231,113 +217,29 @@ public final class QuestUtilCards {
      * @return the card printed
      */
     public PaperCard addRandomRare() {
-        final boolean usePromos = questPreferences.getPrefInt(QPref.EXCLUDE_PROMOS_FROM_POOL) == 0;
-        final Collection<PaperCard> pool = usePromos ? FModel.getMagicDb().getCommonCards().getAllCards()
-                : FModel.getMagicDb().getCommonCards().getAllNonPromoCards();
+        Stream<PaperCard> pool = getQuestCardPool();
+        final PaperCard card = pool
+                .filter(applyFormatFilter(PaperCardPredicates.IS_RARE_OR_MYTHIC))
+                .collect(StreamUtil.random()).get();
 
-        final Predicate<PaperCard> myFilter = applyFormatFilter(QuestUtilCards.RARE_PREDICATE);
-
-        final PaperCard card = Aggregates.random(Iterables.filter(pool, myFilter));
         addSingleCard(card, 1);
         return card;
     }
 
     /**
-     * Adds a random common.
+     * Adds n random cards that match the given predicate (and all other format restrictions)
+     * to the player card pool.
      *
-     * @param n the number of cards to add
-     * @return the list of cards added
+     * @param n         Number of cards to add from the reward pool.
+     * @param predicate Filter to select possible new cards from.
+     * @return the list of cards added to the card pool.
      */
-    public List<PaperCard> addRandomCommon(final int n) {
-        final boolean usePromos = questPreferences.getPrefInt(QPref.EXCLUDE_PROMOS_FROM_POOL) == 0;
-        final Collection<PaperCard> pool = usePromos ? FModel.getMagicDb().getCommonCards().getAllCards()
-                : FModel.getMagicDb().getCommonCards().getAllNonPromoCards();
+    public List<PaperCard> addRandomCards(final int n, Predicate<PaperCard> predicate) {
+        Stream<PaperCard> pool = getQuestCardPool();
+        final List<PaperCard> newCards = pool.filter(predicate).collect(StreamUtil.random(n));
 
-        final Predicate<PaperCard> myFilter = applyFormatFilter(QuestUtilCards.COMMON_PREDICATE);
-        final List<PaperCard> newCards = Aggregates.random(Iterables.filter(pool, myFilter), n);
         addAllCards(newCards);
         return newCards;
-    }
-
-    /**
-     * Adds a random uncommon.
-     *
-     * @param n the number of cards to add
-     * @return the list of cards added
-     */
-    public List<PaperCard> addRandomUncommon(final int n) {
-        final boolean usePromos = questPreferences.getPrefInt(QPref.EXCLUDE_PROMOS_FROM_POOL) == 0;
-        final Collection<PaperCard> pool = usePromos ? FModel.getMagicDb().getCommonCards().getAllCards()
-                : FModel.getMagicDb().getCommonCards().getAllNonPromoCards();
-
-        final Predicate<PaperCard> myFilter = applyFormatFilter(QuestUtilCards.UNCOMMON_PREDICATE);
-        final List<PaperCard> newCards = Aggregates.random(Iterables.filter(pool, myFilter), n);
-        addAllCards(newCards);
-        return newCards;
-    }
-
-    /**
-     * Adds the random rare.
-     *
-     * @param n
-     *            the n
-     * @return the list
-     */
-    public List<PaperCard> addRandomRare(final int n) {
-        final boolean usePromos = questPreferences.getPrefInt(QPref.EXCLUDE_PROMOS_FROM_POOL) == 0;
-        final Collection<PaperCard> pool = usePromos ? FModel.getMagicDb().getCommonCards().getAllCards()
-                : FModel.getMagicDb().getCommonCards().getAllNonPromoCards();
-
-        final Predicate<PaperCard> myFilter = applyFormatFilter(QuestUtilCards.RARE_PREDICATE);
-
-        final List<PaperCard> newCards = Aggregates.random(Iterables.filter(pool, myFilter), n);
-        addAllCards(newCards);
-        return newCards;
-    }
-
-    /**
-     * Adds the random rare.
-     *
-     * @param n
-     *            the n
-     * @return the list
-     */
-    public List<PaperCard> addRandomRareNotMythic(final int n) {
-        final boolean usePromos = questPreferences.getPrefInt(QPref.EXCLUDE_PROMOS_FROM_POOL) == 0;
-        final Collection<PaperCard> pool = usePromos ? FModel.getMagicDb().getCommonCards().getAllCards()
-                : FModel.getMagicDb().getCommonCards().getAllNonPromoCards();
-
-        final Predicate<PaperCard> myFilter = applyFormatFilter(QuestUtilCards.ONLY_RARE_PREDICATE);
-
-        final List<PaperCard> newCards = Aggregates.random(Iterables.filter(pool, myFilter), n);
-        addAllCards(newCards);
-        return newCards;
-    }
-
-    /**
-     * Adds the random rare.
-     *
-     * @param n
-     *            the n
-     * @return the list
-     */
-    public List<PaperCard> addRandomMythicRare(final int n) {
-        final boolean usePromos = questPreferences.getPrefInt(QPref.EXCLUDE_PROMOS_FROM_POOL) == 0;
-        final Collection<PaperCard> pool = usePromos ? FModel.getMagicDb().getCommonCards().getAllCards()
-                : FModel.getMagicDb().getCommonCards().getAllNonPromoCards();
-
-        final Predicate<PaperCard> myFilter = applyFormatFilter(QuestUtilCards.MYTHIC_PREDICATE);
-
-        final Iterable<PaperCard> cardPool = Iterables.filter(pool, myFilter);
-
-        if (!cardPool.iterator().hasNext()) {
-            return null;
-        }
-
-        final List<PaperCard> newCards = Aggregates.random(cardPool, n);
-        addAllCards(newCards);
-        return newCards;
-
     }
 
     /**
@@ -363,7 +265,6 @@ public final class QuestUtilCards {
         final int nR = (int)(questPreferences.getPrefInt(DifficultyPrefs.STARTING_RARES, idxDifficulty) * variantModifier);
 
         addAllCards(BoosterUtils.getQuestStarterDeck(formatStartingPool, nC, nU, nR, userPrefs));
-
     }
 
     /**
@@ -433,7 +334,6 @@ public final class QuestUtilCards {
      * @param cards The cards to lose.
      */
     public void loseCards(final List<PaperCard> cards) {
-
         for(PaperCard card : cards) {
 
 	        removeCard(card, 1);
@@ -441,9 +341,7 @@ public final class QuestUtilCards {
 	        if (questAssets.getItemLevel(QuestItemType.CASH_STAKES) > 0) {
 		        addCardToShop(card);
 	        }
-
         }
-
     }
 
     public void addCardToShop(final PaperCard card) {
@@ -456,21 +354,18 @@ public final class QuestUtilCards {
      * @param qty The quantity of the card to remove.
      */
     public void removeCard(final PaperCard card, int qty) {
-
         questAssets.getCardPool().remove(card, qty);
 
         final int leftInPool = questAssets.getCardPool().count(card);
 
         // If card is a nonfoil basic land of the "free" kind, do not remove from the deck
         // but pretend as if it was added through "Add Basic Land".
-        if ((!card.isFoil())
-                && (card.isVeryBasicLand())) {
+        if (!card.isFoil() && card.isVeryBasicLand()) {
             return;
         }
 
         // remove sold cards from all decks:
         for (final Deck deck : questController.getMyDecks()) {
-
             int cntInMain = deck.getMain().count(card);
             int cntInSb = deck.has(DeckSection.Sideboard) ? deck.get(DeckSection.Sideboard).count(card) : 0;
             int nToRemoveFromThisDeck = cntInMain + cntInSb - leftInPool;
@@ -489,9 +384,7 @@ public final class QuestUtilCards {
             }
 
             deck.getMain().remove(card, nToRemoveFromThisDeck);
-
         }
-
     }
 
     /**
@@ -509,7 +402,6 @@ public final class QuestUtilCards {
      * @return the sell mutliplier
      */
     public double getSellMultiplier() {
-
         double baseMultiplier = Double.parseDouble(questPreferences.getPref(QPref.SHOP_SELLING_PERCENTAGE_BASE))/100.0;
         double maxMultiplier = Double.parseDouble(questPreferences.getPref(QPref.SHOP_SELLING_PERCENTAGE_MAX))/100.0;
 
@@ -535,7 +427,6 @@ public final class QuestUtilCards {
         }
 
         return multi;
-
     }
 
     /**
@@ -558,7 +449,9 @@ public final class QuestUtilCards {
      * @return the predicate
      */
     public static Predicate<CardEdition> isLegalInQuestFormat(final GameFormatQuest qFormat) {
-        return GameFormatQuest.QPredicates.isLegalInFormatQuest(qFormat);
+        if(qFormat == null)
+            return x -> true;
+        return edition -> qFormat.isSetLegal(edition.getCode());
     }
 
 
@@ -570,7 +463,6 @@ public final class QuestUtilCards {
      * @return A list containing the booster packs
      */
     private List<InventoryItem> generateRandomSpecialBoosterPacks(final int quantity) {
-
         List<InventoryItem> output = new ArrayList<>();
 
         for (int i = 0; i < quantity; i++) {
@@ -579,7 +471,6 @@ public final class QuestUtilCards {
         }
 
         return output;
-
     }
 
     /**
@@ -588,28 +479,25 @@ public final class QuestUtilCards {
      * @param quantity the count
      */
     private void generateBoostersInShop(final int quantity) {
-
     	questAssets.getShopList().addAllFlat(BoosterUtils.generateRandomBoosterPacks(quantity, questController));
 
         if (questPreferences.getPrefInt(QPref.SPECIAL_BOOSTERS) == 1) {
         	questAssets.getShopList().addAllFlat(generateRandomSpecialBoosterPacks(quantity));
         }
-
     }
 
     /**
-     * Generate boosters in shop.
+     * Generate singles in shop.
      *
      * @param quantity the count
      */
     private void generateSinglesInShop(final int quantity) {
         // This is the spot we need to change
-        SealedProduct.Template boosterTemplate = getShopBoosterTemplate();
+        SealedTemplate boosterTemplate = getShopBoosterTemplate();
         if (questController.getFormat() == null) {
 		    for (int i = 0; i < quantity; i++) {
 			    questAssets.getShopList().addAllOfTypeFlat(new UnOpenedProduct(boosterTemplate).get());
 		    }
-		    return;
 	    } else {
             for (int i = 0; i < quantity; i++) {
                 // Unopened product based on format of the cards?
@@ -619,7 +507,6 @@ public final class QuestUtilCards {
     }
 
     private static int getRandomCardFromBooster(final List<PaperCard> cards, final Predicate<PaperCard> predicate, final List<PaperCard> toAddTo, final int amount) {
-
     	if (amount <= 0) {
     		return 0;
 	    }
@@ -628,7 +515,7 @@ public final class QuestUtilCards {
     	List<PaperCard> temp = new ArrayList<>();
 
 	    for (PaperCard card : cards) {
-		    if (predicate.apply(card)) {
+		    if (predicate.test(card)) {
 		    	temp.add(card);
 		    }
 	    }
@@ -639,55 +526,50 @@ public final class QuestUtilCards {
 	    }
 
 	    return amount;
-
     }
 
     /**
-     * Generate precons in shop.
+     * Generate tournament packs in shop.
      *
      * @param count
      *            the count
      */
     private void generateTournamentsInShop(final int count) {
-        Predicate<CardEdition> formatFilter = CardEdition.Predicates.HAS_TOURNAMENT_PACK;
-        if (questController.getFormat() != null) {
-            formatFilter = Predicates.and(formatFilter, isLegalInQuestFormat(questController.getFormat()));
-        }
-        Iterable<CardEdition> rightEditions = Iterables.filter(FModel.getMagicDb().getEditions(), formatFilter);
-        questAssets.getShopList().addAllOfTypeFlat(Aggregates.random(Iterables.transform(rightEditions, TournamentPack.FN_FROM_SET), count));
+        List<TournamentPack> packs = FModel.getMagicDb().getEditions().stream()
+                .filter(CardEdition.Predicates.HAS_TOURNAMENT_PACK)
+                .filter(isLegalInQuestFormat(questController.getFormat()))
+                .map(TournamentPack::fromSet)
+                .collect(StreamUtil.random(count));
+        questAssets.getShopList().addAllOfTypeFlat(packs);
     }
 
     /**
-     * Generate precons in shop.
+     * Generate fat packs in shop.
      *
      * @param count
      *            the count
      */
     private void generateFatPacksInShop(final int count) {
-        Predicate<CardEdition> formatFilter = CardEdition.Predicates.HAS_FAT_PACK;
-        if (questController.getFormat() != null) {
-            formatFilter = Predicates.and(formatFilter, isLegalInQuestFormat(questController.getFormat()));
-        }
-        Iterable<CardEdition> rightEditions = Iterables.filter(FModel.getMagicDb().getEditions(), formatFilter);
-        questAssets.getShopList().addAllOfTypeFlat(Aggregates.random(Iterables.transform(rightEditions, FatPack.FN_FROM_SET), count));
+        List<FatPack> packs = FModel.getMagicDb().getEditions().stream()
+                .filter(CardEdition.Predicates.HAS_FAT_PACK)
+                .filter(isLegalInQuestFormat(questController.getFormat()))
+                .map(FatPack::fromSet)
+                .collect(StreamUtil.random(count));
+        questAssets.getShopList().addAllOfTypeFlat(packs);
     }
 
     private void generateBoosterBoxesInShop(final int count) {
-
         if (count == 0) {
             return;
         }
 
         Predicate<CardEdition> formatFilter = CardEdition.Predicates.HAS_BOOSTER_BOX;
         if (questController.getFormat() != null) {
-            formatFilter = Predicates.and(formatFilter, isLegalInQuestFormat(questController.getFormat()));
+            formatFilter = formatFilter.and(isLegalInQuestFormat(questController.getFormat()));
         }
-        Iterable<CardEdition> rightEditions = Iterables.filter(FModel.getMagicDb().getEditions(), formatFilter);
 
-        List<CardEdition> editions = new ArrayList<>();
-        for (CardEdition e : rightEditions) {
-            editions.add(e);
-        }
+        List<CardEdition> editions = FModel.getMagicDb().getEditions().stream()
+                .filter(formatFilter).collect(Collectors.toList());
 
         Collections.shuffle(editions);
 
@@ -701,11 +583,10 @@ public final class QuestUtilCards {
 
         List<BoosterBox> output = new ArrayList<>();
         for (CardEdition e : editions) {
-            output.add(BoosterBox.FN_FROM_SET.apply(e));
+            output.add(BoosterBox.fromSet(e));
         }
 
         questAssets.getShopList().addAllOfTypeFlat(output);
-
     }
 
     /**
@@ -715,70 +596,67 @@ public final class QuestUtilCards {
      *            the count
      */
     private void generatePreconsInShop(final int count) {
-        final List<PreconDeck> meetRequirements = new ArrayList<>();
-        for (final PreconDeck deck : QuestController.getPrecons()) {
-            if (QuestController.getPreconDeals(deck).meetsRequiremnts(questController.getAchievements())
-                    && (null == questController.getFormat() || questController.getFormat().isSetLegal(deck.getEdition()))) {
-                meetRequirements.add(deck);
-            }
+        Predicate<PreconDeck> formatFilter = deck -> QuestController.getPreconDeals(deck).meetsRequiremnts(questController.getAchievements());
+        if (questController.getFormat() != null) {
+            formatFilter = formatFilter.and(deck -> questController.getFormat().isSetLegal(deck.getEdition()));
         }
-        questAssets.getShopList().addAllOfTypeFlat(Aggregates.random(meetRequirements, count));
+        final List<PreconDeck> decks = QuestController.getPrecons().stream()
+                .filter(formatFilter)
+                .collect(StreamUtil.random(count));
+        questAssets.getShopList().addAllOfTypeFlat(decks);
     }
 
     @SuppressWarnings("unchecked")
-    private SealedProduct.Template getShopBoosterTemplate() {
-        return new SealedProduct.Template(Lists.newArrayList(
+    private SealedTemplate getShopBoosterTemplate() {
+        return new SealedTemplate(Lists.newArrayList(
             Pair.of(BoosterSlots.COMMON, questPreferences.getPrefInt(QPref.SHOP_SINGLES_COMMON)),
             Pair.of(BoosterSlots.UNCOMMON, questPreferences.getPrefInt(QPref.SHOP_SINGLES_UNCOMMON)),
             Pair.of(BoosterSlots.RARE_MYTHIC, questPreferences.getPrefInt(QPref.SHOP_SINGLES_RARE))
         ));
     }
 
-    private SealedProduct.Template getBoosterTemplate() {
-        return new SealedProduct.Template(ImmutableList.of(
+    private SealedTemplate getBoosterTemplate() {
+        return new SealedTemplate(ImmutableList.of(
             Pair.of(BoosterSlots.COMMON, questPreferences.getPrefInt(QPref.BOOSTER_COMMONS)),
             Pair.of(BoosterSlots.UNCOMMON, questPreferences.getPrefInt(QPref.BOOSTER_UNCOMMONS)),
             Pair.of(BoosterSlots.RARE_MYTHIC, questPreferences.getPrefInt(QPref.BOOSTER_RARES))
         ));
     }
 
-    public static SealedProduct.Template getColoredBoosterTemplate(final String color) {
+    public static SealedTemplate getColoredBoosterTemplate(final String color) {
         if (FModel.getQuest().getFormat() == null) {
-            return new Template("?", ImmutableList.of(
+            return new SealedTemplate("?", ImmutableList.of(
                     Pair.of(BoosterSlots.COMMON + ":color(\"" + color + "\"):!" + BoosterSlots.LAND, 11),
                     Pair.of(BoosterSlots.UNCOMMON + ":color(\"" + color + "\"):!" + BoosterSlots.LAND, 3),
                     Pair.of(BoosterSlots.RARE_MYTHIC + ":color(\"" + color + "\"):!" + BoosterSlots.LAND, 1),
                     Pair.of(BoosterSlots.LAND + ":color(\"" + color + "\")", 1))
             );
-        } else {
-            StringBuilder restrictions    = new StringBuilder();
-            List<String>  allowedSetCodes = FModel.getQuest().getFormat().getAllowedSetCodes();
-            if (allowedSetCodes.isEmpty()) {
-                for (String restrictedCard : FModel.getQuest().getFormat().getRestrictedCards()) {
-                    restrictions.append(":!name(\"").append(restrictedCard).append("\")");
-                }
-            } else {
-                restrictions.append(":fromSets(\"");
-                for (String set : allowedSetCodes) {
-                    restrictions.append(set).append(",");
-                }
-                restrictions.append(")");
-            }
-            return new Template("?", ImmutableList.of(
-                    Pair.of(BoosterSlots.COMMON + ":color(\"" + color + "\"):!" + BoosterSlots.LAND + restrictions, 11),
-                    Pair.of(BoosterSlots.UNCOMMON + ":color(\"" + color + "\"):!" + BoosterSlots.LAND + restrictions, 3),
-                    Pair.of(BoosterSlots.RARE_MYTHIC + ":color(\"" + color + "\"):!" + BoosterSlots.LAND + restrictions, 1),
-                    Pair.of(BoosterSlots.LAND + ":color(\"" + color + "\")" + restrictions, 1))
-            );
         }
+        StringBuilder restrictions    = new StringBuilder();
+        List<String>  allowedSetCodes = FModel.getQuest().getFormat().getAllowedSetCodes();
+        if (allowedSetCodes.isEmpty()) {
+            for (String restrictedCard : FModel.getQuest().getFormat().getRestrictedCards()) {
+                restrictions.append(":!name(\"").append(restrictedCard).append("\")");
+            }
+        } else {
+            restrictions.append(":fromSets(\"");
+            for (String set : allowedSetCodes) {
+                restrictions.append(set).append(",");
+            }
+            restrictions.append(")");
+        }
+        return new SealedTemplate("?", ImmutableList.of(
+                Pair.of(BoosterSlots.COMMON + ":color(\"" + color + "\"):!" + BoosterSlots.LAND + restrictions, 11),
+                Pair.of(BoosterSlots.UNCOMMON + ":color(\"" + color + "\"):!" + BoosterSlots.LAND + restrictions, 3),
+                Pair.of(BoosterSlots.RARE_MYTHIC + ":color(\"" + color + "\"):!" + BoosterSlots.LAND + restrictions, 1),
+                Pair.of(BoosterSlots.LAND + ":color(\"" + color + "\")" + restrictions, 1))
+        );
     }
 
     /**
      * Generate cards in shop.
      */
     private void generateCardsInShop() {
-
-        // Preferences
         final int startPacks = questPreferences.getPrefInt(QPref.SHOP_STARTING_PACKS);
         final int winsForPack = questPreferences.getPrefInt(QPref.SHOP_WINS_FOR_ADDITIONAL_PACK);
         final int maxPacks = questPreferences.getPrefInt(QPref.SHOP_MAX_PACKS);
@@ -801,7 +679,6 @@ public final class QuestUtilCards {
 	        // Spell shop no longer sells basic lands (we use "Add Basic Lands" instead)
 	        questAssets.getShopList().addAllOfType(generateBasicLands(0, 5, questController.getFormat()));
         }
-
     }
 
     /**
@@ -859,20 +736,10 @@ public final class QuestUtilCards {
     // deck editors
     // Maybe we should consider doing so later
     /** The fn new compare. */
-    private final Function<Entry<InventoryItem, Integer>, Comparable<?>> fnNewCompare = new Function<Entry<InventoryItem, Integer>, Comparable<?>>() {
-        @Override
-        public Comparable<?> apply(final Entry<InventoryItem, Integer> from) {
-            return isNew(from.getKey()) ? Integer.valueOf(1) : Integer.valueOf(0);
-        }
-    };
+    private final Function<Entry<InventoryItem, Integer>, Comparable<?>> fnNewCompare = from -> isNew(from.getKey()) ? Integer.valueOf(1) : Integer.valueOf(0);
 
     /** The fn new get. */
-    private final Function<Entry<? extends InventoryItem, Integer>, Object> fnNewGet = new Function<Entry<? extends InventoryItem, Integer>, Object>() {
-        @Override
-        public Object apply(final Entry<? extends InventoryItem, Integer> from) {
-            return isNew(from.getKey()) ? "NEW" : "";
-        }
-    };
+    private final Function<Entry<? extends InventoryItem, Integer>, Object> fnNewGet = from -> isNew(from.getKey()) ? "NEW" : "";
 
     public Function<Entry<InventoryItem, Integer>, Comparable<?>> getFnOwnedCompare() {
         return fnOwnedCompare;
@@ -883,7 +750,6 @@ public final class QuestUtilCards {
     }
 
     public int getCompletionPercent(String edition) {
-
         for (String color : SealedProduct.specialSets) {
             if (color.equals(edition)) {
                 return 0;
@@ -895,8 +761,13 @@ public final class QuestUtilCards {
         }
 
         // get all cards in the specified edition
-        Predicate<PaperCard> filter = IPaperCard.Predicates.printedInSet(edition);
-        Iterable<PaperCard> editionCards = Iterables.filter(FModel.getMagicDb().getCommonCards().getAllCards(), filter);
+        Predicate<PaperCard> filter = PaperCardPredicates.printedInSet(edition);
+        Iterable<PaperCard> editionCards = IterableUtil.filter(FModel.getMagicDb().getCommonCards().getAllCards(), filter);
+
+        // For editions such as MB1 which only contains PLST cards.
+        if (!editionCards.iterator().hasNext()) {
+            return 0;
+        }
 
         ItemPool<PaperCard> ownedCards = questAssets.getCardPool();
         // 100% means at least one of every basic land and at least 4 of every other card in the set
@@ -910,7 +781,6 @@ public final class QuestUtilCards {
         }
 
         return (numOwnedCards * 100) / completeCards;
-
     }
 
     // These functions provide a way to sort and compare items in the spell shop according to how many are already owned
@@ -931,18 +801,18 @@ public final class QuestUtilCards {
         }
     };
 
-    private final Function<Entry<? extends InventoryItem, Integer>, Object> fnOwnedGet = new Function<Entry<? extends InventoryItem, Integer>, Object>() {
+    private final Function<Entry<? extends InventoryItem, Integer>, Object> fnOwnedGet = new Function<>() {
         @Override
         public Object apply(final Entry<? extends InventoryItem, Integer> from) {
             InventoryItem i = from.getKey();
-            if (i instanceof PaperCard) {
-                return questAssets.getCardPool().count((PaperCard) i);
-            } else if (i instanceof PreconDeck) {
-                PreconDeck pDeck = (PreconDeck) i;
-                return FModel.getQuest().getMyDecks().contains(pDeck.getName()) ? "YES" : "NO";
-            } else if (i instanceof SealedProduct) {
-                SealedProduct oPack = (SealedProduct) i;
-                return String.format("%d%%", getCompletionPercent(oPack.getEdition()));
+            if (i instanceof PaperCard pc) {
+                return questAssets.getCardPool().count(pc);
+            }
+            if (i instanceof PreconDeck pd) {
+                return FModel.getQuest().getMyDecks().contains(pd.getName()) ? "YES" : "NO";
+            }
+            if (i instanceof SealedProduct sp) {
+                return String.format("%d%%", getCompletionPercent(sp.getEdition()));
             }
             return null;
         }

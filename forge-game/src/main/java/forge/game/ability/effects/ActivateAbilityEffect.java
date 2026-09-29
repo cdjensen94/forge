@@ -5,7 +5,6 @@ import java.util.List;
 import org.apache.commons.lang3.StringUtils;
 
 import com.google.common.collect.ImmutableMap;
-import com.google.common.collect.Lists;
 
 import forge.game.ability.SpellAbilityEffect;
 import forge.game.card.Card;
@@ -15,7 +14,6 @@ import forge.game.spellability.SpellAbility;
 import forge.game.zone.ZoneType;
 import forge.util.Lang;
 import forge.util.Localizer;
-import forge.util.collect.FCollection;
 
 public class ActivateAbilityEffect extends SpellAbilityEffect {
     @Override
@@ -45,9 +43,9 @@ public class ActivateAbilityEffect extends SpellAbilityEffect {
 
             List<Card> list = CardLists.getType(p.getCardsIn(ZoneType.Battlefield), sa.getParamOrDefault("Type", "Card"));
             for (Card c : list) {
-                List<SpellAbility> possibleAb = Lists.newArrayList(c.getAllPossibleAbilities(p, true));
+                List<SpellAbility> possibleAb = c.getAllPossibleAbilities(p, true);
                 if (isManaAb) {
-                    possibleAb.retainAll((FCollection<SpellAbility>)c.getManaAbilities());
+                    possibleAb.retainAll(c.getManaAbilities());
                 }
                 if (possibleAb.isEmpty()) {
                     continue;

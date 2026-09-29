@@ -2,6 +2,7 @@ package forge.adventure.stage;
 
 import com.badlogic.gdx.Input;
 import com.badlogic.gdx.controllers.Controller;
+import com.badlogic.gdx.files.FileHandle;
 import com.badlogic.gdx.graphics.OrthographicCamera;
 import com.badlogic.gdx.graphics.g2d.TextureRegion;
 import com.badlogic.gdx.math.Rectangle;
@@ -24,6 +25,8 @@ import com.github.tommyettinger.textra.TextraLabel;
 import com.github.tommyettinger.textra.TypingAdapter;
 import com.github.tommyettinger.textra.TypingLabel;
 import forge.Forge;
+import forge.Graphics;
+import forge.adventure.character.CharacterSprite;
 import forge.adventure.character.MapActor;
 import forge.adventure.character.PlayerSprite;
 import forge.adventure.data.DialogData;
@@ -33,7 +36,9 @@ import forge.adventure.pointofintrest.PointOfInterest;
 import forge.adventure.scene.Scene;
 import forge.adventure.scene.StartScene;
 import forge.adventure.scene.TileMapScene;
+import forge.adventure.util.Config;
 import forge.adventure.util.Controls;
+import forge.adventure.util.Current;
 import forge.adventure.util.KeyBinding;
 import forge.adventure.util.MapDialog;
 import forge.adventure.util.Paths;
@@ -41,13 +46,17 @@ import forge.adventure.world.WorldSave;
 import forge.assets.FBufferedImage;
 import forge.assets.FImageComplex;
 import forge.assets.FSkinImage;
+import forge.card.CardImageRenderer;
 import forge.card.CardRenderer;
 import forge.card.ColorSet;
 import forge.deck.Deck;
 import forge.deck.DeckProxy;
 import forge.game.GameType;
+import forge.gui.FThreads;
 import forge.gui.GuiBase;
+import forge.screens.CoverScreen;
 import forge.util.MyRandom;
+import forge.util.ScreenUtil;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -58,7 +67,6 @@ import java.util.Map;
  */
 public abstract class GameStage extends Stage {
 
-
     private final OrthographicCamera camera;
     Group backgroundSprites;
     SpriteGroup foregroundSprites;
@@ -67,20 +75,26 @@ public abstract class GameStage extends Stage {
     private float touchY = -1;
     private final float timer = 0;
     private float animationTimeout = 0;
-    public static float maximumScrollDistance=1.5f;
-    public static float minimumScrollDistance=0.3f;
+    public static float maximumScrollDistance = 1.5f;
+    public static float minimumScrollDistance = 0.3f;
+    private final Vector2 keyboardInput = new Vector2();
+    private final Vector2 controllerInput = new Vector2();
+    private final Vector2 touchInput = new Vector2();
+    protected final Vector2 touchKnobInput = new Vector2();
 
-
+    private String extraAnnouncement = "";
 
     protected final Dialog dialog;
     protected Stage dialogStage;
     protected boolean dialogOnlyInput;
     protected final Array<TextraButton> dialogButtonMap = new Array<>();
     TextraButton selectedKey;
-
-    public boolean getDialogOnlyInput() {
-        return dialogOnlyInput;
-    }
+    private final Vector2 inputPriorityDir = new Vector2();
+    private final Vector2 touchConversionVec = new Vector2();
+    private final Vector2 touchDiffVec = new Vector2();
+    private final Vector2 collisionAdjX = new Vector2();
+    private final Vector2 collisionAdjY = new Vector2();
+    private final Rectangle collisionBounds = new Rectangle();
 
     public Dialog getDialog() {
         return dialog;
@@ -90,12 +104,12 @@ public abstract class GameStage extends Stage {
         return dialogOnlyInput;
     }
 
-
     public void setDialogStage(Stage dialogStage) {
         this.dialogStage = dialogStage;
     }
+
     public void showDialog() {
-        if (dialogStage == null){
+        if (dialogStage == null) {
             setDialogStage(GameHUD.getInstance());
         }
         GameHUD.getInstance().playerIdle();
@@ -106,7 +120,8 @@ public abstract class GameStage extends Stage {
         dialog.show(dialogStage, Actions.show());
         dialog.setPosition((dialogStage.getWidth() - dialog.getWidth()) / 2, (dialogStage.getHeight() - dialog.getHeight()) / 2);
         dialogOnlyInput = true;
-        if (Forge.hasGamepad() && !dialogButtonMap.isEmpty())
+
+        if (Forge.hasExternalInput() && !dialogButtonMap.isEmpty())
             dialogStage.setKeyboardFocus(dialogButtonMap.first());
     }
 
@@ -117,13 +132,24 @@ public abstract class GameStage extends Stage {
         dialog.clearListeners();
     }
 
+    /**
+     * Triggered when the hud is showing a dialog, which is tracked separately
+     *
+     * @param isShowing Whether a dialog is currently showing
+     */
+    public void hudIsShowingDialog(boolean isShowing) {
+        dialogOnlyInput = isShowing;
+    }
+
     public void effectDialog(EffectData effectData) {
         dialog.getButtonTable().clear();
         dialog.getContentTable().clear();
         dialog.clearListeners();
         TextraButton ok = Controls.newTextButton("OK", this::hideDialog);
         ok.setVisible(false);
-        TypingLabel L = Controls.newTypingLabel("{GRADIENT=CYAN;WHITE;1;1}Strange magical energies flow within this place...{ENDGRADIENT}\nAll opponents get:\n" + effectData.getDescription());
+        TypingLabel L = Controls.newTypingLabel("{GRADIENT=CYAN;WHITE;1;1}" +
+                Forge.getLocalizer().getMessage("lblEffectDialogDescription") + "{ENDGRADIENT}\n" +
+                Forge.getLocalizer().getMessage("lblEffectDataHeader") + "\n" + effectData.getDescription());
         L.setWrap(true);
         L.setTypingListener(new TypingAdapter() {
             @Override
@@ -144,12 +170,12 @@ public abstract class GameStage extends Stage {
         showDialog();
     }
 
-    public void showImageDialog(String message, FBufferedImage fb) {
+    public void showImageDialog(String message, FBufferedImage fb, Runnable runnable) {
         dialog.getContentTable().clear();
         dialog.getButtonTable().clear();
         dialog.clearListeners();
 
-        if (fb.getTexture() != null) {
+        if (fb != null && fb.getTexture() != null) {
             TextureRegion tr = new TextureRegion(fb.getTexture());
             tr.flip(true, true);
             Image image = new Image(tr);
@@ -166,23 +192,30 @@ public abstract class GameStage extends Stage {
             Timer.schedule(new Timer.Task() {
                 @Override
                 public void run() {
-                    fb.dispose();
+                    if (fb != null)
+                        fb.dispose();
                 }
             }, 0.5f);
+            if (runnable != null) {
+                runnable.run();
+            }
         })).width(240f);
         dialog.setKeepWithinStage(true);
         setDialogStage(GameHUD.getInstance());
         showDialog();
     }
 
-    public void showDeckAwardDialog(String message, Deck deck) {
+    public void showDeckAwardDialog(String message, Deck deck, Runnable runnable) {
         dialog.getContentTable().clear();
         dialog.getButtonTable().clear();
         dialog.clearListeners();
         DeckProxy dp = new DeckProxy(deck, "Constructed", GameType.Constructed, null);
         FImageComplex cardArt = CardRenderer.getCardArt(dp.getHighestCMCCard());
-        if (cardArt != null) {
-            Image art = new Image(cardArt.getTextureRegion());
+        if (cardArt != null && cardArt.getTextureRegion() != null) {
+            TextureRegion textureRegion = cardArt.getTextureRegion();
+            if (CardImageRenderer.forgeArt == cardArt)
+                textureRegion.flip(false, true); // fix inverted
+            Image art = new Image(textureRegion);
             art.setWidth(58);
             art.setHeight(46);
             art.setPosition(25, 43);
@@ -220,60 +253,57 @@ public abstract class GameStage extends Stage {
         L.skipToTheEnd();
 
         dialog.getContentTable().add(L).width(250);
-        dialog.getButtonTable().add(Controls.newTextButton("OK", this::hideDialog)).width(240);
+        dialog.getButtonTable().add(Controls.newTextButton("OK", () -> {
+            hideDialog();
+            if (runnable != null)
+                runnable.run();
+        })).width(240);
         dialog.setKeepWithinStage(true);
         setDialogStage(GameHUD.getInstance());
         showDialog();
     }
 
-    
-
     public boolean axisMoved(Controller controller, int axisIndex, float value) {
-
-        if (MapStage.getInstance().isDialogOnlyInput()||isPaused()) {
+        if (MapStage.getInstance().isDialogOnlyInput() || isPaused()) {
             return true;
         }
-        player.getMovementDirection().x = controller.getAxis(0);
-        player.getMovementDirection().y = -controller.getAxis(1);
-        if(player.getMovementDirection().len()<0.2)
-        {
-            player.stop();
-        }
+        controllerInput.set(controller.getAxis(0), -controller.getAxis(1));
         return true;
     }
 
-    enum PlayerModification
-    {
+    public void setTouchKnobInput(float x, float y) {
+        touchKnobInput.set(x, y);
+    }
+
+    enum PlayerModification {
         Sprint,
         Hide,
         Fly
 
     }
 
+    HashMap<PlayerModification, Float> currentModifications = new HashMap<>();
 
-    HashMap<PlayerModification,Float> currentModifications=new HashMap<>();
-    public void modifyPlayer(PlayerModification mod,float value) {
-        float currentValue=0;
-        if(currentModifications.containsKey(mod))
-        {
-            currentValue=currentModifications.get(mod);
-        }
-        currentModifications.put(mod,currentValue+value);
+    public void modifyPlayer(PlayerModification mod, float value) {
+        currentModifications.merge(mod, value, Float::sum);
     }
 
     public void flyFor(float value) {
-        modifyPlayer(PlayerModification.Fly,value);
+        modifyPlayer(PlayerModification.Fly, value);
         player.playEffect(Paths.EFFECT_FLY);
     }
+
     public void hideFor(float value) {
-        modifyPlayer(PlayerModification.Hide,value);
-        player.setColor(player.getColor().r,player.getColor().g,player.getColor().b,0.5f);
+        modifyPlayer(PlayerModification.Hide, value);
+        player.setColor(player.getColor().r, player.getColor().g, player.getColor().b, 0.5f);
         player.playEffect(Paths.EFFECT_HIDE);
     }
+
     public void sprintFor(float value) {
-        modifyPlayer(PlayerModification.Sprint,value);
+        modifyPlayer(PlayerModification.Sprint, value);
         player.playEffect(Paths.EFFECT_SPRINT);
     }
+
     public void startPause(float i) {
         startPause(i, null);
     }
@@ -283,21 +313,19 @@ public abstract class GameStage extends Stage {
         animationTimeout = i;
         player.setMovementDirection(Vector2.Zero);
     }
+
     public boolean isPaused() {
         return animationTimeout > 0;
     }
 
     public GameStage() {
-        super(new ScalingViewport(Scaling.stretch, Scene.getIntendedWidth(), Scene.getIntendedHeight(), new OrthographicCamera()));
-        WorldSave.getCurrentSave().onLoad(new Runnable() {
-            @Override
-            public void run() {
-                if (player == null)
-                    return;
-                foregroundSprites.removeActor(player);
-                player = null;
-                GameStage.this.getPlayerSprite();
-            }
+        super(new ScalingViewport(Scaling.stretch, Scene.getIntendedWidth(), Scene.getIntendedHeight(), new OrthographicCamera()), Forge.getGraphics().getBatch());
+        WorldSave.getCurrentSave().onLoad(() -> {
+            if (player == null)
+                return;
+            foregroundSprites.removeActor(player);
+            player = null;
+            GameStage.this.getPlayerSprite();
         });
         camera = (OrthographicCamera) getCamera();
 
@@ -311,7 +339,7 @@ public abstract class GameStage extends Stage {
         dialog = Controls.newDialog("");
     }
 
-    public void setWinner(boolean b) {
+    public void setWinner(boolean b, boolean a) {
     }
 
     public void setBounds(float width, float height) {
@@ -325,7 +353,6 @@ public abstract class GameStage extends Stage {
         }
         return player;
     }
-
 
     public SpriteGroup getSpriteGroup() {
         return foregroundSprites;
@@ -346,53 +373,79 @@ public abstract class GameStage extends Stage {
             animationTimeout -= delta;
             return;
         }
-        Array<PlayerModification> modsToRemove=new Array<>();
-        for(Map.Entry<PlayerModification, Float> mod:currentModifications.entrySet())
-        {
-            mod.setValue(mod.getValue()-delta);
-            if(mod.getValue()<0)
+
+        Array<PlayerModification> modsToRemove = new Array<>();
+        for (Map.Entry<PlayerModification, Float> mod : currentModifications.entrySet()) {
+            mod.setValue(mod.getValue() - delta);
+            if (mod.getValue() < 0)
                 modsToRemove.add(mod.getKey());
         }
-        for(PlayerModification mod:modsToRemove)
-        {
+        for (PlayerModification mod : modsToRemove) {
             currentModifications.remove(mod);
             onRemoveEffect(mod);
         }
 
-        if (isPaused()) {
-            return;
-        }
-
-
         if (onEndAction != null) {
-
             onEndAction.run();
             onEndAction = null;
         }
 
-        if (touchX >= 0) {
-            Vector2 target = this.screenToStageCoordinates(new Vector2(touchX, touchY));
-            target.x -= player.getWidth() / 2f;
-            Vector2 diff = target.sub(player.pos());
+        if (isPaused() || isDialogOnlyInput() || Forge.advFreezePlayerControls) {
+            keyboardInput.setZero();
+            controllerInput.setZero();
+            touchInput.setZero();
+            touchKnobInput.setZero();
+            player.getMovementDirection().setZero();
+            player.stop();
+        } else {
+            keyboardInput.setZero();
+            if (KeyBinding.Left.isPressed())  keyboardInput.x -= 1;
+            if (KeyBinding.Right.isPressed()) keyboardInput.x += 1;
+            if (KeyBinding.Up.isPressed())    keyboardInput.y += 1;
+            if (KeyBinding.Down.isPressed())  keyboardInput.y -= 1;
 
-            if (diff.len() < 2) {
-                diff.setZero();
-                player.stop();
+            // Input priority: touch > controller > keyboard
+            inputPriorityDir.setZero();
+            if (touchX >= 0 && touchInput.len() > 0.2f) {
+                inputPriorityDir.set(touchInput);
+            } else if (controllerInput.len() > 0.2f) {
+                inputPriorityDir.set(controllerInput);
+            } else if (touchKnobInput.len() > 0.2f) {
+                inputPriorityDir.set(touchKnobInput);
+            } else {
+                inputPriorityDir.set(keyboardInput);
             }
-            player.setMovementDirection(diff);
+
+            if (inputPriorityDir.len() < 0.01f) {
+                player.stop();
+            } else {
+                player.getMovementDirection().set(inputPriorityDir);
+            }
+
+            if (touchX >= 0) {
+                Vector2 target = this.screenToStageCoordinates(touchConversionVec.set(touchX, touchY));
+                target.x -= player.getWidth() / 2f;
+                touchDiffVec.set(target.sub(player.pos()));
+
+                if (touchDiffVec.len() < 2) {
+                    touchInput.setZero();
+                    player.stop();
+                } else {
+                    touchInput.set(touchDiffVec);
+                }
+            }
         }
+
         camera.position.x = Math.min(Math.max(Scene.getIntendedWidth() / 2f, player.pos().x), getViewport().getWorldWidth() - Scene.getIntendedWidth() / 2f);
         camera.position.y = Math.min(Math.max(Scene.getIntendedHeight() / 2f, player.pos().y), getViewport().getWorldHeight() - Scene.getIntendedHeight() / 2f);
-
 
         onActing(delta);
     }
 
     private void onRemoveEffect(PlayerModification mod) {
-        switch (mod)
-        {
+        switch (mod) {
             case Hide:
-                player.setColor(player.getColor().r,player.getColor().g,player.getColor().b,1f);
+                player.setColor(player.getColor().r, player.getColor().g, player.getColor().b, 1f);
                 break;
             case Fly:
                 player.removeEffect(Paths.EFFECT_FLY);
@@ -405,42 +458,37 @@ public abstract class GameStage extends Stage {
 
     abstract protected void onActing(float delta);
 
-
     @Override
     public boolean keyDown(int keycode) {
         super.keyDown(keycode);
         if (isPaused())
             return true;
-        if (KeyBinding.Left.isPressed(keycode))
-        {
-            player.getMovementDirection().x = -1;
+        if (KeyBinding.Left.isPressed(keycode)) {
+            keyboardInput.x = -1;
         }
-        if (KeyBinding.Right.isPressed(keycode) )
-        {
-            player.getMovementDirection().x = +1;
+        if (KeyBinding.Right.isPressed(keycode)) {
+            keyboardInput.x = +1;
         }
-        if (KeyBinding.Up.isPressed(keycode))
-        {
-            player.getMovementDirection().y = +1;
+        if (KeyBinding.Up.isPressed(keycode)) {
+            keyboardInput.y = +1;
         }
-        if (KeyBinding.Down.isPressed(keycode))
-        {
-            player.getMovementDirection().y = -1;
+        if (KeyBinding.Down.isPressed(keycode)) {
+            keyboardInput.y = -1;
         }
         if (keycode == Input.Keys.F5)//todo config
         {
             if (TileMapScene.instance().currentMap().isInMap()) {
                 DialogData noQuicksave = new DialogData();
                 DialogData noQuicksaveOK = new DialogData();
-                noQuicksave.text = "Game not saved. Quicksave is only available on the world map.";
-                noQuicksaveOK.name = "OK";
+                noQuicksave.text = Forge.getLocalizer().getMessageorUseDefault("lblQuicksaveOnlyOnWorldMap", "Game not saved. Quicksave is only available on the world map.");
+                noQuicksaveOK.name = Forge.getLocalizer().getMessage("lblOK");
                 noQuicksave.options = new DialogData[]{noQuicksaveOK};
                 MapDialog noQuicksaveDialog = new MapDialog(noQuicksave, MapStage.getInstance(), -1, null);
                 showDialog();
                 noQuicksaveDialog.activate();
             } else {
                 getPlayerSprite().storePos();
-                WorldSave.getCurrentSave().header.createPreview();
+                WorldSave.requestPreview();
                 WorldSave.getCurrentSave().quickSave();
             }
         }
@@ -460,13 +508,17 @@ public abstract class GameStage extends Stage {
 
         }
         if (keycode == Input.Keys.F2) {
-            TileMapScene S = TileMapScene.instance();
-            PointOfInterestData P = PointOfInterestData.getPointOfInterest("DEBUGZONE");
-            if( P != null)
-            {
-                PointOfInterest PoI = new PointOfInterest(P,new Vector2(0,0), MyRandom.getRandom());
-                S.load(PoI);
-                Forge.switchScene(S);
+            // prevent going to Debug Zone by accident if Debug Map isn't enabled..
+            if (GameHUD.getInstance().isDebugMap()) {
+                TileMapScene S = TileMapScene.instance();
+                PointOfInterestData P = PointOfInterestData.getPointOfInterest("DEBUGZONE");
+                if (P != null) {
+                    PointOfInterest PoI = new PointOfInterest(P, new Vector2(0, 0), MyRandom.getRandom());
+                    S.load(PoI);
+                    Forge.switchScene(S);
+                }
+            } else {
+                System.out.println("Enable Debug Map for Debug Zone.");
             }
         }
         if (keycode == Input.Keys.F11) {
@@ -532,6 +584,10 @@ public abstract class GameStage extends Stage {
     public void stop() {
         WorldStage.getInstance().getPlayerSprite().setMovementDirection(Vector2.Zero);
         MapStage.getInstance().getPlayerSprite().setMovementDirection(Vector2.Zero);
+        touchInput.setZero();
+        touchKnobInput.setZero();
+        keyboardInput.setZero();
+        controllerInput.setZero();
         touchX = -1;
         touchY = -1;
         player.stop();
@@ -547,33 +603,37 @@ public abstract class GameStage extends Stage {
     public boolean keyUp(int keycode) {
         if (isPaused())
             return true;
-        if (KeyBinding.Left.isPressed(keycode)||KeyBinding.Right.isPressed(keycode))
-        {
+        if (KeyBinding.Left.isPressed(keycode) || KeyBinding.Right.isPressed(keycode)) {
             player.getMovementDirection().x = 0;
             if (!player.isMoving())
                 stop();
         }
-        if (KeyBinding.Down.isPressed(keycode)||KeyBinding.Up.isPressed(keycode))
-        {
+        if (KeyBinding.Down.isPressed(keycode) || KeyBinding.Up.isPressed(keycode)) {
             player.getMovementDirection().y = 0;
             if (!player.isMoving())
                 stop();
         }
-        if (KeyBinding.Menu.isPressed(keycode)) {
-            openMenu();
-        }
         return false;
     }
 
+    @Override
+    public boolean touchCancelled(int screenX, int screenY, int pointer, int button) {
+        stop();
+        return super.touchCancelled(screenX, screenY, pointer, button);
+    }
+
     public void openMenu() {
-        if (Forge.restrictAdvMenus)
+        if (Forge.advFreezePlayerControls)
             return;
-        WorldSave.getCurrentSave().header.createPreview();
+        WorldSave.requestPreview();
         Forge.switchScene(StartScene.instance());
     }
 
     public void enter() {
         stop();
+        if (!extraAnnouncement.isEmpty()) {
+            showImageDialog(extraAnnouncement, null, this::clearExtraAnnouncement);
+        }
     }
 
     public void leave() {
@@ -588,53 +648,123 @@ public abstract class GameStage extends Stage {
     }
 
     public Vector2 adjustMovement(Vector2 direction, Rectangle boundingRect) {
-        Vector2 adjDirX = direction.cpy();
-        Vector2 adjDirY = direction.cpy();
+        // populate our local cars in-place via .set() instead of .cpy()
+        collisionAdjX.set(direction);
+        collisionAdjY.set(direction);
         boolean foundX = false;
         boolean foundY = false;
-        while (true) {
 
-            if (!isColliding(new Rectangle(boundingRect.x + adjDirX.x, boundingRect.y + adjDirX.y, boundingRect.width, boundingRect.height))) {
+        while (true) {
+            collisionBounds.set(boundingRect.x + collisionAdjX.x, boundingRect.y + collisionAdjX.y, boundingRect.width, boundingRect.height);
+            if (!isColliding(collisionBounds)) {
                 foundX = true;
                 break;
             }
-            if (adjDirX.x == 0)
+            if (collisionAdjX.x == 0)
                 break;
 
-            if (adjDirX.x >= 0)
-                adjDirX.x = Math.max(0, adjDirX.x - 0.2f);
+            if (collisionAdjX.x >= 0)
+                collisionAdjX.x = Math.max(0, collisionAdjX.x - 0.2f);
             else
-                adjDirX.x = Math.min(0, adjDirX.x + 0.2f);
+                collisionAdjX.x = Math.min(0, collisionAdjX.x + 0.2f);
         }
+
         while (true) {
-            if (!isColliding(new Rectangle(boundingRect.x + adjDirY.x, boundingRect.y + adjDirY.y, boundingRect.width, boundingRect.height))) {
+            collisionBounds.set(boundingRect.x + collisionAdjY.x, boundingRect.y + collisionAdjY.y, boundingRect.width, boundingRect.height);
+            if (!isColliding(collisionBounds)) {
                 foundY = true;
                 break;
             }
-            if (adjDirY.y == 0)
+            if (collisionAdjY.y == 0)
                 break;
 
-            if (adjDirY.y >= 0)
-                adjDirY.y = (Math.max(0, adjDirY.y - 0.2f));
+            if (collisionAdjY.y >= 0)
+                collisionAdjY.y = Math.max(0, collisionAdjY.y - 0.2f);
             else
-                adjDirY.y = (Math.min(0, adjDirY.y + 0.2f));
+                collisionAdjY.y = Math.min(0, collisionAdjY.y + 0.2f);
         }
-        if (foundY && foundX)
-            return adjDirX.len() > adjDirY.len() ? adjDirX : adjDirY;
-        else if (foundY)
-            return adjDirY;
-        else if (foundX)
-            return adjDirX;
-        return Vector2.Zero.cpy();
+
+        if (foundY && foundX) {
+            return collisionAdjX.len() > collisionAdjY.len() ? collisionAdjX : collisionAdjY;
+        } else if (foundY) {
+            return collisionAdjY;
+        } else if (foundX) {
+            return collisionAdjX;
+        }
+
+        collisionAdjX.setZero();
+        return collisionAdjX;
     }
 
-    protected void teleported(Vector2 position)
-    {
+    protected void teleported(Vector2 position) {
 
     }
+
     public void setPosition(Vector2 position) {
         getPlayerSprite().setPosition(position);
         teleported(position);
     }
 
+    public void resetPlayerLocation() {
+        PointOfInterest poi = Current.world().findPointsOfInterest("Spawn");
+        if (poi != null) {
+            Forge.advFreezePlayerControls = true;
+            PlayerSprite playerSprite = getPlayerSprite();
+            playerSprite.setAnimation(CharacterSprite.AnimationTypes.Death);
+            playerSprite.playEffect(Paths.EFFECT_BLOOD, 0.5f);
+            float deathDuration = playerSprite.getActionAnimationDuration(CharacterSprite.AnimationTypes.Death, 1f);
+            Timer.schedule(new Timer.Task() {
+                @Override
+                public void run() {
+                showImageDialog(Current.generateDefeatMessage(true), getDefeatBadge(),
+                    () -> FThreads.invokeInEdtNowOrLater(() -> Forge.setTransitionScreen(new CoverScreen(() -> {
+                        Forge.advFreezePlayerControls = false;
+                        WorldStage.getInstance().setPosition(new Vector2(poi.getPosition().x - 16f, poi.getPosition().y + 16f));
+                        WorldStage.getInstance().loadPOI(poi);
+                        WorldSave.getCurrentSave().autoSave();
+                        Forge.clearTransitionScreen();
+                    }, ScreenUtil.getInstance().takeScreenshot()))));
+                }
+            }, deathDuration);
+        }//Spawn shouldn't be null
+    }
+
+    public void defeatedFromBoss() {
+        if (!Current.player().hasEquippedItem())
+            return;
+        Forge.advFreezePlayerControls = true;
+        PlayerSprite playerSprite = getPlayerSprite();
+        playerSprite.setAnimation(CharacterSprite.AnimationTypes.Hit);
+        playerSprite.playEffect(Paths.EFFECT_BLOOD, 0.5f);
+        float hitDuration = playerSprite.getActionAnimationDuration(CharacterSprite.AnimationTypes.Hit, 1f);
+        Timer.schedule(new Timer.Task() {
+            @Override
+            public void run() {
+                showImageDialog(Current.generateDefeatMessage(false), getDefeatBadge(), () -> Forge.advFreezePlayerControls = false);
+            }
+        }, hitDuration);
+    }
+
+    private FBufferedImage getDefeatBadge() {
+        FileHandle defeat = Config.instance().getFile("ui/defeat.png");
+        if (defeat.exists()) {
+            TextureRegion tr = new TextureRegion(Forge.getAssets().getTexture(defeat, true, false));
+            tr.flip(true, false);
+            return new FBufferedImage(176, 200) {
+                @Override
+                protected void draw(Graphics g, float w, float h) {
+                    g.drawImage(tr, 0, 0, 176, 200);
+                }
+            };
+        }
+        return null;
+    }
+
+    public void setExtraAnnouncement(String message) {
+        extraAnnouncement = message;
+    }
+
+    public void clearExtraAnnouncement() {
+        extraAnnouncement = "";
+    }
 }

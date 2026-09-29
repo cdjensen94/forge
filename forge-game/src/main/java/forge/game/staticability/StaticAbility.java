@@ -45,11 +45,7 @@ import forge.game.player.Player;
 import forge.game.spellability.SpellAbility;
 import forge.game.zone.Zone;
 import forge.game.zone.ZoneType;
-import forge.util.CardTranslation;
-import forge.util.Expressions;
-import forge.util.FileSection;
-import forge.util.Lang;
-import forge.util.TextUtil;
+import forge.util.*;
 
 /**
  * The Class StaticAbility.
@@ -60,12 +56,15 @@ public class StaticAbility extends CardTraitBase implements IIdentifiable, Clone
 
     private int id;
 
+    protected EnumSet<ZoneType> validHostZones;
+    private Set<StaticAbilityMode> modes;
     private Set<StaticAbilityLayer> layers;
     private CardCollectionView ignoreEffectCards = new CardCollection();
     private final List<Player> ignoreEffectPlayers = Lists.newArrayList();
     private int mayPlayTurn = 0;
 
     private SpellAbility payingTrigSA;
+    private StaticAbilityView view = null;
 
     @Override
     public final int getId() {
@@ -80,6 +79,20 @@ public class StaticAbility extends CardTraitBase implements IIdentifiable, Clone
     @Override
     public boolean equals(final Object obj) {
         return obj instanceof StaticAbility && this.id == ((StaticAbility) obj).id;
+    }
+
+    public Set<ZoneType> getActiveZone() {
+        return validHostZones;
+    }
+    public void setActiveZone(EnumSet<ZoneType> zones) {
+        validHostZones = zones;
+    }
+
+    public Set<StaticAbilityMode> getMode() {
+        return this.modes;
+    }
+    public void setMode(Set<StaticAbilityMode> modes) {
+        this.modes = modes;
     }
 
     public SpellAbility getPayingTrigSA() {
@@ -117,8 +130,8 @@ public class StaticAbility extends CardTraitBase implements IIdentifiable, Clone
      *
      * @return the applicable layers.
      */
-    private final Set<StaticAbilityLayer> generateLayer() {
-        if (!checkMode("Continuous")) {
+    private Set<StaticAbilityLayer> generateLayer() {
+        if (!checkMode(StaticAbilityMode.Continuous)) {
             return EnumSet.noneOf(StaticAbilityLayer.class);
         }
 
@@ -128,7 +141,7 @@ public class StaticAbility extends CardTraitBase implements IIdentifiable, Clone
         }
 
         if (hasParam("ChangeColorWordsTo") || hasParam("GainTextOf") || hasParam("AddNames") ||
-                hasParam("SetName")) {
+                hasParam("SetName") || hasParam("Incorporate") || hasParam("ManaCost")) {
             layers.add(StaticAbilityLayer.TEXT);
         }
 
@@ -145,7 +158,7 @@ public class StaticAbility extends CardTraitBase implements IIdentifiable, Clone
             layers.add(StaticAbilityLayer.COLOR);
         }
 
-        if (hasParam("RemoveAllAbilities") || hasParam("GainsAbilitiesOf")
+        if (hasParam("RemoveAllAbilities") || hasParam("RemoveNonManaAbilities") || hasParam("GainsAbilitiesOf")
                 || hasParam("GainsAbilitiesOfDefined") || hasParam("GainsTriggerAbsOf")
                 || hasParam("AddKeyword") || hasParam("AddAbility")
                 || hasParam("AddTrigger") || hasParam("AddReplacementEffect")
@@ -156,7 +169,7 @@ public class StaticAbility extends CardTraitBase implements IIdentifiable, Clone
         }
 
         if (hasParam("SetPower") || hasParam("SetToughness")) {
-            layers.add(hasParam("CharacteristicDefining") ? StaticAbilityLayer.CHARACTERISTIC :
+            layers.add(isCharacteristicDefining() ? StaticAbilityLayer.CHARACTERISTIC :
                 StaticAbilityLayer.SETPT);
         }
         if (hasParam("AddPower") || hasParam("AddToughness")) {
@@ -177,6 +190,10 @@ public class StaticAbility extends CardTraitBase implements IIdentifiable, Clone
         return layers;
     }
 
+    public boolean isCharacteristicDefining() {
+        return hasParam("CharacteristicDefining");
+    }
+
     /**
      * <p>
      * toString.
@@ -187,15 +204,11 @@ public class StaticAbility extends CardTraitBase implements IIdentifiable, Clone
     @Override
     public final String toString() {
         if (hasParam("Description") && !this.isSuppressed()) {
-            String currentName;
-            if (this.isIntrinsic() && cardState != null && cardState.getCard() == getHostCard()) {
-                currentName = cardState.getName();
-            } else {
-                currentName = getHostCard().getName();
-            }
-            String desc = CardTranslation.translateSingleDescriptionText(getParam("Description"), currentName);
-            desc = TextUtil.fastReplace(desc, "CARDNAME", CardTranslation.getTranslatedName(currentName));
-            desc = TextUtil.fastReplace(desc, "NICKNAME", Lang.getInstance().getNickName(CardTranslation.getTranslatedName(currentName)));
+            ITranslatable nameSource = getHostName(this);
+            String desc = CardTranslation.translateSingleDescriptionText(getParam("Description"), nameSource);
+            String translatedName = nameSource.getTranslatedName();
+            desc = TextUtil.fastReplace(desc, "CARDNAME", translatedName);
+            desc = TextUtil.fastReplace(desc, "NICKNAME", Lang.getInstance().getNickName(translatedName));
 
             return desc;
         } else {
@@ -234,9 +247,25 @@ public class StaticAbility extends CardTraitBase implements IIdentifiable, Clone
         this.id = nextId();
         this.originalMapParams.putAll(params);
         this.mapParams.putAll(params);
-        this.layers = this.generateLayer();
         this.hostCard = host;
         this.setCardState(state);
+        if (hasParam("EffectZone")) {
+            setActiveZone(EnumSet.copyOf(ZoneType.listValueOf(getParam("EffectZone"))));
+        }
+        if (hasParam("Mode")) {
+            setMode(StaticAbilityMode.setValueOf(getParam("Mode")));
+        }
+        this.layers = this.generateLayer();
+    }
+
+    public StaticAbilityView getView() {
+        if (view == null)
+            view = new StaticAbilityView(this);
+        else {
+            view.updateHostCard(this);
+            view.updateDescription(this);
+        }
+        return view;
     }
 
     public final CardCollectionView applyContinuousAbilityBefore(final StaticAbilityLayer layer, final CardCollectionView preList) {
@@ -268,39 +297,61 @@ public class StaticAbility extends CardTraitBase implements IIdentifiable, Clone
      *         conditions are fulfilled.
      */
     private boolean shouldApplyContinuousAbility(final StaticAbilityLayer layer, final boolean previousRun) {
-        return layers.contains(layer) && checkConditions("Continuous") && (previousRun || getHostCard().getStaticAbilities().contains(this));
+        return layers.contains(layer) && checkConditions(StaticAbilityMode.Continuous) && ( previousRun ||
+                getHostCard().getStaticAbilities().contains(this) ||
+                getHostCard().getHiddenStaticAbilities().contains(this));
     }
 
     public final Cost getAttackCost(final Card attacker, final GameEntity target, final List<Card> attackersWithOptionalCost) {
-        if (!checkMode("CantAttackUnless") && (!checkMode("OptionalAttackCost") || !attackersWithOptionalCost.contains(attacker))) {
+        if (!checkMode(StaticAbilityMode.CantAttackUnless) && (!checkMode(StaticAbilityMode.OptionalAttackCost) || !attackersWithOptionalCost.contains(attacker))) {
             return null;
         }
-        if (!this.checkConditions()) {
+        if (!checkConditions()) {
             return null;
         }
         return StaticAbilityCantAttackBlock.getAttackCost(this, attacker, target);
     }
 
     public final boolean hasAttackCost(final Card attacker, Class<? extends CostPart> costType) {
-        if (!checkConditions("OptionalAttackCost")) {
+        if (!checkConditions(StaticAbilityMode.OptionalAttackCost)) {
             return false;
         }
         return StaticAbilityCantAttackBlock.getAttackCost(this, attacker, null).hasSpecificCostType(costType);
     }
 
     public final Cost getBlockCost(final Card blocker, final Card attacker) {
-        if (!checkConditions("CantBlockUnless")) {
+        if (!checkConditions(StaticAbilityMode.CantBlockUnless)) {
             return null;
         }
         return StaticAbilityCantAttackBlock.getBlockCost(this, blocker, attacker);
     }
 
-    public final boolean checkMode(String mode) {
-        return getParam("Mode").equals(mode);
+    public final boolean checkMode(StaticAbilityMode mode) {
+        return this.modes.contains(mode);
     }
 
-    public final boolean checkConditions(String mode) {
+    public final boolean checkConditions(StaticAbilityMode mode) {
         return checkMode(mode) && checkConditions();
+    }
+
+    public final boolean zonesCheck() {
+        if (isSuppressed()) {
+            return false;
+        }
+        if (getHostCard().isPhasedOut()) {
+            return false;
+        }
+        if (!isCharacteristicDefining()) {
+            if (this.validHostZones != null) {
+                Zone zone = getHostCard().getGame().getZoneOf(getHostCard());
+                if (zone == null || !this.validHostZones.contains(zone.getZoneType())) {
+                    return false;
+                }
+            } else if (!getHostCard().isInPlay()) { // default
+                return false;
+            }
+        }
+        return true;
     }
 
     /**
@@ -313,24 +364,8 @@ public class StaticAbility extends CardTraitBase implements IIdentifiable, Clone
         final Game game = getHostCard().getGame();
         final PhaseHandler ph = game.getPhaseHandler();
 
-        if (isSuppressed()) {
+        if (!zonesCheck()) {
             return false;
-        }
-        if (getHostCard().isPhasedOut()) {
-            return false;
-        }
-
-        if (hasParam("EffectZone")) {
-            if (!getParam("EffectZone").equals("All")) {
-                Zone zone = game.getZoneOf(getHostCard());
-                if (zone == null || !ZoneType.listValueOf(getParam("EffectZone")).contains(zone.getZoneType())) {
-                    return false;
-                }
-            }
-        } else if (!hasParam("CharacteristicDefining")) {
-            if (!getHostCard().isInPlay()) { // default
-                return false;
-            }
         }
 
         String condition = getParam("Condition");
@@ -340,10 +375,11 @@ public class StaticAbility extends CardTraitBase implements IIdentifiable, Clone
             if (condition.equals("Metalcraft") && !controller.hasMetalcraft()) return false;
             if (condition.equals("Delirium") && !controller.hasDelirium()) return false;
             if (condition.equals("Ferocious") && !controller.hasFerocious()) return false;
-            if (condition.equals("Desert") && !controller.hasDesert()) return false;
             if (condition.equals("Blessing") && !controller.hasBlessing()) return false;
+            if (condition.equals("EnduringStory") && !controller.hasEnduringStory()) return false;
             if (condition.equals("Monarch") & !controller.isMonarch()) return false;
             if (condition.equals("Night") & !game.isNight()) return false;
+            if (condition.equals("MaxSpeed") && !controller.maxSpeed()) return false;
 
             if (condition.equals("PlayerTurn")) {
                 if (!ph.isPlayerTurn(controller)) {
@@ -377,13 +413,6 @@ public class StaticAbility extends CardTraitBase implements IIdentifiable, Clone
             }
         }
 
-        if (hasParam("UnlessDefinedPlayer")) {
-            List<Player> players = AbilityUtils.getDefinedPlayers(hostCard, getParam("UnlessDefinedPlayer"), this);
-            if (!players.isEmpty()) {
-                return false;
-            }
-        }
-
         if (hasParam("TopCardOfLibraryIs")) {
             if (controller.getCardsIn(ZoneType.Library).isEmpty()) {
                 return false;
@@ -395,7 +424,7 @@ public class StaticAbility extends CardTraitBase implements IIdentifiable, Clone
         }
 
         if (hasParam("IsPresent")) {
-            final ZoneType zone = hasParam("PresentZone") ? ZoneType.valueOf(getParam("PresentZone")) : ZoneType.Battlefield;
+            final List<ZoneType> zone = hasParam("PresentZone") ? ZoneType.listValueOf(getParam("PresentZone")) : List.of(ZoneType.Battlefield);
             final String compare = getParamOrDefault("PresentCompare", "GE1");
             CardCollectionView list = game.getCardsIn(zone);
             final String present = getParam("IsPresent");
@@ -419,20 +448,6 @@ public class StaticAbility extends CardTraitBase implements IIdentifiable, Clone
                 isRelevantStage |= (game.getAge() == GameStage.valueOf(stage));
             }
             return isRelevantStage;
-        }
-
-        if (hasParam("Presence")) {
-            if (hostCard.getCastFrom() == null || hostCard.getCastSA() == null)
-                return false;
-
-            final String type = getParam("Presence");
-
-            int revealed = AbilityUtils.calculateAmount(hostCard, "Revealed$Valid " + type, hostCard.getCastSA());
-            int ctrl = AbilityUtils.calculateAmount(hostCard, "Count$LastStateBattlefield " + type + ".YouCtrl", hostCard.getCastSA());
-
-            if (revealed + ctrl == 0) {
-                return false;
-            }
         }
 
         if (hasParam("ClassLevel")) {
@@ -537,7 +552,7 @@ public class StaticAbility extends CardTraitBase implements IIdentifiable, Clone
     }
 
     public int getMayPlayTurn() {
-        return mayPlayTurn;
+        return mayPlayTurn + (int)this.hostCard.getGame().getStack().getSpellsCastThisTurn().stream().filter(sp -> this.equals(sp.getMayPlay())).count();
     }
 
     public void incMayPlayTurn() {
@@ -556,6 +571,13 @@ public class StaticAbility extends CardTraitBase implements IIdentifiable, Clone
         .result();
     }
 
+    public long getTimestamp() {
+        if (hasParam("Timestamp")) {
+            return Long.valueOf(getParam("Timestamp"));
+        }
+        return getHostCard().getLayerTimestamp();
+    }
+
     @Override
     public void setHostCard(Card host) {
         super.setHostCard(host);
@@ -564,13 +586,16 @@ public class StaticAbility extends CardTraitBase implements IIdentifiable, Clone
         }
     }
 
-    public StaticAbility copy(Card host, final boolean lki) {
+    public final StaticAbility copy(Card newHost, boolean lki) {
+        return copy(newHost, lki, false);
+    }
+    public StaticAbility copy(Card host, final boolean lki, boolean keepTextChanges) {
         StaticAbility clone = null;
         try {
             clone = (StaticAbility) clone();
             clone.id = lki ? id : nextId();
 
-            copyHelper(clone, host);
+            copyHelper(clone, host, lki || keepTextChanges);
 
             // reset to force refresh if needed
             clone.payingTrigSA = null;
@@ -580,14 +605,16 @@ public class StaticAbility extends CardTraitBase implements IIdentifiable, Clone
             }
 
             clone.layers = this.generateLayer();
+            if (validHostZones != null) {
+                clone.setActiveZone(EnumSet.copyOf(validHostZones));
+            }
+            if (modes != null) {
+                clone.setMode(EnumSet.copyOf(modes));
+            }
         } catch (final CloneNotSupportedException e) {
             System.err.println(e);
         }
         return clone;
     }
 
-    @Override
-    public List<Object> getTriggerRemembered() {
-        return ImmutableList.of();
-    }
 }

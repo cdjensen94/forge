@@ -142,7 +142,7 @@ public class CardDetailPanel extends SkinnedPanel {
     }
 
     public final void setItem(final InventoryItemFromSet item) {
-        nameCostLabel.setText(item.getName());
+        nameCostLabel.setText(item.getDisplayName());
         typeLabel.setVisible(false);
         powerToughnessLabel.setVisible(false);
         idLabel.setText("");
@@ -167,12 +167,7 @@ public class CardDetailPanel extends SkinnedPanel {
             setInfoLabel.setBorder(BorderFactory.createLineBorder(Color.WHITE));
         }
 
-        SwingUtilities.invokeLater(new Runnable() {
-            @Override
-            public void run() {
-                scrArea.getVerticalScrollBar().setValue(scrArea.getVerticalScrollBar().getMinimum());
-            }
-        });
+        SwingUtilities.invokeLater(() -> scrArea.getVerticalScrollBar().setValue(scrArea.getVerticalScrollBar().getMinimum()));
     }
 
     public final void setCard(final CardView card) {
@@ -199,14 +194,14 @@ public class CardDetailPanel extends SkinnedPanel {
         }
 
         final String name = CardDetailUtil.formatCardName(card, mayView, isInAltState), nameCost;
-        if (state.getManaCost().isNoCost() || !mayView) {
+        if (state.getOriginalManaCost().isNoCost() || !mayView) {
             nameCost = name;
         } else {
             final String manaCost;
-            if (card.isSplitCard() && card.hasAlternateState() && !card.isFaceDown() && card.getZone() != ZoneType.Stack) { //only display current state's mana cost when on stack
-                manaCost = card.getLeftSplitState().getManaCost() + " // " + card.getAlternateState().getManaCost();
+            if (card.isSplitCard() && card.hasAlternateState() && !card.isFaceDown() && card.getZone() != ZoneType.Stack && card.getZone() != ZoneType.Battlefield) { //only display current state's mana cost when on stack
+                manaCost = card.getLeftSplitState().getOriginalManaCost() + " // " + card.getAlternateState().getOriginalManaCost();
             } else {
-                manaCost = state.getManaCost().toString();
+                manaCost = state.getOriginalManaCost().toString();
             }
             nameCost = String.format("%s - %s", name, manaCost);
         }
@@ -219,7 +214,7 @@ public class CardDetailPanel extends SkinnedPanel {
             set = state.getSetCode();
             rarity = state.getRarity();
         } else {
-            set = CardEdition.UNKNOWN.getCode();
+            set = CardEdition.UNKNOWN_CODE;
             rarity = CardRarity.Unknown;
         }
         setInfoLabel.setText(set);
@@ -251,18 +246,14 @@ public class CardDetailPanel extends SkinnedPanel {
             updateBorder(state, mayView);
         }
 
-        powerToughnessLabel.setText(CardDetailUtil.formatPrimaryCharacteristic(state, mayView));
+        powerToughnessLabel.setText(FSkin.encodeSymbols(CardDetailUtil.formatPrimaryCharacteristic(state, mayView), false));
 
         idLabel.setText(mayView ? CardDetailUtil.formatCardId(state) : "");
 
         // fill the card text
         cdArea.setText(FSkin.encodeSymbols(CardDetailUtil.composeCardText( state, gameView, mayView), true));
 
-        SwingUtilities.invokeLater(new Runnable() {
-            @Override public void run() {
-                scrArea.getVerticalScrollBar().setValue(scrArea.getVerticalScrollBar().getMinimum());
-            }
-        });
+        SwingUtilities.invokeLater(() -> scrArea.getVerticalScrollBar().setValue(scrArea.getVerticalScrollBar().getMinimum()));
     }
 
     /** @return FLabel */

@@ -8,7 +8,7 @@ import forge.game.ability.AbilityUtils;
 import forge.game.card.Card;
 import forge.game.card.CardCollection;
 import forge.game.card.CardCollectionView;
-import forge.game.card.CardDamageMap;
+import forge.game.card.CardDamageTable;
 import forge.game.card.CardLists;
 import forge.game.player.Player;
 import forge.game.spellability.AbilitySub;
@@ -56,8 +56,7 @@ public class DamageAllEffect extends DamageBaseEffect {
         final Card sourceLKI = card.getGame().getChangeZoneLKIInfo(card);
         final Game game = sa.getActivatingPlayer().getGame();
 
-        final String damage = sa.getParam("NumDmg");
-        final int dmg = AbilityUtils.calculateAmount(source, damage, sa);
+        final int dmg = AbilityUtils.calculateAmount(source, sa.getParam("NumDmg"), sa);
 
         //Remember params from this effect have been moved to dealDamage in GameAction
         Player targetPlayer = sa.getTargets().getFirstTargetedPlayer();
@@ -78,14 +77,14 @@ public class DamageAllEffect extends DamageBaseEffect {
         list = AbilityUtils.filterListByType(list, sa.getParam("ValidCards"), sa);
 
         boolean usedDamageMap = true;
-        CardDamageMap damageMap = sa.getDamageMap();
-        CardDamageMap preventMap = sa.getPreventMap();
+        CardDamageTable damageMap = sa.getDamageMap();
+        CardDamageTable preventMap = sa.getPreventMap();
         GameEntityCounterTable counterTable = sa.getCounterTable();
 
         if (damageMap == null) {
             // make a new damage map
-            damageMap = new CardDamageMap();
-            preventMap = new CardDamageMap();
+            damageMap = new CardDamageTable();
+            preventMap = new CardDamageTable();
             counterTable = new GameEntityCounterTable();
             usedDamageMap = false;
         }

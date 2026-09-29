@@ -11,14 +11,12 @@ import forge.game.spellability.SpellAbility;
 import forge.util.Lang;
 import forge.util.Localizer;
 
-
 public class ScryEffect extends SpellAbilityEffect {
     @Override
     protected String getStackDescription(SpellAbility sa) {
         final StringBuilder sb = new StringBuilder();
 
-        final List<Player> players = Lists.newArrayList(); // players really affected
-        players.addAll(getTargetPlayers(sa));
+        final List<Player> players = getTargetPlayers(sa);
         sb.append(Lang.joinHomogenous(players)).append(" ");
 
         int num = 1;
@@ -38,10 +36,8 @@ public class ScryEffect extends SpellAbilityEffect {
         }
 
         boolean isOptional = sa.hasParam("Optional");
+        final List<Player> players = Lists.newArrayList();
 
-        final List<Player> players = Lists.newArrayList(); // players really affected
-
-        // Optional here for spells that have optional multi-player scrying
         for (final Player p : getTargetPlayers(sa)) {
             if (!p.isInGame()) {
                 continue;

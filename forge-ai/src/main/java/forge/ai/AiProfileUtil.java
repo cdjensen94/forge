@@ -17,18 +17,18 @@
  */
 package forge.ai;
 
+import forge.LobbyPlayer;
+import forge.game.player.Player;
+import forge.util.Aggregates;
+import forge.util.FileUtil;
+import forge.util.TextUtil;
+import org.apache.commons.lang3.ArrayUtils;
+
 import java.io.File;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-
-import org.apache.commons.lang3.ArrayUtils;
-
-import forge.LobbyPlayer;
-import forge.util.Aggregates;
-import forge.util.FileUtil;
-import forge.util.TextUtil;
 
 /**
  * Holds default AI personality profile values in an enum.
@@ -93,7 +93,7 @@ public class AiProfileUtil {
      * Load a single profile.
      * @param profileName a profile to load.
      */
-    private static final Map<AiProps, String> loadProfile(final String profileName) {
+    private static Map<AiProps, String> loadProfile(final String profileName) {
         Map<AiProps, String> profileMap = new HashMap<>();
 
         List<String> lines = FileUtil.readFile(buildFileName(profileName));
@@ -112,6 +112,23 @@ public class AiProfileUtil {
         }
 
         return profileMap;
+    }
+
+    public static String getProperty(final Player p, final AiProps propName) {
+        String prop = AiProfileUtil.getAIProp(p.getLobbyPlayer(), propName);
+
+        if (prop == null || prop.isEmpty()) {
+            // TODO if p is human try to predict some values from previous plays or something
+            return propName.getDefault();
+        }
+
+        return prop;
+    }
+    public static int getIntProperty(final Player p, final AiProps propName) {
+        return Integer.parseInt(getProperty(p, propName));
+    }
+    public static boolean getBoolProperty(final Player p, final AiProps propName) {
+        return Boolean.parseBoolean(getProperty(p, propName));
     }
 
     /**
@@ -147,9 +164,9 @@ public class AiProfileUtil {
         if (children == null) {
             System.err.println("AIProfile > can't find AI profile directory!");
         } else {
-            for (int i = 0; i < children.length; i++) {
-                if (children[i].endsWith(AI_PROFILE_EXT)) {
-                    availableProfiles.add(children[i].substring(0, children[i].length() - AI_PROFILE_EXT.length()));
+            for (String child : children) {
+                if (child.endsWith(AI_PROFILE_EXT)) {
+                    availableProfiles.add(child.substring(0, child.length() - AI_PROFILE_EXT.length()));
                 }
             }
         }

@@ -17,25 +17,15 @@
  */
 package forge.ai.ability;
 
-import java.util.List;
-
-import com.google.common.base.Predicate;
-import com.google.common.collect.Iterables;
-
 import forge.ai.ComputerUtilCard;
 import forge.ai.SpellAbilityAi;
-import forge.game.card.Card;
-import forge.game.card.CardCollection;
-import forge.game.card.CardCollectionView;
-import forge.game.card.CardLists;
-import forge.game.card.CardPredicates;
-import forge.game.card.CounterEnumType;
-import forge.game.card.CounterType;
+import forge.game.card.*;
 import forge.game.keyword.Keyword;
 import forge.game.player.Player;
 import forge.game.zone.ZoneType;
 import forge.util.Aggregates;
 
+import java.util.List;
 
 /**
  * <p>
@@ -46,7 +36,6 @@ import forge.util.Aggregates;
  * @version $Id$
  */
 public abstract class CountersAi extends SpellAbilityAi {
-    // An AbilityFactory subclass for Putting or Removing Counters on Cards.
 
     /**
      * <p>
@@ -54,19 +43,19 @@ public abstract class CountersAi extends SpellAbilityAi {
      * </p>
      *
      * @param list
-     *            a {@link forge.CardList} object.
+     *            a {@link CardCollectionView} object.
      * @param type
-     *            a {@link java.lang.String} object.
+     *            a {@link String} object.
      * @param amount
      *            a int.
-     * @param newParam TODO
-     * @return a {@link forge.game.card.Card} object.
+     * @param ai a {@link Player} object.
+     * @return a {@link Card} object.
      */
     public static Card chooseCursedTarget(final CardCollectionView list, final String type, final int amount, final Player ai) {
         Card choice;
 
         // opponent can always order it so that he gets 0
-        if (amount == 1 && Iterables.any(ai.getOpponents().getCardsIn(ZoneType.Battlefield), CardPredicates.nameEquals("Vorinclex, Monstrous Raider"))) {
+        if (amount == 1 && ai.getOpponents().getCardsIn(ZoneType.Battlefield).anyMatch(CardPredicates.nameEquals("Vorinclex, Monstrous Raider"))) {
             return null;
         }
 
@@ -74,7 +63,7 @@ public abstract class CountersAi extends SpellAbilityAi {
             // try to kill the best killable creature, or reduce the best one
             // but try not to target a Undying Creature
             final List<Card> killable = CardLists.getNotKeyword(CardLists.filterToughness(list, amount), Keyword.UNDYING);
-            if (killable.size() > 0) {
+            if (!killable.isEmpty()) {
                 choice = ComputerUtilCard.getBestCreatureAI(killable);
             } else {
                 choice = ComputerUtilCard.getBestCreatureAI(list);
@@ -92,15 +81,19 @@ public abstract class CountersAi extends SpellAbilityAi {
      * </p>
      *
      * @param list
-     *            a {@link forge.CardList} object.
+     *            a {@link CardCollectionView} object.
      * @param type
-     *            a {@link java.lang.String} object.
-     * @return a {@link forge.game.card.Card} object.
+     *            a {@link String} object.
+     * @return a {@link Card} object.
      */
     public static Card chooseBoonTarget(final CardCollectionView list, final String type) {
-        Card choice = null;
+        Card choice;
+        CounterType counterType = CounterType.getType(type);
+        if (counterType == null) {
+            return Aggregates.random(list);
+        }
 
-        if (type.equals("P1P1")) {
+        if (counterType.is(CounterEnumType.P1P1)) {
             // TODO look for modified
             choice = ComputerUtilCard.getBestCreatureAI(list);
 
@@ -108,21 +101,20 @@ public abstract class CountersAi extends SpellAbilityAi {
                 // We'd only get here if list isn't empty, maybe we're trying to animate a land?
                 choice = ComputerUtilCard.getBestLandToAnimate(list);
             }
-        } else if (type.equals("DIVINITY")) {
-            final CardCollection boon = CardLists.filter(list, new Predicate<Card>() {
-                @Override
-                public boolean apply(final Card c) {
-                    return c.getCounters(CounterEnumType.DIVINITY) == 0;
-                }
-            });
+        } else if (counterType.is(CounterEnumType.CHARGE)) {
+            final CardCollection boon = CardLists.filter(list, c -> c.getCounters(CounterEnumType.CHARGE) < c.getKeywordMagnitude(Keyword.STATION) || c.getOracleText().matches(".*(for|number|emove) \\w+ (?:charge )counter.*"));
             choice = ComputerUtilCard.getMostExpensivePermanentAI(boon);
-        } else if (CounterType.get(type).isKeywordCounter()) {
+        } else if (counterType.isKeywordCounter()) {
             choice = ComputerUtilCard.getBestCreatureAI(CardLists.getNotKeyword(list, type));
         } else {
-            // The AI really should put counters on cards that can use it.
-            // Charge counters on things with Charge abilities, etc. Expand
-            // these above
-            choice = Aggregates.random(list);
+            CardCollectionView pref = CardLists.filter(list, c -> c.getCounters(counterType) == 0);
+            if (type.equals("DIVINITY") || type.equals("SHIELD")) {
+                choice = ComputerUtilCard.getMostExpensivePermanentAI(CardLists.filter(pref, Card::canBeDestroyed));
+            } else if (pref.isEmpty()) {
+                choice = Aggregates.random(list);
+            } else {
+                choice = ComputerUtilCard.getMostExpensivePermanentAI(pref);
+            }
         }
         return choice;
     }

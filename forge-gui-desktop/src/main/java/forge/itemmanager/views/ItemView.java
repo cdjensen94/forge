@@ -4,8 +4,6 @@ import java.awt.Color;
 import java.awt.Container;
 import java.awt.Dimension;
 import java.awt.Point;
-import java.awt.event.ActionEvent;
-import java.awt.event.ActionListener;
 import java.awt.event.ComponentAdapter;
 import java.awt.event.ComponentEvent;
 import java.awt.event.FocusAdapter;
@@ -28,8 +26,6 @@ import javax.swing.ScrollPaneConstants;
 import javax.swing.SwingConstants;
 import javax.swing.SwingUtilities;
 import javax.swing.Timer;
-import javax.swing.event.ChangeEvent;
-import javax.swing.event.ChangeListener;
 import javax.swing.event.ListSelectionEvent;
 import javax.swing.event.ListSelectionListener;
 
@@ -89,13 +85,27 @@ public abstract class ItemView<T extends InventoryItem> {
         this.pnlOptions.setOpaque(false);
         this.pnlOptions.setBorder(new FSkin.MatteSkinBorder(1, 0, 0, 0, BORDER_COLOR));
         this.scroller.setBorder(new FSkin.LineSkinBorder(BORDER_COLOR));
-        this.button = new FLabel.Builder()
+        final String buttonText = getButtonText();
+        final FLabel.Builder buttonBuilder = new FLabel.Builder()
             .hoverable()
             .selectable(true)
-            .icon(getIcon())
-            .iconScaleAuto(false)
             .tooltip(getCaption())
-            .build();
+            .text(buttonText);
+        final SkinImage icon = getIcon();
+        if (icon == null) {
+            buttonBuilder.fontAlign(SwingConstants.CENTER);
+            configureTextButton(buttonBuilder);
+        }
+        else {
+            buttonBuilder.icon(icon).iconScaleAuto(false);
+        }
+        this.button = buttonBuilder.build();
+        if (buttonText != null) {
+            this.button.setHorizontalAlignment(SwingConstants.CENTER);
+            this.button.setVerticalAlignment(SwingConstants.CENTER);
+            this.button.setHorizontalTextPosition(SwingConstants.CENTER);
+            this.button.setVerticalTextPosition(SwingConstants.CENTER);
+        }
 
         this.uniqueCardsOnlyChkBox = new FCheckBox(localizer.getMessage("lblUniqueCardsOnly"),
                                                    this.itemManager.getWantUnique());
@@ -113,14 +123,12 @@ public abstract class ItemView<T extends InventoryItem> {
         });
         comp.addKeyListener(incrementalSearch);
 
-        this.button.setCommand(new Runnable() {
-            @Override public void run() {
-                if (button.isSelected()) {
-                    itemManager.setViewIndex(index);
-                }
-                else {
-                    button.setSelected(true); //prevent toggling off button
-                }
+        this.button.setCommand((Runnable) () -> {
+            if (button.isSelected()) {
+                itemManager.setViewIndex(index);
+            }
+            else {
+                button.setSelected(true); //prevent toggling off button
             }
         });
 
@@ -180,16 +188,14 @@ public abstract class ItemView<T extends InventoryItem> {
     protected void setUniqueCardsOnlyFilter() {
         this.uniqueCardsOnlyChkBox.setFont(ROW_FONT);
         this.uniqueCardsOnlyChkBox.setToolTipText(localizer.getMessage("ttUniqueCardsOnly"));
-        this.uniqueCardsOnlyChkBox.addChangeListener(new ChangeListener() {
-            @Override public void stateChanged(final ChangeEvent arg0) {
-                final boolean wantUnique = uniqueCardsOnlyChkBox.isSelected();
-                if (itemManager.getWantUnique() == wantUnique) { return; }
-                itemManager.setWantUnique(wantUnique);
-                itemManager.refresh();
+        this.uniqueCardsOnlyChkBox.addChangeListener(arg0 -> {
+            final boolean wantUnique = uniqueCardsOnlyChkBox.isSelected();
+            if (itemManager.getWantUnique() == wantUnique) { return; }
+            itemManager.setWantUnique(wantUnique);
+            itemManager.refresh();
 
-                if (itemManager.getConfig() != null) {
-                    itemManager.getConfig().setUniqueCardsOnly(wantUnique);
-                }
+            if (itemManager.getConfig() != null) {
+                itemManager.getConfig().setUniqueCardsOnly(wantUnique);
             }
         });
         getPnlOptions().add(uniqueCardsOnlyChkBox);
@@ -349,6 +355,11 @@ public abstract class ItemView<T extends InventoryItem> {
     public abstract int getSelectionCount();
     public abstract int getIndexAtPoint(Point p);
     protected abstract SkinImage getIcon();
+    protected String getButtonText() {
+        return null;
+    }
+    protected void configureTextButton(final FLabel.Builder buttonBuilder) {
+    }
     protected abstract String getCaption();
     protected abstract void onSetSelectedIndex(int index);
     protected abstract void onSetSelectedIndices(Iterable<Integer> indices);
@@ -427,11 +438,7 @@ public abstract class ItemView<T extends InventoryItem> {
                 popup = factory.getPopup(null, popupLabel, tableLoc.x + 10, tableLoc.y + 10);
                 FSkin.setTempBackground(SwingUtilities.getRoot(popupLabel), FSkin.getColor(FSkin.Colors.CLR_INACTIVE));
 
-                popupTimer = new Timer(5000, new ActionListener() {
-                    @Override public void actionPerformed(final ActionEvent e) {
-                        cancel();
-                    }
-                });
+                popupTimer = new Timer(5000, e -> cancel());
                 popupTimer.setRepeats(false);
 
                 popup.show();

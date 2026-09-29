@@ -23,39 +23,45 @@ public class MulliganService {
     public void perform() {
         initializeMulligans();
         runPlayerMulligans();
+        runPostMulligans();
     }
 
     private void initializeMulligans() {
         List<Player> whoCanMulligan = Lists.newArrayList(game.getPlayers());
         int offset = whoCanMulligan.indexOf(firstPlayer);
 
-        // Have to cycle-shift the list to get the first player on index 0
         for (int i = 0; i < offset; i++) {
             whoCanMulligan.add(whoCanMulligan.remove(0));
         }
 
         boolean firstMullFree = game.getPlayers().size() > 2 || game.getRules().hasAppliedVariant(GameType.Brawl);
 
-        for (int i = 0; i < whoCanMulligan.size(); i++) {
+        for (Player player : whoCanMulligan) {
             MulliganDefs.MulliganRule rule = StaticData.instance().getMulliganRule();
+            AbstractMulligan mulligan;
             switch (rule) {
                 case Original:
-                    mulligans.add(new OriginalMulligan(whoCanMulligan.get(i), firstMullFree));
+                    mulligan = new OriginalMulligan(player, firstMullFree);
                     break;
                 case Paris:
-                    mulligans.add(new ParisMulligan(whoCanMulligan.get(i), firstMullFree));
+                    mulligan = new ParisMulligan(player, firstMullFree);
                     break;
                 case Vancouver:
-                    mulligans.add(new VancouverMulligan(whoCanMulligan.get(i), firstMullFree));
+                    mulligan = new VancouverMulligan(player, firstMullFree);
                     break;
                 case London:
-                    mulligans.add(new LondonMulligan(whoCanMulligan.get(i), firstMullFree));
+                    mulligan = new LondonMulligan(player, firstMullFree);
+                    break;
+                case Houston:
+                    mulligan = new HoustonMulligan(player, firstMullFree);
                     break;
                 default:
-                    // Default to Vancouver mulligan for now. Should ideally never get here.
-                    mulligans.add(new VancouverMulligan(whoCanMulligan.get(i), firstMullFree));
+                    mulligan = new VancouverMulligan(player, firstMullFree);
                     break;
             }
+
+            mulligans.add(mulligan);
+            mulligan.beforeFirstMulligan();
         }
     }
 
@@ -67,10 +73,17 @@ public class MulliganService {
                 if (mulligan.hasKept()) {
                     continue;
                 }
-                Player p = mulligan.getPlayer();
-                boolean keep = !mulligan.canMulligan() || p.getController().mulliganKeepHand(firstPlayer, mulligan.tuckCardsAfterKeepHand());
 
-                if (game.isGameOver()) { // conceded on mulligan prompt
+                Player p = mulligan.getPlayer();
+
+                boolean keep = !mulligan.canMulligan() ||
+                        p.getController().mulliganKeepHand(
+                                firstPlayer,
+                                mulligan.tuckCardsDuringMulligan()
+                        );
+
+                if (game.isGameOver()) {
+                    // conceded during mulligan prompt
                     return;
                 }
 
@@ -80,11 +93,12 @@ public class MulliganService {
                 }
 
                 allKept = false;
-
                 mulligan.mulligan();
             }
         } while (!allKept);
+    }
 
+    private void runPostMulligans() {
         for (AbstractMulligan mulligan : mulligans) {
             mulligan.afterMulligan();
         }

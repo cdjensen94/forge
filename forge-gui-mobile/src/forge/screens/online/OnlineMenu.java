@@ -12,54 +12,31 @@ import forge.menu.FMenuItem;
 import forge.menu.FPopupMenu;
 import forge.model.FModel;
 import forge.screens.FScreen;
-import forge.toolbox.FEvent;
-import forge.toolbox.FEvent.FEventHandler;
 import forge.toolbox.FOptionPane;
-import forge.util.Callback;
 
 public class OnlineMenu extends FPopupMenu {
     public enum OnlineScreen {
-        Lobby("lblLobby", FSkinImage.FAVICON, OnlineLobbyScreen.class),
-        Chat("lblChat", FSkinImage.QUEST_NOTES, OnlineChatScreen.class),
-        Disconnect("lblDisconnect", FSkinImage.DELETE, null);
+        Lobby("lblPlayOnline", FSkinImage.FAVICON, OnlineLobbyScreen.class, null),
+        Chat("lblChat", FSkinImage.QUEST_NOTES, OnlineChatScreen.class, null),
+        ServerUrl("lblServerURL", FSkinImage.INFORMATION, null, ServerAddressesDialog::show),
+        Disconnect("lblDisconnect", FSkinImage.DELETE, null, OnlineMenu::handleDisconnect);
 
         private final FMenuItem item;
         private final Class<? extends FScreen> screenClass;
+        private final Runnable customAction;
         private FScreen screen;
 
-        OnlineScreen(final String caption0, final FImage icon0, final Class<? extends FScreen> screenClass0) {
+        OnlineScreen(final String caption0, final FImage icon0, final Class<? extends FScreen> screenClass0, final Runnable customAction0) {
             screenClass = screenClass0;
-            item = new FMenuItem(Forge.getLocalizer().getMessage(caption0), icon0, new FEventHandler() {
-                @Override
-                public void handleEvent(FEvent e) {
-                    if(screenClass == null) {
-                        FOptionPane.showConfirmDialog(
-                                Forge.getLocalizer().getMessage("lblLeaveLobbyDescription"),
-                                Forge.getLocalizer().getMessage("lblDisconnect"), new Callback<Boolean>() {
-                                    @Override
-                                    public void run(Boolean result) {
-                                        if (result) {
-                                            if (FServerManager.getInstance() != null)
-                                                if(FServerManager.getInstance().isHosting()) {
-                                                    FServerManager.getInstance().unsetReady();
-                                                    FServerManager.getInstance().stopServer();
-                                                }
-
-                                            if (OnlineLobbyScreen.getfGameClient() != null)
-                                                OnlineLobbyScreen.closeClient();
-
-                                            Forge.back();
-                                            screen = null;
-                                            OnlineLobbyScreen.clearGameLobby();
-                                        }
-                                    }
-                                });
-                        return;
-                    }
-                    Forge.back(); //remove current screen from chain
-                    open();
-                    setPreferredScreen(OnlineScreen.this);
+            customAction = customAction0;
+            item = new FMenuItem(Forge.getLocalizer().getMessage(caption0), icon0, e -> {
+                if (customAction != null) {
+                    customAction.run();
+                    return;
                 }
+                Forge.back(); //remove current screen from chain
+                open();
+                setPreferredScreen(OnlineScreen.this);
             });
         }
         
@@ -93,14 +70,8 @@ public class OnlineMenu extends FPopupMenu {
         }
 
         public void update(){
-            for (OnlineScreen ngs : OnlineScreen.values()) {
-                if (ngs.ordinal() == 2){ //disconect
-                    if (getGameLobby() == null)
-                        ngs.item.setEnabled(false);
-                    else
-                        ngs.item.setEnabled(true);
-                }
-            }
+            Disconnect.item.setEnabled(getGameLobby() != null);
+            ServerUrl.item.setEnabled(FServerManager.getInstance() != null && FServerManager.getInstance().isHosting());
         }
     }
 
@@ -135,6 +106,27 @@ public class OnlineMenu extends FPopupMenu {
     }
 
     private OnlineMenu() {
+    }
+
+    private static void handleDisconnect() {
+        FOptionPane.showConfirmDialog(
+                Forge.getLocalizer().getMessage("lblLeaveLobbyDescription"),
+                Forge.getLocalizer().getMessage("lblDisconnect"), result -> {
+                    if (result) {
+                        if (FServerManager.getInstance() != null)
+                            if (FServerManager.getInstance().isHosting()) {
+                                FServerManager.getInstance().unsetReady();
+                                FServerManager.getInstance().stopServer();
+                            }
+
+                        if (OnlineLobbyScreen.getfGameClient() != null)
+                            OnlineLobbyScreen.closeClient();
+
+                        Forge.back();
+                        OnlineScreen.Disconnect.screen = null;
+                        OnlineLobbyScreen.clearGameLobby();
+                    }
+                });
     }
 
     @Override

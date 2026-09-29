@@ -23,6 +23,7 @@ import java.util.Objects;
 
 import com.google.common.collect.*;
 
+import forge.util.ITranslatable;
 import org.apache.commons.lang3.StringUtils;
 
 import forge.game.Game;
@@ -34,6 +35,7 @@ import forge.game.ability.ApiType;
 import forge.game.card.Card;
 import forge.game.card.CardCollectionView;
 import forge.game.phase.PhaseType;
+import forge.game.player.Player;
 import forge.game.spellability.SpellAbility;
 import forge.game.zone.ZoneType;
 import forge.util.CardTranslation;
@@ -59,6 +61,7 @@ public abstract class ReplacementEffect extends TriggerReplacementBase {
     private boolean hasRun = false;
 
     private List<ReplacementEffect> otherChoices = null;
+    private ReplacementEffectView view = null;
 
     /**
      * Gets the id.
@@ -108,6 +111,15 @@ public abstract class ReplacementEffect extends TriggerReplacementBase {
         }
     }
 
+    public ReplacementEffectView getView() {
+        if (view == null)
+            view = new ReplacementEffectView(this);
+        else {
+            view.updateHostCard(this);
+            view.updateDescription(this);
+        }
+        return view;
+    }
     /**
      * Sets the checks for run.
      *
@@ -143,37 +155,44 @@ public abstract class ReplacementEffect extends TriggerReplacementBase {
      * @return a boolean.
      */
     public boolean requirementsCheck(Game game) {
-        return this.requirementsCheck(game, this.getMapParams());
-    }
-    public boolean requirementsCheck(Game game, Map<String,String> params) {
         if (this.isSuppressed()) {
             return false; // Effect removed by effect
         }
 
-        if (params.containsKey("PlayerTurn")) {
-            if (params.get("PlayerTurn").equals("True") && !game.getPhaseHandler().isPlayerTurn(this.getHostCard().getController())) {
+        if (hasParam("PlayerTurn")) {
+            if (getParam("PlayerTurn").equals("True")) {
+                if (!game.getPhaseHandler().isPlayerTurn(getHostCard().getController())) {
+                    return false;
+                }
+            } else {
+                List<Player> players = AbilityUtils.getDefinedPlayers(getHostCard(), getParam("PlayerTurn"), this);
+                if (!players.contains(game.getPhaseHandler().getPlayerTurn())) {
+                    return false;
+                }
+            }
+        }
+
+        if (hasParam("ActivePhases")) {
+            if (!PhaseType.parseRange(getParam("ActivePhases")).contains(game.getPhaseHandler().getPhase())) {
                 return false;
             }
         }
 
-        if (params.containsKey("ActivePhases")) {
-            if (!PhaseType.parseRange(params.get("ActivePhases")).contains(game.getPhaseHandler().getPhase())) {
-                return false;
-            }
-        }
-
-        return meetsCommonRequirements(params);
+        return meetsCommonRequirements(getMapParams());
     }
 
+    public final ReplacementEffect copy(Card newHost, boolean lki) {
+        return copy(newHost, lki, false);
+    }
     /**
      * Gets the copy.
      *
      * @return the copy
      */
-    public final ReplacementEffect copy(final Card host, final boolean lki) {
+    public final ReplacementEffect copy(final Card host, final boolean lki, boolean keepTextChanges) {
         final ReplacementEffect res = (ReplacementEffect) clone();
 
-        copyHelper(res, host);
+        copyHelper(res, host, lki || keepTextChanges);
 
         final SpellAbility sa = this.getOverridingAbility();
         if (sa != null) {
@@ -221,15 +240,11 @@ public abstract class ReplacementEffect extends TriggerReplacementBase {
     public String getDescription() {
         if (hasParam("Description") && !this.isSuppressed()) {
             String desc = AbilityUtils.applyDescriptionTextChangeEffects(getParam("Description"), this);
-            String currentName;
-            if (this.isIntrinsic() && cardState != null && cardState.getCard() == getHostCard()) {
-                currentName = cardState.getName();
-            } else {
-                currentName = getHostCard().getName();
-            }
-            desc = CardTranslation.translateSingleDescriptionText(desc, currentName);
-            desc = TextUtil.fastReplace(desc, "CARDNAME", CardTranslation.getTranslatedName(currentName));
-            desc = TextUtil.fastReplace(desc, "NICKNAME", Lang.getInstance().getNickName(CardTranslation.getTranslatedName(currentName)));
+            ITranslatable nameSource = getHostName(this);
+            desc = CardTranslation.translateMultipleDescriptionText(desc, nameSource);
+            String translatedName = nameSource.getTranslatedName();
+            desc = TextUtil.fastReplace(desc, "CARDNAME", translatedName);
+            desc = TextUtil.fastReplace(desc, "NICKNAME", Lang.getInstance().getNickName(translatedName));
             if (desc.contains("EFFECTSOURCE")) {
                 desc = TextUtil.fastReplace(desc, "EFFECTSOURCE", getHostCard().getEffectSource().toString());
             }
@@ -258,9 +273,8 @@ public abstract class ReplacementEffect extends TriggerReplacementBase {
                 }
             }
             return desc;
-        } else {
-            return "";
         }
+        return "";
     }
 
     /**
@@ -316,11 +330,6 @@ public abstract class ReplacementEffect extends TriggerReplacementBase {
         return sa;
     }
 
-    @Override
-    public List<Object> getTriggerRemembered() {
-        return ImmutableList.of();
-    }
-
     protected boolean canReplaceETB(Map<AbilityKey, Object> runParams) {
         // if Card does affect something other than itself
         if (!hasParam("ValidCard") || !getParam("ValidCard").startsWith("Card.Self")) {
@@ -329,13 +338,17 @@ public abstract class ReplacementEffect extends TriggerReplacementBase {
                 return false;
             }
             // and it wasn't already on the field, skip
-            if (getActiveZone().contains(ZoneType.Battlefield) && runParams.containsKey(AbilityKey.LastStateBattlefield)) {
+            if (getActiveZone() != null && getActiveZone().contains(ZoneType.Battlefield) && runParams.containsKey(AbilityKey.LastStateBattlefield)) {
                 CardCollectionView lastBattlefield = (CardCollectionView) runParams.get(AbilityKey.LastStateBattlefield);
-                if (!lastBattlefield.contains(getHostCard())) {
+                if (lastBattlefield != null && !lastBattlefield.contains(getHostCard())) {
                     return false;
                 }
             }
         }
         return true;
+    }
+
+    public boolean modeCheck(ReplacementType event, Map<AbilityKey, Object> runParams) {
+        return event.equals(getMode());
     }
 }

@@ -17,20 +17,16 @@
  */
 package forge.ai.ability;
 
-import java.util.List;
-import java.util.Map;
-
-import com.google.common.base.Predicate;
-
-import forge.ai.ComputerUtilCard;
-import forge.ai.ComputerUtilCombat;
-import forge.ai.SpellAbilityAi;
+import forge.ai.*;
 import forge.game.card.Card;
 import forge.game.card.CardLists;
 import forge.game.combat.CombatUtil;
 import forge.game.player.Player;
 import forge.game.player.PlayerActionConfirmMode;
 import forge.game.spellability.SpellAbility;
+
+import java.util.List;
+import java.util.Map;
 
 /**
  * <p>
@@ -47,19 +43,17 @@ public final class EncodeAi extends SpellAbilityAi {
      * </p>
      * @param sa
      *            a {@link forge.game.spellability.SpellAbility} object.
-     * @param af
-     *            a {@link forge.game.ability.AbilityFactory} object.
      * 
      * @return a boolean.
      */
     @Override
-    protected boolean canPlayAI(Player aiPlayer, SpellAbility sa) {
-        return true;
+    protected AiAbilityDecision canPlay(Player aiPlayer, SpellAbility sa) {
+        return new AiAbilityDecision(100, AiPlayDecision.WillPlay);
     }
 
     @Override
-    public boolean chkAIDrawback(SpellAbility sa, Player ai) {
-        return true;
+    public AiAbilityDecision chkDrawback(Player ai, SpellAbility sa) {
+        return new AiAbilityDecision(100, AiPlayDecision.WillPlay);
     }
 
     /*
@@ -91,24 +85,16 @@ public final class EncodeAi extends SpellAbilityAi {
         Card choice = null;
         // final String logic = sa.getParam("AILogic");
         // if (logic == null) {
-        final List<Card> attackers = CardLists.filter(list, new Predicate<Card>() {
-            @Override
-            public boolean apply(final Card c) {
-                return ComputerUtilCombat.canAttackNextTurn(c);
-            }
-        });
-        final List<Card> unblockables = CardLists.filter(attackers, new Predicate<Card>() {
-            @Override
-            public boolean apply(final Card c) {
-                boolean canAttackOpponent = false;
-                for (Player opp : ai.getOpponents()) {
-                    if (CombatUtil.canAttack(c, opp) && !CombatUtil.canBeBlocked(c, null, opp)) {
-                        canAttackOpponent = true;
-                        break;
-                    }
+        final List<Card> attackers = CardLists.filter(list, ComputerUtilCombat::canAttackNextTurn);
+        final List<Card> unblockables = CardLists.filter(attackers, c -> {
+            boolean canAttackOpponent = false;
+            for (Player opp : ai.getOpponents()) {
+                if (CombatUtil.canAttack(c, opp) && !CombatUtil.canBeBlocked(c, null, opp)) {
+                    canAttackOpponent = true;
+                    break;
                 }
-                return canAttackOpponent;
             }
+            return canAttackOpponent;
         });
         if (!unblockables.isEmpty()) {
             choice = ComputerUtilCard.getBestAI(unblockables);

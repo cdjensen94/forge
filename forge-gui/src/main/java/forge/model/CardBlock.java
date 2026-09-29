@@ -17,23 +17,21 @@
  */
 package forge.model;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.TreeMap;
-
-import org.apache.commons.lang3.StringUtils;
-
-import com.google.common.base.Function;
-import com.google.common.base.Predicate;
-
 import forge.card.CardEdition;
-import forge.item.IPaperCard;
 import forge.item.PaperCard;
+import forge.item.PaperCardPredicates;
 import forge.item.generation.IUnOpenedProduct;
 import forge.item.generation.UnOpenedProduct;
 import forge.util.TextUtil;
 import forge.util.storage.StorageReaderFile;
+import org.apache.commons.lang3.StringUtils;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.TreeMap;
+import java.util.function.Function;
+import java.util.function.Predicate;
 
 // import forge.deck.Deck;
 
@@ -49,6 +47,7 @@ public final class CardBlock implements Comparable<CardBlock> {
     private final int cntBoostersDraft;
     private final int cntBoostersSealed;
     private Predicate<PaperCard> filter = null;
+    private Function<String, IUnOpenedProduct> boosterResolver;
 
     /**
      * Instantiates a new card block.
@@ -143,7 +142,7 @@ public final class CardBlock implements Comparable<CardBlock> {
         for (final CardEdition set : this.sets) {
             setCodes.add(set.getCode());
         }
-        return IPaperCard.Predicates.printedInSets(setCodes, true);
+        return PaperCardPredicates.printedInSets(setCodes, true);
     }
 
     /*
@@ -212,14 +211,6 @@ public final class CardBlock implements Comparable<CardBlock> {
         return this.name + " (block)";
     }
 
-    public static final Function<CardBlock, String> FN_GET_NAME = new Function<CardBlock, String>() {
-
-        @Override
-        public String apply(CardBlock arg1) {
-            return arg1.getName();
-        }
-    };
-
     public static class Reader extends StorageReaderFile<CardBlock> {
 
         private final CardEdition.Collection editions;
@@ -229,7 +220,7 @@ public final class CardBlock implements Comparable<CardBlock> {
          * @param editions0
          */
         public Reader(String pathname, CardEdition.Collection editions0) {
-            super(pathname, CardBlock.FN_GET_NAME);
+            super(pathname, CardBlock::getName);
             editions = editions0;
         }
 
@@ -288,6 +279,21 @@ public final class CardBlock implements Comparable<CardBlock> {
      */
     public IUnOpenedProduct getBooster(final String code) {
         MetaSet ms = metaSets.get(code);
-        return ms == null ? new UnOpenedProduct(FModel.getMagicDb().getBoosters().get(code)) : ms.getBooster();
+        if (ms != null) return ms.getBooster();
+        if (boosterResolver != null) {
+            IUnOpenedProduct override = boosterResolver.apply(code);
+            if (override != null) return override;
+        }
+        return new UnOpenedProduct(FModel.getMagicDb().getBoosters().get(code));
+    }
+
+    /**
+     * Install an optional booster resolver consulted before falling back
+     * to the shared {@code StaticData} booster cache. Used by adventure
+     * mods to supply plane-scoped booster templates without mutating the
+     * upstream edition data.
+     */
+    public void setBoosterResolver(Function<String, IUnOpenedProduct> resolver) {
+        this.boosterResolver = resolver;
     }
 }

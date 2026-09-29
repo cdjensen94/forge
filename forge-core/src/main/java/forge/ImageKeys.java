@@ -23,10 +23,18 @@ public final class ImageKeys {
 
     public static final String HIDDEN_CARD           = "hidden";
     public static final String MORPH_IMAGE           = "morph";
-    public static final String DISGUISED_IMAGE       = "disguised";
     public static final String MANIFEST_IMAGE        = "manifest";
     public static final String CLOAKED_IMAGE         = "cloaked";
     public static final String FORETELL_IMAGE        = "foretell";
+    public static final String BLESSING_IMAGE        = "blessing";
+    public static final String ENDURING_STORY_IMAGE  = "enduring_story";
+    public static final String INITIATIVE_IMAGE      = "initiative";
+    public static final String MONARCH_IMAGE         = "monarch";
+    public static final String THE_RING_IMAGE        = "the_ring";
+    public static final String RADIATION_IMAGE       = "radiation";
+    public static final String SPEED_IMAGE           = "speed";
+    public static final String MAX_SPEED_IMAGE       = "max_speed";
+    public static final String ADVENTURE_IMAGE       = "adventure";
 
     public static final String BACKFACE_POSTFIX  = "$alt";
     public static final String SPECFACE_W = "$wspec";
@@ -85,7 +93,7 @@ public final class ImageKeys {
     }
 
     private static final Map<String, File> cachedCards = new HashMap<>(50000);
-    private static HashSet<String> missingCards = new HashSet<>();
+    public static HashSet<String> missingCards = new HashSet<>();
     public static void clearMissingCards() {
         missingCards.clear();
     }
@@ -98,8 +106,18 @@ public final class ImageKeys {
 
         final String dir;
         final String filename;
+        String[] tempdata = null;
         if (key.startsWith(ImageKeys.TOKEN_PREFIX)) {
-            filename = key.substring(ImageKeys.TOKEN_PREFIX.length());
+            tempdata = key.substring(ImageKeys.TOKEN_PREFIX.length()).split("\\|");
+            String tokenname = tempdata[0];
+            if (tempdata.length > 1) {
+                tokenname += "_" + tempdata[1];
+            }
+            if (tempdata.length > 2) {
+                tokenname += "_" + tempdata[2];
+            }
+            filename = tokenname;
+
             dir = CACHE_TOKEN_PICS_DIR;
         } else if (key.startsWith(ImageKeys.ICON_PREFIX)) {
             filename = key.substring(ImageKeys.ICON_PREFIX.length());
@@ -139,6 +157,30 @@ public final class ImageKeys {
             if (file != null) {
                 cachedCards.put(filename, file);
                 return file;
+            }
+            if (dir.equals(CACHE_TOKEN_PICS_DIR)) {
+                String setlessFilename = tempdata[0];
+                String setCode = tempdata.length > 1 ? tempdata[1] : "";
+                String collectorNumber = tempdata.length > 2 ? tempdata[2] : "";
+                if (!setCode.isEmpty()) {
+                    if (!collectorNumber.isEmpty()) {
+                        file = findFile(dir, setCode + "/" + collectorNumber + "_" + setlessFilename);
+                        if (file != null) {
+                            cachedCards.put(filename, file);
+                            return file;
+                        }
+                    }
+                    file = findFile(dir, setCode + "/" + setlessFilename);
+                    if (file != null) {
+                        cachedCards.put(filename, file);
+                        return file;
+                    }
+                }
+                file = findFile(dir, setlessFilename);
+                if (file != null) {
+                    cachedCards.put(filename, file);
+                    return file;
+                }
             }
 
             // AE -> Ae and Ae -> AE for older cards with different file names
@@ -221,39 +263,7 @@ public final class ImageKeys {
                     return file;
                 }
             }
-            if (dir.equals(CACHE_TOKEN_PICS_DIR)) {
-                int index = filename.lastIndexOf('_');
-                if (index != -1) {
-                    String setlessFilename = filename.substring(0, index);
-                    String setCode = filename.substring(index + 1);
-                    // try with upper case set
-                    file = findFile(dir, setlessFilename + "_" + setCode.toUpperCase());
-                    if (file != null) {
-                        cachedCards.put(filename, file);
-                        return file;
-                    }
-                    // try with lower case set
-                    file = findFile(dir, setlessFilename + "_" + setCode.toLowerCase());
-                    if (file != null) {
-                        cachedCards.put(filename, file);
-                        return file;
-                    }
-                    // try without set name
-                    file = findFile(dir, setlessFilename);
-                    if (file != null) {
-                        cachedCards.put(filename, file);
-                        return file;
-                    }
-                    // if there's an art variant try without it
-                    if (setlessFilename.matches(".*[0-9]*$")) {
-                        file = findFile(dir, setlessFilename.replaceAll("[0-9]*$", ""));
-                        if (file != null) {
-                            cachedCards.put(filename, file);
-                            return file;
-                        }
-                    }
-                }
-            } else if (filename.contains("/")) {
+            if (filename.contains("/")) {
                 String setlessFilename = filename.substring(filename.indexOf('/') + 1);
                 file = findFile(dir, setlessFilename);
                 if (file != null) {
@@ -310,7 +320,7 @@ public final class ImageKeys {
         }
 
         // System.out.println("File not found, no image created: " + key);
-        //add missing cards - disable for desktop version for compatibility reasons with autodownloader
+        // add missing cards - disable for desktop version for compatibility reasons with autodownloader
         if (isLibGDXPort && !hasSetLookup(filename)) //missing cards with setlookup is handled differently
             missingCards.add(filename);
         return null;
@@ -322,8 +332,10 @@ public final class ImageKeys {
                 : CACHE_CARD_PICS_SUBDIR.get(edition); // may use custom paths though
     }
     public static boolean hasSetLookup(String filename) {
+        if (filename == null)
+            return false;
         if (!StaticData.instance().getSetLookup().isEmpty()) {
-            return StaticData.instance().getSetLookup().keySet().stream().anyMatch(setKey -> filename.startsWith(setKey));
+            return StaticData.instance().getSetLookup().keySet().stream().anyMatch(filename::startsWith);
         }
 
         return false;
@@ -337,7 +349,7 @@ public final class ImageKeys {
                         File f = new File(lookupDirectory);
                         if (f.exists() && f.isDirectory()) {
                             for (String ext : FILE_EXTENSIONS) {
-                                if (ext.equals(""))
+                                if (ext.isEmpty())
                                     continue;
                                 File placeholder;
                                 String fb1 = fullborderFile.replace(setKey+"/","")+ext;
@@ -371,7 +383,7 @@ public final class ImageKeys {
     private static File findFile(String dir, String filename) {
         if (dir.equals(CACHE_CARD_PICS_DIR)) {
             for (String ext : FILE_EXTENSIONS) {
-                if (ext.equals(""))
+                if (ext.isEmpty())
                     continue;
 
                 File f = new File(dir, filename + ext);

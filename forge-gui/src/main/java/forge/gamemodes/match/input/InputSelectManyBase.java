@@ -1,18 +1,17 @@
 package forge.gamemodes.match.input;
 
-import java.util.Collection;
-
 import com.google.common.collect.Iterables;
-
 import forge.game.GameEntity;
-import forge.game.card.Card;
+import forge.game.GameEntityView;
 import forge.game.card.CardView;
-import forge.game.player.Player;
-import forge.game.player.PlayerView;
 import forge.game.spellability.SpellAbility;
 import forge.localinstance.properties.ForgePreferences;
 import forge.model.FModel;
 import forge.player.PlayerControllerHuman;
+
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.List;
 
 public abstract class InputSelectManyBase<T extends GameEntity> extends InputSyncronizedBase {
     private static final long serialVersionUID = -2305549394512889450L;
@@ -55,7 +54,6 @@ public abstract class InputSelectManyBase<T extends GameEntity> extends InputSyn
         this.tally = tally0;
     }
 
-
     protected InputSelectManyBase(final PlayerControllerHuman controller, final int min, final int max, final CardView card0) {
     	this(controller,min,max);
     	this.sa = null;
@@ -76,28 +74,32 @@ public abstract class InputSelectManyBase<T extends GameEntity> extends InputSyn
     protected abstract String getMessage();
 
     @Override
-    public final void showMessage() {
+    public void showMessage() {
         if (FModel.getPreferences().getPrefBoolean(ForgePreferences.FPref.UI_DETAILED_SPELLDESC_IN_PROMPT) &&
-             card != null) {
+                card != null) {
             final StringBuilder sb = new StringBuilder();
             sb.append(card.toString());
-            if ( (sa != null) && (!sa.toString().isEmpty()) ) { // some spell abilities have no useful string value
-                sb.append(" - ").append(sa.toString());
+            if (sa != null) {
+                if (sa.isSpell() && sa.getHostCard().isPermanent() && !sa.hasParam("SpellDescription") && !sa.getPayCosts().isOnlyManaCost()) {
+                    sb.append(" - ").append(sa.getPayCosts().toString());
+                } else if (!sa.toString().isEmpty()) { // some spell abilities have no useful string value
+                    sb.append("\n - ").append(sa.toString());
+                } else {
+                    sb.append("\n");
+                }
             }
-            sb.append("\n\n").append(getMessage());
+            sb.append("\n").append(getMessage());
             showMessage(sb.toString(), card);
+        } else if (card != null) {
+            showMessage(getMessage(), card);
         } else {
-            if (card != null) { 
-                showMessage(getMessage(), card);
-            } else {
-                showMessage(getMessage());
-            }
+            showMessage(getMessage());
         }
         getController().getGui().updateButtons(getOwner(), hasEnoughTargets(), allowCancel, true);
     }
 
     @Override
-    protected final void onCancel() {
+    protected void onCancel() {
         bCancelled = true;
         resetUsedToPay();
         this.getSelected().clear();
@@ -121,24 +123,14 @@ public abstract class InputSelectManyBase<T extends GameEntity> extends InputSyn
         this.message = message0;
     }
 
-    protected void onSelectStateChanged(final GameEntity c, final boolean newState) {
-        if (c instanceof Card) {
-            getController().getGui().setUsedToPay(CardView.get((Card) c), newState); // UI supports card highlighting though this abstraction-breaking mechanism
-        }
-        else if (c instanceof Player) {
-            getController().getGui().setHighlighted(PlayerView.get((Player) c), newState);
-        }
+    protected void onSelectStateChanged(final GameEntity ge, final boolean newState) {
+        getController().getGui().setHighlighted(List.of(GameEntityView.get(ge)), newState);
     }
 
     private void resetUsedToPay() {
-        for (final GameEntity c : getSelected()) {
-            if (c instanceof Card) {
-                getController().getGui().setUsedToPay(CardView.get((Card) c), false);
-            }
-            else if (c instanceof Player) {
-                getController().getGui().setHighlighted(PlayerView.get((Player) c), false);
-            }
-        }
+        final List<GameEntityView> views = new ArrayList<>();
+        for (final GameEntity ge : getSelected()) views.add(GameEntityView.get(ge));
+        getController().getGui().setHighlighted(views, false);
     }
 
     public final void setCancelAllowed(boolean allow) {

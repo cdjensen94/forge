@@ -1,9 +1,10 @@
 [metadata]
-Code=PDCI
+Code=DCI
 Date=2006-01-01
 Name=DCI Promos
+Code2=PDCI
 Type=Promo
-ScryfallCode=PDCI
+ScryfallCode=DCI
 
 [cards]
 1 R Wood Elves @Rebecca Guay
@@ -55,6 +56,7 @@ ScryfallCode=PDCI
 48 R Staggershock @Raymond Swanland
 49 R Deathless Angel @Johann Bodin
 50 R Fling @Daren Bader
+50† R Fling @Daren Bader
 51 R Sylvan Ranger @Ciruelo
 52 C Liliana's Specter @Jaime Jones
 53 R Mitotic Slime @Ron Spencer

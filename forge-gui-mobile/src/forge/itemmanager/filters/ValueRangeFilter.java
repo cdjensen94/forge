@@ -1,7 +1,6 @@
 package forge.itemmanager.filters;
 
 import com.badlogic.gdx.utils.Align;
-import com.google.common.base.Predicate;
 
 import forge.card.CardRules;
 import forge.card.CardRulesPredicates;
@@ -9,11 +8,11 @@ import forge.item.InventoryItem;
 import forge.itemmanager.ItemManager;
 import forge.itemmanager.SFilterUtil;
 import forge.toolbox.FDisplayObject;
-import forge.toolbox.FEvent;
-import forge.toolbox.FEvent.FEventHandler;
 import forge.toolbox.FLabel;
 import forge.toolbox.FSpinner;
 import forge.util.ComparableOp;
+
+import java.util.function.Predicate;
 
 
 public abstract class ValueRangeFilter<T extends InventoryItem> extends ItemFilter<T> {
@@ -60,24 +59,18 @@ public abstract class ValueRangeFilter<T extends InventoryItem> extends ItemFilt
 
         upperBound = addSpinner(widget, false);
 
-        lowerBound.setChangedHandler(new FEventHandler() {
-            @Override
-            public void handleEvent(FEvent e) {
-                if (upperBound.getValue() < lowerBound.getValue()) {
-                    upperBound.setValue(lowerBound.getValue());
-                }
-                applyChange();
+        lowerBound.setChangedHandler(e -> {
+            if (upperBound.getValue() < lowerBound.getValue()) {
+                upperBound.setValue(lowerBound.getValue());
             }
+            applyChange();
         });
 
-        upperBound.setChangedHandler(new FEventHandler() {
-            @Override
-            public void handleEvent(FEvent e) {
-                if (lowerBound.getValue() > upperBound.getValue()) {
-                    lowerBound.setValue(upperBound.getValue());
-                }
-                applyChange();
+        upperBound.setChangedHandler(e -> {
+            if (lowerBound.getValue() > upperBound.getValue()) {
+                lowerBound.setValue(upperBound.getValue());
             }
+            applyChange();
         });
     }
 

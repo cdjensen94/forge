@@ -4,10 +4,36 @@ Date=2024-04-19
 Name=Outlaws of Thunder Junction
 Type=Expansion
 ScryfallCode=OTJ
-Booster=6 Common, 3 Uncommon, 1 RareMythic, 1 Land, 1 Any, 1 Any OTP, 1 Any+
-ChanceReplaceCommonWith=.20F fromsheet("OTJ outlaw list")
+BoosterSlots=Common,Common-Guest,Uncommon,RareMythic,Land,Wildcard,WildcardOTP
+Booster=5 Common, 1 Common-Guest, 3 Uncommon, 1 RareMythic, 1 Land, 1 Wildcard, 1 Wildcard+, 1 WildcardOTP
 Prerelease=6 Boosters, 1 RareMythic+
 BoosterBox=36
+
+#Numbers from https://mtgscribe.com/2024/04/05/outlaws-of-thunder-junction-play-booster-fact-sheet/
+[Common]
+Base=Common:fromSheet("OTJ cards")
+
+[Common-Guest]
+Base=Common:fromSheet("OTJ cards")
+Replace=.20F fromSheet("OTJ outlaw list")
+
+[Uncommon]
+Base=Uncommon:fromSheet("OTJ cards")
+
+[RareMythic]
+Base=RareMythic:fromSheet("OTJ cards")
+Replace=.025F RareMythic:!fromSheet("OTJ outlaw list")
+
+[Wildcard]
+Base=Any:!fromSheet("OTJ outlaw list")
+Replace=.0833F RareMythic:fromSheet("OTJ cards")
+
+[WildcardOTP]
+Base=Uncommon:fromSheet("OTP cards")
+Replace=.3333F RareMythic:fromSheet("OTP cards")
+
+[Land]
+Base=Land:fromSheet("OTJ cards")
 
 [cards]
 1 R Another Round @Darrell Riche
@@ -75,7 +101,7 @@ BoosterBox=36
 63 C Razzle-Dazzler @Wayne Wu
 64 C Seize the Secrets @Miranda Meeks
 65 U Shackle Slinger @Josh Hass
-66 U Shifting Grift @Marzena Nereida Piwowar
+66 U Shifting Grift @Nereida
 67 U Slickshot Lockpicker @Wei Wei
 68 C Slickshot Vault-Buster @Julia Metzger
 69 C Spring Splasher @Loïc Canavaggia
@@ -104,7 +130,7 @@ BoosterBox=36
 92 R Kaervek, the Punisher @Cristi Balanescu
 93 U Lively Dirge @Warren Mahy
 94 C Mourner's Surprise @Zuzanna Wużyk
-95 U Neutralize the Guards @Marzena Nereida Piwowar
+95 U Neutralize the Guards @Nereida
 96 C Nezumi Linkbreaker @Miro Petrov
 97 C Overzealous Muscle @Sam White
 98 R Pitiless Carnage @Richard Kane Ferguson
@@ -119,7 +145,7 @@ BoosterBox=36
 107 C Skulduggery @Miro Petrov
 108 R Tinybones Joins Up @Wylie Beckert
 109 M Tinybones, the Pickpocket @Ekaterina Burmak
-110 U Treasure Dredger @Marzena Nereida Piwowar
+110 U Treasure Dredger @Nereida
 111 U Unfortunate Accident @Josiah "Jo" Cameron
 112 U Unscrupulous Contractor @Mila Pesic
 113 R Vadmir, New Blood @Andreas Zafiratos
@@ -239,7 +265,7 @@ BoosterBox=36
 227 R Riku of Many Paths @Denys Tsiperko
 228 R Roxanne, Starfall Savant @Ina Wong
 229 U Ruthless Lawbringer @Joshua Raphael
-230 R Satoru, the Infiltrator @Heonhwa Choe
+230 R Satoru, the Infiltrator @Heonhwa
 231 M Selvala, Eager Trailblazer @Viko Menezes
 232 R Seraphic Steed @Jonas De Ro
 233 U Slick Sequence @Fajareka Setiawan
@@ -438,20 +464,24 @@ BoosterBox=36
 1 Tarnation Vista|BIG
 
 [tokens]
-b_1_1_vampire_rogue_lifelink
-beau
-c_a_clue_draw
-c_a_treasure_sac
-g_2_1_varmint
-g_3_3_elk
-g_x_x_elemental
-meteorite
-r_1_1_mercenary_tappump
-r_3_1_dinosaur
-r_4_4_scorpion_dragon_flying_haste
-u_1_1_bird_flying
-ub_2_2_zombie_rogue
-w_1_1_sheep
-w_2_2_ox
-w_2_2_spirit_flying
-w_3_3_angel_flying
+2 w_3_3_angel_flying @Leonardo Santanna
+3 w_2_2_ox @Fiona Hsieh
+4 w_1_1_sheep @Edgar Sánchez Hidalgo
+5 w_2_2_spirit_flying @Domenico Cava
+6 beau @Loïc Canavaggia
+7 u_1_1_bird_flying @Eduardo Francisco
+8 b_1_1_vampire_rogue_lifelink @Robin Olausson
+9 r_3_1_dinosaur @Xabi Gaztelua
+10 r_1_1_mercenary_tappump @Eduardo Francisco
+11 r_4_4_scorpion_dragon_flying_haste @Diego Gisbert
+12 g_x_x_elemental @Jason Smith
+13 g_3_3_elk @Lie Setiawan
+14 g_2_1_varmint @Ralph Horsley
+15 ub_2_2_zombie_rogue @Caio E Santos
+16 c_a_clue_draw @Clint Lockwood
+17 meteorite @Ina Wong
+18 c_a_treasure_sac @Monztre
+
+[other]
+1 copy @Brian Valeza
+20 plot @Olena Richards

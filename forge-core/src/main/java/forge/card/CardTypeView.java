@@ -1,21 +1,24 @@
 package forge.card;
 
-import java.io.Serializable;
-import java.util.Set;
-
 import forge.card.CardType.CoreType;
 import forge.card.CardType.Supertype;
 
+import java.io.Serializable;
+import java.util.Collection;
+import java.util.Set;
+
 //Interface to expose only the desired functions of CardType without allowing modification
-public interface CardTypeView extends Iterable<String>, Serializable {
+public interface CardTypeView extends Serializable {
     boolean isEmpty();
-    Iterable<CoreType> getCoreTypes();
-    Iterable<Supertype> getSupertypes();
-    Iterable<String> getSubtypes();
+    Collection<CoreType> getCoreTypes();
+    Collection<Supertype> getSupertypes();
+    Collection<String> getSubtypes();
     Iterable<String> getExcludedCreatureSubTypes();
 
     Set<String> getCreatureTypes();
     Set<String> getLandTypes();
+    Set<String> getPlaneswalkerTypes();
+    Set<String> getBattleTypes();
 
     boolean hasStringType(String t);
     boolean hasType(CoreType type);
@@ -26,10 +29,11 @@ public interface CardTypeView extends Iterable<String>, Serializable {
     boolean hasABasicLandType();
     boolean hasANonBasicLandType();
 
-    public boolean sharesCreaturetypeWith(final CardTypeView ctOther);
-    public boolean sharesLandTypeWith(final CardTypeView ctOther);
-    public boolean sharesPermanentTypeWith(final CardTypeView ctOther);
-    public boolean sharesCardTypeWith(final CardTypeView ctOther);
+    boolean sharesCreaturetypeWith(final CardTypeView ctOther);
+    boolean sharesLandTypeWith(final CardTypeView ctOther);
+    boolean sharesPermanentTypeWith(final CardTypeView ctOther);
+    boolean sharesCardTypeWith(final CardTypeView ctOther);
+    boolean sharesAllCardTypesWith(final CardTypeView ctOther);
 
     boolean isPermanent();
     boolean isCreature();
@@ -57,10 +61,12 @@ public interface CardTypeView extends Iterable<String>, Serializable {
     boolean isEquipment();
     boolean isFortification();
     boolean isAttraction();
+    boolean isContraption();
 
     boolean isSaga();
     boolean isHistoric();
     boolean isOutlaw();
+    boolean isParty();
 
-    CardTypeView getTypeWithChanges(Iterable<CardChangedType> changedCardTypes);
+    CardTypeView getTypeWithChanges(Iterable<ICardChangedType> changedCardTypes);
 }

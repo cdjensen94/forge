@@ -1,7 +1,5 @@
 package forge.gamemodes.net;
 
-import java.util.concurrent.TimeoutException;
-
 import forge.gamemodes.net.event.GuiGameEvent;
 
 public final class GameProtocolSender {
@@ -15,17 +13,21 @@ public final class GameProtocolSender {
         method.checkArgs(args);
         remote.send(new GuiGameEvent(method, args));
     }
+    public void send(final ProtocolMethod method, boolean replace, final Object... args) {
+        method.checkArgs(args);
+        remote.send(new GuiGameEvent(method, replace, args));
+    }
+
+    public void write(final ProtocolMethod method, final Object... args) {
+        method.checkArgs(args);
+        remote.write(new GuiGameEvent(method, args));
+    }
 
     @SuppressWarnings("unchecked")
     public <T> T sendAndWait(final ProtocolMethod method, final Object... args) {
         method.checkArgs(args);
-        try {
-            final Object returned = remote.sendAndWait(new GuiGameEvent(method, args));
-            method.checkReturnValue(returned);
-            return (T) returned;
-        } catch (final TimeoutException e) {
-            e.printStackTrace();
-        }
-        return null;
+        final Object returned = remote.sendAndWait(new GuiGameEvent(method, args));
+        method.checkReturnValue(returned);
+        return (T) returned;
     }
 }

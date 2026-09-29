@@ -125,7 +125,7 @@ ScryfallCode=ACR
 117 M The Capitoline Triad @John Stanko
 118 M Leonardo da Vinci @Miklós Ligeti
 119 M Cleopatra, Exiled Pharaoh @Néstor Ossandón Leal
-120 R Mary Read and Anne Bonny @Wangjie Li
+120 R Mary Read and Anne Bonny @Wei Guan
 121 R Sokrates, Athenian Teacher @JB Casacop
 122 M Apple of Eden, Isu Relic @Thanh Tuấn
 123 M Staff of Eden, Vault's Key @Narendra Bintara Adi
@@ -312,4 +312,16 @@ ScryfallCode=ACR
 304 L Swamp @Wangjie Li
 305 L Mountain @Jeremy Paillotin
 306 R Royal Assassin @Wei Guan
-307 U Hidden Blade @Evyn Fong
+307 R Hidden Blade @Evyn Fong
+
+[tokens]
+2 c_3_2_shapeshifter_changeling @Filipe Pagliuso
+3 w_1_1_human_rogue @Elizabeth Peiró
+4 b_1_1_assassin_menace @Rimas Valeikis
+5 phobos @Daniel Correia
+6 c_a_treasure_sac @Xabi Gaztelua
+
+[other]
+1 copy @Miklós Ligeti
+7 emblem_the_capitoline_triad @Syd Mills
+8 cloaked @Allen Morris

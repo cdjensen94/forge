@@ -93,12 +93,7 @@ public class CEditorWinstonProcess extends ACEditorBase<PaperCard, DeckGroup> {
         this.setCatalogManager(catalogManager);
         this.setDeckManager(deckManager);
 
-        getBtnAddBasicLands().setCommand(new UiCommand() {
-            @Override
-            public void run() {
-                CEditorLimited.addBasicLands(CEditorWinstonProcess.this);
-            }
-        });
+        getBtnAddBasicLands().setCommand((UiCommand) () -> CEditorLimited.addBasicLands(CEditorWinstonProcess.this));
     }
 
     /**
@@ -235,7 +230,7 @@ public class CEditorWinstonProcess extends ACEditorBase<PaperCard, DeckGroup> {
         // TODO For pile drafts, only one other draft deck is made
 
         // Construct computer's decks and save draft
-        final Deck[] computer = this.boosterDraft.getDecks();
+        final Deck[] computer = this.boosterDraft.getComputerDecks();
 
         final DeckGroup finishedDraft = new DeckGroup(s);
         finishedDraft.setHumanDeck((Deck) this.getPlayersDeck().copyTo(s));
@@ -247,7 +242,7 @@ public class CEditorWinstonProcess extends ACEditorBase<PaperCard, DeckGroup> {
 
         //open draft pool in Draft Deck Editor right away
         Singletons.getControl().setCurrentScreen(FScreen.DECK_EDITOR_DRAFT);
-        CDeckEditorUI.SINGLETON_INSTANCE.setEditorController(new CEditorLimited(FModel.getDecks().getWinston(), FScreen.DECK_EDITOR_DRAFT, getCDetailPicture()));
+        CDeckEditorUI.SINGLETON_INSTANCE.setEditorController(new CEditorLimited<>(FModel.getDecks().getWinston(), DeckGroup::new, FScreen.DECK_EDITOR_DRAFT, getCDetailPicture()));
         CDeckEditorUI.SINGLETON_INSTANCE.getCurrentEditorController().getDeckController().load(null, s);
     }
 
@@ -308,18 +303,8 @@ public class CEditorWinstonProcess extends ACEditorBase<PaperCard, DeckGroup> {
         this.ccAddCommand = this.getBtnAdd().getCommand();
         this.ccAdd4Command = this.getBtnAdd4().getCommand();
 
-        this.getBtnAdd().setCommand(new UiCommand() {
-            @Override
-            public void run() {
-                CEditorWinstonProcess.this.takePile();
-            }
-        });
-        this.getBtnAdd4().setCommand(new UiCommand() {
-            @Override
-            public void run() {
-                CEditorWinstonProcess.this.passPile();
-            }
-        });
+        this.getBtnAdd().setCommand((UiCommand) CEditorWinstonProcess.this::takePile);
+        this.getBtnAdd4().setCommand((UiCommand) CEditorWinstonProcess.this::passPile);
 
         deckGenParent = removeTab(VDeckgen.SINGLETON_INSTANCE);
         allDecksParent = removeTab(VAllDecks.SINGLETON_INSTANCE);

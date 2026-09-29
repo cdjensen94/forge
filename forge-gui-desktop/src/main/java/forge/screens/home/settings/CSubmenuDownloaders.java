@@ -2,6 +2,7 @@ package forge.screens.home.settings;
 
 import javax.swing.SwingUtilities;
 
+import forge.control.FControl;
 import forge.download.AutoUpdater;
 import forge.download.GuiDownloader;
 import forge.gui.ImportDialog;
@@ -15,6 +16,12 @@ import forge.gui.download.GuiDownloadSetPicturesLQ;
 import forge.gui.download.GuiDownloadSkins;
 import forge.gui.error.BugReporter;
 import forge.gui.framework.ICDoc;
+import forge.util.BuildInfo;
+import forge.util.RSSReader;
+
+import java.util.concurrent.CompletableFuture;
+
+import static forge.localinstance.properties.ForgeConstants.GITHUB_COMMITS_ATOM;
 
 /**
  * Controls the utilities submenu in the home UI.
@@ -26,73 +33,21 @@ import forge.gui.framework.ICDoc;
 public enum CSubmenuDownloaders implements ICDoc {
     SINGLETON_INSTANCE;
 
-    private final UiCommand cmdLicensing = new UiCommand() {
-        @Override public void run() {
-            VSubmenuDownloaders.SINGLETON_INSTANCE.showLicensing();
-        }
-    };
-    private final UiCommand cmdCheckForUpdates = new UiCommand() {
-        @Override
-        public void run() {
-            new AutoUpdater(false).attemptToUpdate();
-        }
-    };
+    private final UiCommand cmdLicensing = VSubmenuDownloaders.SINGLETON_INSTANCE::showLicensing;
+    private final UiCommand cmdCheckForUpdates = () -> new AutoUpdater(false).attemptToUpdate(CompletableFuture.supplyAsync(() -> RSSReader.getCommitLog(GITHUB_COMMITS_ATOM, BuildInfo.getTimestamp(), FControl.instance.getSnapsTimestamp())));
+    private final UiCommand cmdDownloadCardImages = () -> new DialogDownloadCardImages().show();
 
-    private final UiCommand cmdPicDownload = new UiCommand() {
-        @Override public void run() {
-            new GuiDownloader(new GuiDownloadPicturesLQ()).show();
-        }
-    };
-    private final UiCommand cmdPicDownloadHQ = new UiCommand() {
-        @Override public void run() {
-            new GuiDownloader(new GuiDownloadPicturesHQ()).show();
-        }
-    };
-    private final UiCommand cmdSetDownload = new UiCommand() {
-        @Override public void run() {
-            new GuiDownloader(new GuiDownloadSetPicturesLQ()).show();
-        }
-    };
-    private final UiCommand cmdQuestImages = new UiCommand() {
-        @Override public void run() {
-            new GuiDownloader(new GuiDownloadQuestImages()).show();
-        }
-    };
-    private final UiCommand cmdAchievementImages = new UiCommand() {
-        @Override public void run() {
-            new GuiDownloader(new GuiDownloadAchievementImages()).show();
-        }
-    };
-    private final UiCommand cmdDownloadPrices = new UiCommand() {
-        @Override public void run() {
-            new GuiDownloader(new GuiDownloadPrices()).show();
-        }
-    };
-    private final UiCommand cmdDownloadSkins = new UiCommand() {
-        @Override public void run() {
-            new GuiDownloader(new GuiDownloadSkins()).show();
-        }
-    };
-    private final UiCommand cmdHowToPlay = new UiCommand() {
-        @Override public void run() {
-            VSubmenuDownloaders.SINGLETON_INSTANCE.showHowToPlay();
-        }
-    };
-    private final UiCommand cmdListImageData = new UiCommand() {
-        @Override public void run() {
-            VSubmenuDownloaders.SINGLETON_INSTANCE.showCardandImageAuditData();
-        }
-    };
-    private final UiCommand cmdImportPictures = new UiCommand() {
-        @Override public void run() {
-            new ImportDialog(null, null).show();
-        }
-    };
-    private final UiCommand cmdReportBug = new UiCommand() {
-        @Override public void run() {
-            BugReporter.reportBug(null);
-        }
-    };
+    private final UiCommand cmdPicDownload = () -> new GuiDownloader(new GuiDownloadPicturesLQ()).show();
+    private final UiCommand cmdPicDownloadHQ = () -> new GuiDownloader(new GuiDownloadPicturesHQ()).show();
+    private final UiCommand cmdSetDownload = () -> new GuiDownloader(new GuiDownloadSetPicturesLQ()).show();
+    private final UiCommand cmdQuestImages = () -> new GuiDownloader(new GuiDownloadQuestImages()).show();
+    private final UiCommand cmdAchievementImages = () -> new GuiDownloader(new GuiDownloadAchievementImages()).show();
+    private final UiCommand cmdDownloadPrices = () -> new GuiDownloader(new GuiDownloadPrices()).show();
+    private final UiCommand cmdDownloadSkins = () -> new GuiDownloader(new GuiDownloadSkins()).show();
+    private final UiCommand cmdHowToPlay = VSubmenuDownloaders.SINGLETON_INSTANCE::showHowToPlay;
+    private final UiCommand cmdListImageData = VSubmenuDownloaders.SINGLETON_INSTANCE::showCardandImageAuditData;
+    private final UiCommand cmdImportPictures = () -> new ImportDialog(null, null).show();
+    private final UiCommand cmdReportBug = () -> BugReporter.reportBug(null);
 
     @Override
     public void register() {
@@ -105,6 +60,7 @@ public enum CSubmenuDownloaders implements ICDoc {
     public void initialize() {
         final VSubmenuDownloaders view = VSubmenuDownloaders.SINGLETON_INSTANCE;
         view.setCheckForUpdatesCommand(cmdCheckForUpdates);
+        view.setDownloadCardImagesCommand(cmdDownloadCardImages);
         view.setDownloadPicsCommand(cmdPicDownload);
         view.setDownloadPicsHQCommand(cmdPicDownloadHQ);
         view.setDownloadSetPicsCommand(cmdSetDownload);
@@ -124,12 +80,7 @@ public enum CSubmenuDownloaders implements ICDoc {
      */
     @Override
     public void update() {
-        SwingUtilities.invokeLater(new Runnable() {
-            @Override
-            public void run() {
-                VSubmenuDownloaders.SINGLETON_INSTANCE.focusTopButton();
-            }
-        });
+        SwingUtilities.invokeLater(VSubmenuDownloaders.SINGLETON_INSTANCE::focusTopButton);
     }
 
 }

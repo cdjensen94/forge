@@ -2,7 +2,6 @@
 Code=DMU
 Date=2022-09-09
 Name=Dominaria United
-Code2=DMU
 Type=Expansion
 BoosterCovers=3
 Booster=10 Common:fromsheet("DMU cards"), 3 Uncommon:fromSheet("DMU cards"), 1 RareMythic:fromSheet("DMU cards"), 1 fromSheet("DMU lands")
@@ -43,13 +42,13 @@ ScryfallCode=DMU
 29 U Resolute Reinforcements @Billy Christian
 30 U Runic Shot @Cristi Balanescu
 31 C Samite Herbalist @Alessandra Pisano
-32 M Serra Paragon @Heonhwa Choe
+32 M Serra Paragon @Heonhwa
 33 U Shalai's Acolyte @Zara Alfonso
 34 C Stall for Time @Ryan Alexander Lee
 35 C Take Up the Shield @Manuel Castañón
 36 R Temporary Lockdown @Bryan Sola
 37 R Urza Assembles the Titans @Josu Hernaiz
-38 R Valiant Veteran @Nestor Ossandon Leal
+38 R Valiant Veteran @Néstor Ossandón Leal
 39 U Wingmantle Chaplain @Miranda Meeks
 40 R Academy Loremaster @Marcela Medeiros
 41 C Academy Wall @Adam Paquette
@@ -70,7 +69,7 @@ ScryfallCode=DMU
 56 U Joint Exploration @Zezhou Chen
 57 U Micromancer @Ernanda Souza
 58 C Negate @Isis
-59 R The Phasing of Zhalfir @LA Draws
+59 R The Phasing of Zhalfir @L.A. Draws
 60 C Phyrexian Espionage @Allen Williams
 61 C Pixie Illusionist @Anastasia Ovchinnikova
 62 U Protect the Negotiators @Dominik Mayer
@@ -95,7 +94,7 @@ ScryfallCode=DMU
 81 C Battlefly Swarm @Xavier Ribeiro
 82 U Blight Pile @Olivier Bernard
 83 C Bone Splinters @Jeremy Wilson
-84 R Braids, Arisen Nightmare @Heonhwa Choe
+84 R Braids, Arisen Nightmare @Heonhwa
 85 U Braids's Frightful Return @Dominik Mayer
 86 U Choking Miasma @Inka Schulz
 87 R The Cruelty of Gix @Volkan Baǵa
@@ -108,7 +107,7 @@ ScryfallCode=DMU
 94 C Extinguish the Light @Ekaterina Burmak
 95 C Gibbering Barricade @Drew Tucker
 96 U Knight of Dusk's Shadow @Wisnu Tan
-97 M Liliana of the Veil @Martina Fackova
+97 M Liliana of the Veil @Martina Fačková
 98 U Monstrous War-Leech @Christopher Burdett
 99 C Phyrexian Rager @Brock Grossman
 100 C Phyrexian Vivisector @Irina Nordsol
@@ -158,7 +157,7 @@ ScryfallCode=DMU
 144 C Smash to Dust @Marc Simonetti
 145 U Sprouting Goblin @Uriah Voth
 146 R Squee, Dubious Monarch @Zoltan Boros
-147 R Temporal Firestorm @Nestor Ossandon Leal
+147 R Temporal Firestorm @Néstor Ossandón Leal
 148 C Thrill of Possibility @David Auden Nash
 149 U Twinferno @Justyna Dura
 150 C Viashino Branchrider @Andrew Mar
@@ -300,11 +299,6 @@ ScryfallCode=DMU
 284 R Tyrannical Pitlord @Donato Giancola
 285 R Ragefire Hellkite @Xavier Ribeiro
 286 R Briar Hydra @Caio Monteiro
-423 R Serra Redeemer @Joshua Raphael
-424 R Cosmic Epiphany @Eli Minaya
-425 R Tyrannical Pitlord @Donato Giancola
-426 R Ragefire Hellkite @Xavier Ribeiro
-427 R Briar Hydra @Caio Monteiro
 
 [showcase]
 287 R Danitha, Benalia's Hope @Barbara Rosiak
@@ -412,9 +406,9 @@ ScryfallCode=DMU
 385 R Defiler of Faith @Magali Villeneuve
 386 R Guardian of New Benalia @Ernanda Souza
 387 R Leyline Binding @Cristi Balanescu
-388 M Serra Paragon @Heonhwa Choe
+388 M Serra Paragon @Heonhwa
 389 R Temporary Lockdown @Bryan Sola
-390 R Valiant Veteran @Nestor Ossandon Leal
+390 R Valiant Veteran @Néstor Ossandón Leal
 391 R Academy Loremaster @Marcela Medeiros
 392 R Aether Channeler @Caio Monteiro
 393 R Defiler of Dreams @Ryan Pancoast
@@ -435,7 +429,7 @@ ScryfallCode=DMU
 408 R Radha's Firebrand @Ângelo Bortolini
 409 R Rundvelt Hordemaster @Bruno Biazotto
 410 M Shivan Devastator @Brent Hollowell
-411 R Temporal Firestorm @Nestor Ossandon Leal
+411 R Temporal Firestorm @Néstor Ossandón Leal
 412 R Defiler of Vigor @Chase Stone
 413 R Herd Migration @Eric Deschamps
 414 R Leaf-Crowned Visionary @Anna Steinbauer
@@ -447,6 +441,11 @@ ScryfallCode=DMU
 420 R Urborg Lhurgoyf @Andrey Kuzinskiy
 421 R Plaza of Heroes @Gabor Szikszai
 422 R Thran Portal @Sarah Finnigan
+423 R Serra Redeemer @Joshua Raphael
+424 R Cosmic Epiphany @Eli Minaya
+425 R Tyrannical Pitlord @Donato Giancola
+426 R Ragefire Hellkite @Xavier Ribeiro
+427 R Briar Hydra @Caio Monteiro
 
 [buy a box]
 428 R Llanowar Loamspeaker @Volkan Baǵa
@@ -462,23 +461,23 @@ ScryfallCode=DMU
 436 M Sheoldred, the Apocalypse @Richard Whitters
 
 [rebalanced]
-A1 M A-Karn, Living Legacy @Chris Rahn
-A138 C A-Meria's Outrider @Lius Lasahido
-A141 R A-Radha's Firebrand @Ângelo Bortolini
-A145 U A-Sprouting Goblin @Uriah Voth
-A169 R A-Llanowar Greenwidow @Jokubas Uogintas
-A170 R A-Llanowar Loamspeaker @Zara Alfonso
-A176 C A-Scout the Wilderness @A. M. Sartor
-A181 C A-Sunbathing Rootwalla @Campbell White
-A207 U A-Nael, Avizoa Aeronaut @Miguel Mercado
-A211 U A-Radha, Coalition Warlord @Randy Vargas
-A217 U A-Rulik Mons, Warren Chief @Tuan Duong Chu
-A220 M A-Soul of Windgrace @Liiga Smilshkalne
-A222 U A-Tatyova, Steward of Tides @Howard Lyon
-A225 U A-Uurg, Spawn of Turg @Nicholas Gregory
-A227 U A-Zar Ojanen, Scion of Efrava @Justine Cruz
-A259 R A-Thran Portal @Sarah Finnigan
-A286 R A-Briar Hydra @Caio Monteiro
+A-1 M A-Karn, Living Legacy @Chris Rahn
+A-138 C A-Meria's Outrider @Lius Lasahido
+A-141 R A-Radha's Firebrand @Ângelo Bortolini
+A-145 U A-Sprouting Goblin @Uriah Voth
+A-169 R A-Llanowar Greenwidow @Jokubas Uogintas
+A-170 R A-Llanowar Loamspeaker @Zara Alfonso
+A-176 C A-Scout the Wilderness @A. M. Sartor
+A-181 C A-Sunbathing Rootwalla @Campbell White
+A-207 U A-Nael, Avizoa Aeronaut @Miguel Mercado
+A-211 U A-Radha, Coalition Warlord @Randy Vargas
+A-217 U A-Rulik Mons, Warren Chief @Tuan Duong Chu
+A-220 M A-Soul of Windgrace @Liiga Smilshkalne
+A-222 U A-Tatyova, Steward of Tides @Howard Lyon
+A-225 U A-Uurg, Spawn of Turg @Nicholas Gregory
+A-227 U A-Zar Ojanen, Scion of Efrava @Justine Cruz
+A-259 R A-Thran Portal @Sarah Finnigan
+A-286 R A-Briar Hydra @Caio Monteiro
 
 [lands]
 2 Plains|DMU|1
@@ -503,15 +502,31 @@ A286 R A-Briar Hydra @Caio Monteiro
 1 Forest|DMU|4
 
 [tokens]
-b_1_1_bird_flying_noblock
-b_2_2_phyrexian
-c_a_powerstone
-g_1_1_saproling
-g_3_3_beast
-ornithopter
-r_1_1_goblin
-r_1_1_monk_prowess
-r_2_1_elemental_trample_haste
-r_4_4_dragon_flying
-w_1_1_bird_flying
-w_1_1_soldier
+1 w_4_4_angel_flying_vigilance @Winona Nelson
+2 w_1_1_bird_flying @Allen Douglas
+3 w_2_2_knight_pro_red @Matt Stewart
+4 w_1_1_soldier @Justine Cruz
+5 u_1_1_merfolk @PINDURSKI
+6 b_1_1_bird_flying_noblock @Allen Douglas
+7 b_1_1_insect_flying @Mila Pesic
+8 b_2_2_phyrexian @David Auden Nash
+9 b_2_2_zombie @Antonio José Manzanedo
+10 r_4_4_dragon_flying @Alexander Ostrowski
+11 r_2_1_elemental_trample_haste @Tuan Duong Chu
+12 r_1_1_goblin @Néstor Ossandón Leal
+13 kobolds_of_kher_keep @Paolo Parente
+14 r_1_1_monk_prowess @Irina Nordsol
+15 g_3_3_badger @Tuan Duong Chu
+16 g_3_3_beast @Eric Deschamps
+17 g_2_2_cat_warrior_forestwalk @Michael Sutfin
+18 g_1_1_saproling @Sam White
+19 g_4_4_wurm @Andrew Mar
+20 rgw_1_1_sand_warrior @Piotr Foksowicz
+21 stangg_twin @Randy Vargas
+22 ornithopter @Fariba Khamseh
+23 c_a_powerstone @David Auden Nash
+24 c_a_treasure_sac @Alayna Danner
+
+[other]
+25 emblem_ajani_sleeper_agent @Matt Stewart
+26 emblem_jaya_fiery_negotiator @Marta Nael

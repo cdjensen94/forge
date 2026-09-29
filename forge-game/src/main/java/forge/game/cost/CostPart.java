@@ -17,16 +17,15 @@
  */
 package forge.game.cost;
 
-import java.io.Serializable;
-
 import forge.card.CardType;
-import org.apache.commons.lang3.StringUtils;
-
 import forge.game.CardTraitBase;
 import forge.game.ability.AbilityUtils;
 import forge.game.card.Card;
 import forge.game.player.Player;
 import forge.game.spellability.SpellAbility;
+import org.apache.commons.lang3.StringUtils;
+
+import java.io.Serializable;
 
 /**
  * The Class CostPart.
@@ -107,7 +106,7 @@ public abstract class CostPart implements Comparable<CostPart>, Cloneable, Seria
         return this.typeDescription;
     }
 
-    public final String getDescriptiveType() {
+    public String getDescriptiveType() {
         String typeDesc = this.getTypeDescription();
         if (typeDesc == null) {
             String typeS = this.getType();

@@ -1,9 +1,9 @@
 Name:Mortal Wound
 ManaCost:G
 Types:Enchantment Aura
-K:Enchant creature
-A:SP$ Attach | Cost$ G | ValidTgts$ Creature | AILogic$ Curse
-S:Mode$ Continuous | Affected$ Creature.EnchantedBy | AddSVar$ MortalDestroy
+K:Enchant:Creature
+SVar:AttachAILogic:Curse
+S:Mode$ Continuous | AffectedDefined$ Enchanted | Affected$ Creature | AddSVar$ MortalDestroy
 SVar:MortalDestroy:SVar:DestroyWhenDamaged:True
 T:Mode$ DamageDoneOnce | ValidTarget$ Creature.EnchantedBy | Execute$ TrigDestroy | TriggerZones$ Battlefield | TriggerDescription$ When enchanted creature is dealt damage, destroy it.
 SVar:TrigDestroy:DB$ Destroy | Defined$ TriggeredTargetLKICopy

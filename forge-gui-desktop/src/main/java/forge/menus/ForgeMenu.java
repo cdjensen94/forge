@@ -1,6 +1,5 @@
 package forge.menus;
 
-import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.event.KeyEvent;
 import java.util.HashMap;
@@ -16,6 +15,7 @@ import javax.swing.event.PopupMenuListener;
 import forge.Singletons;
 import forge.gui.GuiUtils;
 import forge.screens.home.online.OnlineMenu;
+import forge.screens.match.menus.DisplayMenu;
 import forge.util.Localizer;
 import forge.util.ReflectionUtil;
 
@@ -74,6 +74,8 @@ public final class ForgeMenu {
             }
         }
         add(new LayoutMenu().getMenu());
+        MenuUtil.withMatchUI(vmu -> add(new DisplayMenu(vmu.getControl()).getMenu()));
+        add(new AudioMenu().getMenu());
         add(HelpMenu.getMenu());
         addSeparator();
         add(OnlineMenu.getMenu());
@@ -134,12 +136,7 @@ public final class ForgeMenu {
     }
 
     private static ActionListener getRestartAction() {
-        return new ActionListener() {
-            @Override
-            public void actionPerformed(ActionEvent e) {
-                Singletons.getControl().restartForge();
-            }
-        };
+        return e -> Singletons.getControl().restartForge();
     }
 
     private static JMenuItem getMenuItem_Exit() {
@@ -151,11 +148,6 @@ public final class ForgeMenu {
     }
 
     private static ActionListener getExitAction() {
-        return new ActionListener() {
-            @Override
-            public void actionPerformed(ActionEvent e) {
-                Singletons.getControl().exitForge();
-            }
-        };
+        return e -> Singletons.getControl().exitForge();
     }
 }

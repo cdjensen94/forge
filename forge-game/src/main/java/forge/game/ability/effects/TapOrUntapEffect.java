@@ -1,6 +1,7 @@
 package forge.game.ability.effects;
 
 import com.google.common.collect.Maps;
+
 import forge.game.ability.AbilityKey;
 import forge.game.ability.AbilityUtils;
 import forge.game.ability.SpellAbilityEffect;
@@ -10,7 +11,6 @@ import forge.game.player.Player;
 import forge.game.player.PlayerController;
 import forge.game.spellability.SpellAbility;
 import forge.game.trigger.TriggerType;
-import forge.util.CardTranslation;
 import forge.util.Lang;
 import forge.util.Localizer;
 
@@ -40,6 +40,7 @@ public class TapOrUntapEffect extends SpellAbilityEffect {
             tapper = AbilityUtils.getDefinedPlayers(sa.getHostCard(), sa.getParam("Tapper"), sa).getFirst();
         }
         PlayerController pc = tapper.getController();
+        boolean toggle = sa.hasParam("Toggle");
 
         CardCollection tapped = new CardCollection();
         final Map<Player, CardCollection> untapMap = Maps.newHashMap();
@@ -51,14 +52,27 @@ public class TapOrUntapEffect extends SpellAbilityEffect {
                 continue;
             }
 
+            // check if the object is still in game or if it was moved
+            Card gameCard = tapper.getGame().getCardState(tgtC, null);
+            // gameCard is LKI in that case, the card is not in game anymore
+            // or the timestamp did change
+            // this should check Self too
+            if (gameCard == null || !tgtC.equalsWithGameTimestamp(gameCard)) {
+                continue;
+            }
             // If the effected card is controlled by the same controller of the SA, default to untap.
-            boolean tap = pc.chooseBinary(sa, Localizer.getInstance().getMessage("lblTapOrUntapTarget", CardTranslation.getTranslatedName(tgtC.getName())), PlayerController.BinaryChoiceType.TapOrUntap,
-                    !tgtC.getController().equals(tapper) );
-
+            boolean tap;
+            if (toggle) {
+                tap = !gameCard.isTapped();
+            } else {
+                // all cards using this are optional, so don't need to worry about impossible choice
+                tap = pc.chooseBinary(sa, Localizer.getInstance().getMessage("lblTapOrUntapTarget", gameCard.getTranslatedName()), PlayerController.BinaryChoiceType.TapOrUntap,
+                        !gameCard.getController().equals(tapper));
+            }
             if (tap) {
-                if (tgtC.tap(true, sa, tapper)) tapped.add(tgtC);
-            } else if (tgtC.untap(true)) {
-                untapMap.computeIfAbsent(tapper, i -> new CardCollection()).add(tgtC);
+                if (gameCard.tap(true, sa, tapper)) tapped.add(gameCard);
+            } else if (gameCard.untap()) {
+                untapMap.computeIfAbsent(tapper, i -> new CardCollection()).add(gameCard);
             }
         }
         if (!untapMap.isEmpty()) {
@@ -72,5 +86,4 @@ public class TapOrUntapEffect extends SpellAbilityEffect {
             tapper.getGame().getTriggerHandler().runTrigger(TriggerType.TapAll, runParams, false);
         }
     }
-
 }

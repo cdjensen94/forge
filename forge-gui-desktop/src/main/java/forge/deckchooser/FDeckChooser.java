@@ -1,6 +1,5 @@
 package forge.deckchooser;
 
-import com.google.common.base.Predicate;
 import com.google.common.collect.ImmutableList;
 import forge.deck.*;
 import forge.game.GameFormat;
@@ -22,15 +21,18 @@ import forge.model.FModel;
 import forge.screens.match.controllers.CDetailPicture;
 import forge.toolbox.FLabel;
 import forge.toolbox.FOptionPane;
+import forge.toolbox.FTextField;
 import forge.util.Localizer;
 import net.miginfocom.swing.MigLayout;
 import org.apache.commons.lang3.StringUtils;
 
 import javax.swing.*;
 import java.awt.*;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.function.Predicate;
 
 @SuppressWarnings("serial")
 public class FDeckChooser extends JPanel implements IDecksComboBoxListener {
@@ -54,6 +56,12 @@ public class FDeckChooser extends JPanel implements IDecksComboBoxListener {
 
     private final FLabel btnViewDeck = new FLabel.ButtonBuilder().text(localizer.getMessage("lblViewDeck")).fontSize(14).build();
     private final FLabel btnRandom = new FLabel.ButtonBuilder().fontSize(14).build();
+    private JPanel pnlDeckUrl;
+    private FTextField txtDeckUrl;
+    private FLabel btnReloadUrl;
+    private String lastLoadedUrlDeckName;
+    private UiCommand deckSelectionCommand;
+    private boolean updatingDeckPool;
 
     private boolean isAi;
 
@@ -63,7 +71,8 @@ public class FDeckChooser extends JPanel implements IDecksComboBoxListener {
     //Show dialog to select a deck
     public static Deck promptForDeck(final CDetailPicture cDetailPicture, final String title, final DeckType defaultDeckType, final boolean forAi) {
         FThreads.assertExecutedByEdt(true);
-        final FDeckChooser chooser = new FDeckChooser(cDetailPicture, forAi, GameType.Constructed, false);
+        boolean isForCommander = defaultDeckType.equals(DeckType.COMMANDER_DECK);
+        final FDeckChooser chooser = new FDeckChooser(cDetailPicture, forAi, isForCommander? GameType.Commander : GameType.Constructed, isForCommander);
         chooser.initialize(defaultDeckType);
         chooser.populate();
         final Dimension parentSize = JOptionPane.getRootFrame().getSize();
@@ -71,11 +80,9 @@ public class FDeckChooser extends JPanel implements IDecksComboBoxListener {
         final Localizer localizer = Localizer.getInstance();
         final FOptionPane optionPane = new FOptionPane(null, title, null, chooser, ImmutableList.of(localizer.getMessage("lblOK"), localizer.getMessage("lblCancel")), 0);
         optionPane.setDefaultFocus(chooser);
-        chooser.lstDecks.setItemActivateCommand(new UiCommand() {
-            @Override
-            public void run() {
-                optionPane.setResult(0); //accept selected deck on double click or Enter
-            }
+        chooser.lstDecks.setItemActivateCommand((UiCommand) () -> {
+            //accept selected deck on double click or Enter
+            optionPane.setResult(0);
         });
         optionPane.setVisible(true);
         final int dialogResult = optionPane.getResult();
@@ -91,14 +98,13 @@ public class FDeckChooser extends JPanel implements IDecksComboBoxListener {
         setOpaque(false);
         isAi = forAi;
         isForCommander = forCommander;
-        final UiCommand cmdViewDeck = new UiCommand() {
-            @Override public void run() {
-                if (selectedDeckType != DeckType.COLOR_DECK && selectedDeckType != DeckType.THEME_DECK) {
-                    FDeckViewer.show(getDeck());
-                }
+        final UiCommand cmdViewDeck = () -> {
+            if (selectedDeckType != DeckType.COLOR_DECK && selectedDeckType != DeckType.THEME_DECK) {
+                FDeckViewer.show(getDeck(), gameType.getDeckFormat() == DeckFormat.Commander);
             }
         };
         lstDecks.setItemActivateCommand(cmdViewDeck);
+        lstDecks.setSelectCommand(this::handleDeckSelection);
         btnViewDeck.setCommand(cmdViewDeck);
     }
 
@@ -120,19 +126,17 @@ public class FDeckChooser extends JPanel implements IDecksComboBoxListener {
 
     public DeckManager getLstDecks() { return lstDecks; }
 
+    public void setDeckSelectionCommand(final UiCommand command) {
+        deckSelectionCommand = command;
+    }
+
     private void updateDecks(final Iterable<DeckProxy> decks, final ItemManagerConfig config) {
         lstDecks.setAllowMultipleSelections(false);
 
-        lstDecks.setPool(decks);
-        lstDecks.setup(config);
+        setDeckPoolWithConfig(decks, config);
 
         btnRandom.setText(localizer.getMessage("lblRandomDeck"));
-        btnRandom.setCommand(new UiCommand() {
-            @Override
-            public void run() {
-                DeckgenUtil.randomSelect(lstDecks);
-            }
-        });
+        btnRandom.setCommand((UiCommand) () -> DeckgenUtil.randomSelect(lstDecks));
 
         lstDecks.setSelectedIndex(0);
     }
@@ -161,16 +165,10 @@ public class FDeckChooser extends JPanel implements IDecksComboBoxListener {
     private void updateColors(Predicate<PaperCard> formatFilter) {
         lstDecks.setAllowMultipleSelections(true);
 
-        lstDecks.setPool(ColorDeckGenerator.getColorDecks(lstDecks, formatFilter, isAi));
-        lstDecks.setup(ItemManagerConfig.STRING_ONLY);
+        setDeckPoolWithConfig(ColorDeckGenerator.getColorDecks(lstDecks, formatFilter, isAi), ItemManagerConfig.STRING_ONLY);
 
         btnRandom.setText(localizer.getMessage("lblRandomColors"));
-        btnRandom.setCommand(new UiCommand() {
-            @Override
-            public void run() {
-                DeckgenUtil.randomSelectColors(lstDecks);
-            }
-        });
+        btnRandom.setCommand((UiCommand) () -> DeckgenUtil.randomSelectColors(lstDecks));
 
         // default selection = basic two color deck
         lstDecks.setSelectedIndices(new Integer[]{0, 1});
@@ -179,16 +177,10 @@ public class FDeckChooser extends JPanel implements IDecksComboBoxListener {
     private void updateMatrix(GameFormat format) {
         lstDecks.setAllowMultipleSelections(false);
 
-        lstDecks.setPool(ArchetypeDeckGenerator.getMatrixDecks(format, isAi));
-        lstDecks.setup(ItemManagerConfig.STRING_ONLY);
+        setDeckPoolWithConfig(ArchetypeDeckGenerator.getMatrixDecks(format, isAi), ItemManagerConfig.STRING_ONLY);
 
         btnRandom.setText("Random");
-        btnRandom.setCommand(new UiCommand() {
-            @Override
-            public void run() {
-                DeckgenUtil.randomSelect(lstDecks);
-            }
-        });
+        btnRandom.setCommand((UiCommand) () -> DeckgenUtil.randomSelect(lstDecks));
 
         // default selection = basic two color deck
         lstDecks.setSelectedIndices(new Integer[]{0});
@@ -201,16 +193,10 @@ public class FDeckChooser extends JPanel implements IDecksComboBoxListener {
         }
 
         lstDecks.setAllowMultipleSelections(false);
-        lstDecks.setPool(CommanderDeckGenerator.getCommanderDecks(deckFormat, isAi, false));
-        lstDecks.setup(ItemManagerConfig.STRING_ONLY);
+        setDeckPoolWithConfig(CommanderDeckGenerator.getCommanderDecks(deckFormat, isAi, false), ItemManagerConfig.STRING_ONLY);
 
         btnRandom.setText("Random");
-        btnRandom.setCommand(new UiCommand() {
-            @Override
-            public void run() {
-                DeckgenUtil.randomSelect(lstDecks);
-            }
-        });
+        btnRandom.setCommand((UiCommand) () -> DeckgenUtil.randomSelect(lstDecks));
 
         // default selection = basic two color deck
         lstDecks.setSelectedIndices(new Integer[]{0});
@@ -223,16 +209,10 @@ public class FDeckChooser extends JPanel implements IDecksComboBoxListener {
         }
 
         lstDecks.setAllowMultipleSelections(false);
-        lstDecks.setPool(CommanderDeckGenerator.getCommanderDecks(deckFormat, isAi, true));
-        lstDecks.setup(ItemManagerConfig.STRING_ONLY);
+        setDeckPoolWithConfig(CommanderDeckGenerator.getCommanderDecks(deckFormat, isAi, true), ItemManagerConfig.STRING_ONLY);
 
         btnRandom.setText("Random");
-        btnRandom.setCommand(new UiCommand() {
-            @Override
-            public void run() {
-                DeckgenUtil.randomSelect(lstDecks);
-            }
-        });
+        btnRandom.setCommand((UiCommand) () -> DeckgenUtil.randomSelect(lstDecks));
 
         // default selection = basic two color deck
         lstDecks.setSelectedIndices(new Integer[]{0});
@@ -262,7 +242,10 @@ public class FDeckChooser extends JPanel implements IDecksComboBoxListener {
         if (netDeckCategory != null) {
             decksComboBox.setText(netDeckCategory.getDeckType());
         }
-        updateDecks(DeckProxy.getNetDecks(netDeckCategory), ItemManagerConfig.NET_DECKS);
+        final ItemManagerConfig config = selectedDeckType == DeckType.NET_COMMANDER_DECK
+                ? ItemManagerConfig.NET_COMMANDER_DECKS
+                : ItemManagerConfig.NET_DECKS;
+        updateDecks(DeckProxy.getNetDecks(netDeckCategory), config);
     }
 
     private void updateNetArchiveStandardDecks() {
@@ -314,6 +297,39 @@ public class FDeckChooser extends JPanel implements IDecksComboBoxListener {
         updateDecks(DeckProxy.getNetArchiveBlockDecks(NetDeckArchiveBlock), ItemManagerConfig.NET_DECKS);
     }
 
+    private void updateProvidedDeckUrl() {
+        lstDecks.setAllowMultipleSelections(false);
+        setDeckPoolWithConfig(DeckUrlLoader.getUrlDecks(), ItemManagerConfig.NET_DECKS);
+
+        btnRandom.setText(localizer.getMessage("lblRandomDeck"));
+        btnRandom.setCommand((UiCommand) () -> DeckgenUtil.randomSelect(lstDecks));
+
+        if (lastLoadedUrlDeckName != null) {
+            lstDecks.setSelectedString(lastLoadedUrlDeckName);
+        }
+        if (lstDecks.getSelectedIndex() < 0) {
+            lstDecks.setSelectedIndex(0);
+        }
+        syncUrlFieldWithSelectedDeck();
+    }
+
+    private void setDeckPoolWithConfig(final Iterable<DeckProxy> decks, final ItemManagerConfig config) {
+        updatingDeckPool = true;
+        try {
+            // Clear the old source before applying a new ItemManagerConfig; otherwise stale items can
+            // be sorted/rendered with columns from the next deck browser during source transitions.
+            lstDecks.setPool(ImmutableList.of());
+            lstDecks.setup(config);
+            lstDecks.setPool(decks);
+        } finally {
+            updatingDeckPool = false;
+        }
+    }
+
+    private void updateNetEventDecks() {
+        updateDecks(DeckProxy.getAllNetworkEventDecks(), ItemManagerConfig.NET_EVENT_DECKS);
+    }
+
     public Deck getDeck() {
         final DeckProxy proxy = lstDecks.getSelectedItem();
         if (proxy == null) {
@@ -330,10 +346,10 @@ public class FDeckChooser extends JPanel implements IDecksComboBoxListener {
         if (selectedDeckType == DeckType.QUEST_OPPONENT_DECK) {
             final QuestEvent event = DeckgenUtil.getQuestEvent(lstDecks.getSelectedItem().getName());
             final RegisteredPlayer result = new RegisteredPlayer(event.getEventDeck());
-            if (event instanceof QuestEventChallenge) {
-                result.setStartingLife(((QuestEventChallenge) event).getAiLife());
+            if (event instanceof QuestEventChallenge qec) {
+                result.setStartingLife(qec.getAiLife());
             }
-            result.setCardsOnBattlefield(QuestUtil.getComputerStartingCards(event));
+            result.addExtraCardsOnBattlefield(QuestUtil.getComputerStartingCards(event));
             return result;
         }
 
@@ -344,26 +360,108 @@ public class FDeckChooser extends JPanel implements IDecksComboBoxListener {
         if (decksComboBox == null) { //initialize components with delayed initialization the first time this is populated
             decksComboBox = new DecksComboBox();
             lstDecksContainer = new ItemManagerContainer(lstDecks);
+            initializeDeckUrlPanel();
             decksComboBox.addListener(this);
             restoreSavedState();
         } else {
             removeAll();
         }
-        this.setLayout(new MigLayout("insets 0, gap 0"));
+        this.setLayout(new MigLayout("insets 0, gap 0, hidemode 3"));
         decksComboBox.addTo(this, "w 100%, h 30px!, gapbottom 5px, spanx 2, wrap");
+        this.add(pnlDeckUrl, "w 100%, h 30px!, gapbottom 5px, spanx 2, wrap");
         this.add(lstDecksContainer, "w 100%, growy, pushy, spanx 2, wrap");
         this.add(btnViewDeck, "w 50%-3px, h 30px!, gaptop 5px, gapright 6px");
         this.add(btnRandom, "w 50%-3px, h 30px!, gaptop 5px");
+        updateDeckUrlPanelVisibility();
         if (isShowing()) {
             revalidate();
             repaint();
         }
     }
 
+    private void initializeDeckUrlPanel() {
+        pnlDeckUrl = new JPanel(new MigLayout("insets 0, gap 0"));
+        pnlDeckUrl.setOpaque(false);
+        pnlDeckUrl.add(new FLabel.Builder().text(localizer.getMessage("lblDeckUrlLabel")).fontSize(12).fontStyle(Font.BOLD).build(),
+                "h " + FTextField.HEIGHT + "px!, gapright 6px");
+        txtDeckUrl = new FTextField.Builder().build();
+        txtDeckUrl.addActionListener(e -> loadDeckFromUrl());
+        pnlDeckUrl.add(txtDeckUrl, "growx, pushx, h " + FTextField.HEIGHT + "px!, gapright 6px");
+        btnReloadUrl = new FLabel.ButtonBuilder().text(localizer.getMessage("lblReload")).fontSize(14).build();
+        btnReloadUrl.setCommand(this::loadDeckFromUrl);
+        pnlDeckUrl.add(btnReloadUrl, "h " + FTextField.HEIGHT + "px!, w pref!");
+    }
+
+    private void updateDeckUrlPanelVisibility() {
+        final boolean isProvidedDeckUrl = selectedDeckType == DeckType.PROVIDED_DECK_URL;
+        if (pnlDeckUrl != null) {
+            pnlDeckUrl.setVisible(isProvidedDeckUrl);
+        }
+    }
+
+    private void syncUrlFieldWithSelectedDeck() {
+        if (txtDeckUrl == null || selectedDeckType != DeckType.PROVIDED_DECK_URL) {
+            return;
+        }
+        final DeckProxy selected = lstDecks.getSelectedItem();
+        if (selected != null && selected.getSourceUrl() != null) {
+            txtDeckUrl.setText(selected.getSourceUrl());
+        }
+    }
+
+    private void handleDeckSelection() {
+        if (updatingDeckPool) {
+            return;
+        }
+        syncUrlFieldWithSelectedDeck();
+        if (deckSelectionCommand != null) {
+            deckSelectionCommand.run();
+        }
+    }
+
+    private void loadDeckFromUrl() {
+        if (txtDeckUrl == null) {
+            return;
+        }
+        final String deckUrl = txtDeckUrl.getText().trim();
+        if (deckUrl.isBlank()) {
+            return;
+        }
+
+        setDeckUrlLoading(true);
+        FThreads.invokeInBackgroundThread(() -> {
+            try {
+                final DeckProxy deck = DeckUrlLoader.load(deckUrl);
+                FThreads.invokeInEdtLater(() -> {
+                    lastLoadedUrlDeckName = deck.toString();
+                    if (selectedDeckType == DeckType.PROVIDED_DECK_URL) {
+                        refreshDecksList(DeckType.PROVIDED_DECK_URL, true, null);
+                    }
+                    setDeckUrlLoading(false);
+                });
+            } catch (final IOException ex) {
+                FThreads.invokeInEdtLater(() -> {
+                    setDeckUrlLoading(false);
+                    FOptionPane.showErrorDialog(ex.getMessage(), localizer.getMessage("lblUnableToLoadDeckUrl"));
+                });
+            }
+        });
+    }
+
+    private void setDeckUrlLoading(final boolean loading) {
+        txtDeckUrl.setEnabled(!loading);
+        btnReloadUrl.setEnabled(!loading);
+        btnRandom.setEnabled(!loading);
+        if (loading) {
+            btnReloadUrl.setText(localizer.getMessage("lblLoadingEllipsis"));
+        } else {
+            btnReloadUrl.setText(localizer.getMessage("lblReload"));
+        }
+    }
+
     public final boolean isAi() {
         return isAi;
     }
-
     public void setIsAi(final boolean isAiDeck) {
         isAi = isAiDeck;
     }
@@ -373,208 +471,168 @@ public class FDeckChooser extends JPanel implements IDecksComboBoxListener {
         if (ev.getDeckType() == DeckType.NET_ARCHIVE_STANDARD_DECK && !refreshingDeckType) {
             if (lstDecks.getGameType() != GameType.Constructed)
                 return;
-            FThreads.invokeInBackgroundThread(new Runnable() { //needed for loading net decks
-                @Override
-                public void run() {
-                    final NetDeckArchiveStandard category = NetDeckArchiveStandard.selectAndLoad(lstDecks.getGameType());
-                    FThreads.invokeInEdtLater(new Runnable() {
-                        @Override
-                        public void run() {
-                            if (category == null) {
-                                decksComboBox.setDeckType(selectedDeckType); //restore old selection if user cancels
-                                if (selectedDeckType == DeckType.NET_ARCHIVE_STANDARD_DECK && NetDeckArchiveStandard != null) {
-                                    decksComboBox.setText(NetDeckArchiveStandard.getDeckType());
-                                }
-                                return;
-                            }
-
-                            NetDeckArchiveStandard = category;
-                            refreshDecksList(ev.getDeckType(), true, ev);
+            //needed for loading net decks
+            FThreads.invokeInBackgroundThread(() -> {
+                final NetDeckArchiveStandard category = NetDeckArchiveStandard.selectAndLoad(lstDecks.getGameType());
+                FThreads.invokeInEdtLater(() -> {
+                    if (category == null) {
+                        decksComboBox.setDeckType(selectedDeckType); //restore old selection if user cancels
+                        if (selectedDeckType == DeckType.NET_ARCHIVE_STANDARD_DECK && NetDeckArchiveStandard != null) {
+                            decksComboBox.setText(NetDeckArchiveStandard.getDeckType());
                         }
-                    });
+                        return;
+                    }
 
-                }
+                    NetDeckArchiveStandard = category;
+                    refreshDecksList(ev.getDeckType(), true, ev);
+                });
+
             });
             return;
 
         } else if (ev.getDeckType() == DeckType.NET_ARCHIVE_PIONEER_DECK && !refreshingDeckType) {
             if (lstDecks.getGameType() != GameType.Constructed)
                 return;
-            FThreads.invokeInBackgroundThread(new Runnable() { //needed for loading net decks
-                @Override
-                public void run() {
-                    final NetDeckArchivePioneer category = NetDeckArchivePioneer.selectAndLoad(lstDecks.getGameType());
-                    FThreads.invokeInEdtLater(new Runnable() {
-                        @Override
-                        public void run() {
-                            if (category == null) {
-                                decksComboBox.setDeckType(selectedDeckType); //restore old selection if user cancels
-                                if (selectedDeckType == DeckType.NET_ARCHIVE_PIONEER_DECK && NetDeckArchivePioneer != null) {
-                                    decksComboBox.setText(NetDeckArchivePioneer.getDeckType());
-                                }
-                                return;
-                            }
-
-                            NetDeckArchivePioneer = category;
-                            refreshDecksList(ev.getDeckType(), true, ev);
+            //needed for loading net decks
+            FThreads.invokeInBackgroundThread(() -> {
+                final NetDeckArchivePioneer category = NetDeckArchivePioneer.selectAndLoad(lstDecks.getGameType());
+                FThreads.invokeInEdtLater(() -> {
+                    if (category == null) {
+                        decksComboBox.setDeckType(selectedDeckType); //restore old selection if user cancels
+                        if (selectedDeckType == DeckType.NET_ARCHIVE_PIONEER_DECK && NetDeckArchivePioneer != null) {
+                            decksComboBox.setText(NetDeckArchivePioneer.getDeckType());
                         }
-                    });
-                }
+                        return;
+                    }
+
+                    NetDeckArchivePioneer = category;
+                    refreshDecksList(ev.getDeckType(), true, ev);
+                });
             });
             return;
 
         } else if (ev.getDeckType() == DeckType.NET_ARCHIVE_MODERN_DECK && !refreshingDeckType) {
             if (lstDecks.getGameType() != GameType.Constructed)
                 return;
-            FThreads.invokeInBackgroundThread(new Runnable() { //needed for loading net decks
-                @Override
-                public void run() {
-                    final NetDeckArchiveModern category = NetDeckArchiveModern.selectAndLoad(lstDecks.getGameType());
-                    FThreads.invokeInEdtLater(new Runnable() {
-                        @Override
-                        public void run() {
-                            if (category == null) {
-                                decksComboBox.setDeckType(selectedDeckType); //restore old selection if user cancels
-                                if (selectedDeckType == DeckType.NET_ARCHIVE_MODERN_DECK && NetDeckArchiveModern != null) {
-                                    decksComboBox.setText(NetDeckArchiveModern.getDeckType());
-                                }
-                                return;
-                            }
-
-                            NetDeckArchiveModern = category;
-                            refreshDecksList(ev.getDeckType(), true, ev);
+            //needed for loading net decks
+            FThreads.invokeInBackgroundThread(() -> {
+                final NetDeckArchiveModern category = NetDeckArchiveModern.selectAndLoad(lstDecks.getGameType());
+                FThreads.invokeInEdtLater(() -> {
+                    if (category == null) {
+                        decksComboBox.setDeckType(selectedDeckType); //restore old selection if user cancels
+                        if (selectedDeckType == DeckType.NET_ARCHIVE_MODERN_DECK && NetDeckArchiveModern != null) {
+                            decksComboBox.setText(NetDeckArchiveModern.getDeckType());
                         }
-                    });
-                }
+                        return;
+                    }
+
+                    NetDeckArchiveModern = category;
+                    refreshDecksList(ev.getDeckType(), true, ev);
+                });
             });
             return;
 
         } else if (ev.getDeckType() == DeckType.NET_ARCHIVE_PAUPER_DECK && !refreshingDeckType) {
             if (lstDecks.getGameType() != GameType.Constructed)
                 return;
-            FThreads.invokeInBackgroundThread(new Runnable() { //needed for loading net decks
-                @Override
-                public void run() {
-                    final NetDeckArchivePauper category = NetDeckArchivePauper.selectAndLoad(lstDecks.getGameType());
-                    FThreads.invokeInEdtLater(new Runnable() {
-                        @Override
-                        public void run() {
-                            if (category == null) {
-                                decksComboBox.setDeckType(selectedDeckType); //restore old selection if user cancels
-                                if (selectedDeckType == DeckType.NET_ARCHIVE_PAUPER_DECK && NetDeckArchivePauper != null) {
-                                    decksComboBox.setText(NetDeckArchivePauper.getDeckType());
-                                }
-                                return;
-                            }
-
-                            NetDeckArchivePauper = category;
-                            refreshDecksList(ev.getDeckType(), true, ev);
+            //needed for loading net decks
+            FThreads.invokeInBackgroundThread(() -> {
+                final NetDeckArchivePauper category = NetDeckArchivePauper.selectAndLoad(lstDecks.getGameType());
+                FThreads.invokeInEdtLater(() -> {
+                    if (category == null) {
+                        decksComboBox.setDeckType(selectedDeckType); //restore old selection if user cancels
+                        if (selectedDeckType == DeckType.NET_ARCHIVE_PAUPER_DECK && NetDeckArchivePauper != null) {
+                            decksComboBox.setText(NetDeckArchivePauper.getDeckType());
                         }
-                    });
-                }
+                        return;
+                    }
+
+                    NetDeckArchivePauper = category;
+                    refreshDecksList(ev.getDeckType(), true, ev);
+                });
             });
             return;
 
         } else if (ev.getDeckType() == DeckType.NET_ARCHIVE_LEGACY_DECK && !refreshingDeckType) {
             if (lstDecks.getGameType() != GameType.Constructed)
                 return;
-            FThreads.invokeInBackgroundThread(new Runnable() { //needed for loading net decks
-                @Override
-                public void run() {
-                    final NetDeckArchiveLegacy category = NetDeckArchiveLegacy.selectAndLoad(lstDecks.getGameType());
-                    FThreads.invokeInEdtLater(new Runnable() {
-                        @Override
-                        public void run() {
-                            if (category == null) {
-                                decksComboBox.setDeckType(selectedDeckType); //restore old selection if user cancels
-                                if (selectedDeckType == DeckType.NET_ARCHIVE_LEGACY_DECK && NetDeckArchiveLegacy != null) {
-                                    decksComboBox.setText(NetDeckArchiveLegacy.getDeckType());
-                                }
-                                return;
-                            }
-
-                            NetDeckArchiveLegacy = category;
-                            refreshDecksList(ev.getDeckType(), true, ev);
+            //needed for loading net decks
+            FThreads.invokeInBackgroundThread(() -> {
+                final NetDeckArchiveLegacy category = NetDeckArchiveLegacy.selectAndLoad(lstDecks.getGameType());
+                FThreads.invokeInEdtLater(() -> {
+                    if (category == null) {
+                        decksComboBox.setDeckType(selectedDeckType); //restore old selection if user cancels
+                        if (selectedDeckType == DeckType.NET_ARCHIVE_LEGACY_DECK && NetDeckArchiveLegacy != null) {
+                            decksComboBox.setText(NetDeckArchiveLegacy.getDeckType());
                         }
-                    });
-                }
+                        return;
+                    }
+
+                    NetDeckArchiveLegacy = category;
+                    refreshDecksList(ev.getDeckType(), true, ev);
+                });
             });
             return;
 
         } else if (ev.getDeckType() == DeckType.NET_ARCHIVE_VINTAGE_DECK && !refreshingDeckType) {
             if (lstDecks.getGameType() != GameType.Constructed)
                 return;
-            FThreads.invokeInBackgroundThread(new Runnable() { //needed for loading net decks
-                @Override
-                public void run() {
-                    final NetDeckArchiveVintage category = NetDeckArchiveVintage.selectAndLoad(lstDecks.getGameType());
-                    FThreads.invokeInEdtLater(new Runnable() {
-                        @Override
-                        public void run() {
-                            if (category == null) {
-                                decksComboBox.setDeckType(selectedDeckType); //restore old selection if user cancels
-                                if (selectedDeckType == DeckType.NET_ARCHIVE_VINTAGE_DECK && NetDeckArchiveVintage != null) {
-                                    decksComboBox.setText(NetDeckArchiveVintage.getDeckType());
-                                }
-                                return;
-                            }
-
-                            NetDeckArchiveVintage = category;
-                            refreshDecksList(ev.getDeckType(), true, ev);
+            //needed for loading net decks
+            FThreads.invokeInBackgroundThread(() -> {
+                final NetDeckArchiveVintage category = NetDeckArchiveVintage.selectAndLoad(lstDecks.getGameType());
+                FThreads.invokeInEdtLater(() -> {
+                    if (category == null) {
+                        decksComboBox.setDeckType(selectedDeckType); //restore old selection if user cancels
+                        if (selectedDeckType == DeckType.NET_ARCHIVE_VINTAGE_DECK && NetDeckArchiveVintage != null) {
+                            decksComboBox.setText(NetDeckArchiveVintage.getDeckType());
                         }
-                    });
-                }
+                        return;
+                    }
+
+                    NetDeckArchiveVintage = category;
+                    refreshDecksList(ev.getDeckType(), true, ev);
+                });
             });
             return;
 
         } else if (ev.getDeckType() == DeckType.NET_ARCHIVE_BLOCK_DECK && !refreshingDeckType) {
             if (lstDecks.getGameType() != GameType.Constructed)
                 return;
-            FThreads.invokeInBackgroundThread(new Runnable() { //needed for loading net decks
-                @Override
-                public void run() {
-                    final NetDeckArchiveBlock category = NetDeckArchiveBlock.selectAndLoad(lstDecks.getGameType());
-                    FThreads.invokeInEdtLater(new Runnable() {
-                        @Override
-                        public void run() {
-                            if (category == null) {
-                                decksComboBox.setDeckType(selectedDeckType); //restore old selection if user cancels
-                                if (selectedDeckType == DeckType.NET_ARCHIVE_BLOCK_DECK && NetDeckArchiveBlock != null) {
-                                    decksComboBox.setText(NetDeckArchiveBlock.getDeckType());
-                                }
-                                return;
-                            }
-
-                            NetDeckArchiveBlock = category;
-                            refreshDecksList(ev.getDeckType(), true, ev);
+            //needed for loading net decks
+            FThreads.invokeInBackgroundThread(() -> {
+                final NetDeckArchiveBlock category = NetDeckArchiveBlock.selectAndLoad(lstDecks.getGameType());
+                FThreads.invokeInEdtLater(() -> {
+                    if (category == null) {
+                        decksComboBox.setDeckType(selectedDeckType); //restore old selection if user cancels
+                        if (selectedDeckType == DeckType.NET_ARCHIVE_BLOCK_DECK && NetDeckArchiveBlock != null) {
+                            decksComboBox.setText(NetDeckArchiveBlock.getDeckType());
                         }
-                    });
-                }
+                        return;
+                    }
+
+                    NetDeckArchiveBlock = category;
+                    refreshDecksList(ev.getDeckType(), true, ev);
+                });
             });
             return;
 
         } else if ((ev.getDeckType() == DeckType.NET_DECK || ev.getDeckType() == DeckType.NET_COMMANDER_DECK) && !refreshingDeckType) {
-            FThreads.invokeInBackgroundThread(new Runnable() { //needed for loading net decks
-                @Override
-                public void run() {
-                    final NetDeckCategory category = NetDeckCategory.selectAndLoad(lstDecks.getGameType());
+            //needed for loading net decks
+            FThreads.invokeInBackgroundThread(() -> {
+                final NetDeckCategory category = NetDeckCategory.selectAndLoad(lstDecks.getGameType());
 
-                    FThreads.invokeInEdtLater(new Runnable() {
-                        @Override
-                        public void run() {
-                            if (category == null) {
-                                decksComboBox.setDeckType(selectedDeckType); //restore old selection if user cancels
-                                if (selectedDeckType == DeckType.NET_DECK && netDeckCategory != null) {
-                                    decksComboBox.setText(netDeckCategory.getDeckType());
-                                }
-                                return;
-                            }
-
-                            netDeckCategory = category;
-                            refreshDecksList(ev.getDeckType(), true, ev);
+                FThreads.invokeInEdtLater(() -> {
+                    if (category == null) {
+                        decksComboBox.setDeckType(selectedDeckType); //restore old selection if user cancels
+                        if (selectedDeckType == DeckType.NET_DECK && netDeckCategory != null) {
+                            decksComboBox.setText(netDeckCategory.getDeckType());
                         }
-                    });
-                }
+                        return;
+                    }
+
+                    netDeckCategory = category;
+                    refreshDecksList(ev.getDeckType(), true, ev);
+                });
             });
             return;
         }
@@ -715,9 +773,16 @@ public class FDeckChooser extends JPanel implements IDecksComboBoxListener {
             case NET_ARCHIVE_BLOCK_DECK:
                 updateNetArchiveBlockDecks();
                 break;
+            case PROVIDED_DECK_URL:
+                updateProvidedDeckUrl();
+                break;
+            case NET_EVENT_DECK:
+                updateNetEventDecks();
+                break;
             default:
                 break; //other deck types not currently supported here
         }
+        updateDeckUrlPanelVisibility();
     }
 
     private final String SELECTED_DECK_DELIMITER = "::";

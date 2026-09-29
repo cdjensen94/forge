@@ -1,18 +1,17 @@
 package forge.game.card;
 
-
-import java.util.List;
-import java.util.Map;
-
-import org.apache.commons.lang3.tuple.Pair;
-
 import com.google.common.collect.Lists;
-
+import com.google.common.collect.Sets;
 import forge.game.CardTraitBase;
 import forge.game.GameEntity;
 import forge.game.player.Player;
 import forge.game.zone.ZoneType;
 import forge.util.collect.FCollection;
+import org.apache.commons.lang3.tuple.Pair;
+
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 /** 
  * TODO: Write javadoc for this type.
@@ -40,10 +39,13 @@ public class CardDamageHistory {
     private final List<Player> damagedThisCombat = Lists.newArrayList();
     // only needed for The Fallen
     private final FCollection<GameEntity> damagedThisGame = new FCollection<>();
-    boolean hasdealtDamagetoAny = false;
+    Set<Boolean> hasdealtDamagetoAny = Sets.newHashSet();
 
     public final boolean getHasdealtDamagetoAny() {
-        return hasdealtDamagetoAny;
+        return !hasdealtDamagetoAny.isEmpty();
+    }
+    public final boolean getHasdealtCombatDamagetoAny() {
+        return hasdealtDamagetoAny.contains(Boolean.TRUE);
     }
 
     // used to see if an attacking creature with a triggering attack ability
@@ -236,7 +238,7 @@ public class CardDamageHistory {
             return;
         }
         damagedThisGame.add(target);
-        hasdealtDamagetoAny = true;
+        hasdealtDamagetoAny.add(isCombat);
         if (isCombat && target instanceof Player) {
             final Player pTgt = (Player) target;
             damagedThisCombat.add(pTgt);
@@ -252,6 +254,9 @@ public class CardDamageHistory {
     }
 
     public int getDamageDoneThisTurn(Boolean isCombat, boolean anyIsEnough, String validSourceCard, String validTargetEntity, Card source, Player sourceController, CardTraitBase ctb) {
+        return getDamageDoneThisTurn(isCombat, anyIsEnough, false, validSourceCard, validTargetEntity, source, sourceController, ctb);
+    }
+    public int getDamageDoneThisTurn(Boolean isCombat, boolean anyIsEnough, boolean times, String validSourceCard, String validTargetEntity, Card source, Player sourceController, CardTraitBase ctb) {
         int sum = 0;
         for (Pair<Integer, Boolean> damage : damageDoneThisTurn) {
             Pair<Card, GameEntity> sourceToTarget = sourceController.getGame().getDamageLKI(damage);
@@ -267,12 +272,16 @@ public class CardDamageHistory {
                     continue;
                 }
             }
-            sum += damage.getLeft();
+            sum += times ? 1 : damage.getLeft();
             if (anyIsEnough) {
                 break;
             }
         }
         return sum;
+    }
+
+    public List<Pair<Integer, Boolean>> getAllDmgInstances() {
+        return damageDoneThisTurn;
     }
 
     public void newTurn() {

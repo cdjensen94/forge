@@ -7,6 +7,8 @@ import forge.game.ability.SpellAbilityEffect;
 import forge.game.card.Card;
 import forge.game.phase.ExtraTurn;
 import forge.game.player.Player;
+import forge.game.replacement.ReplacementEffect;
+import forge.game.replacement.ReplacementHandler;
 import forge.game.spellability.SpellAbility;
 import forge.game.trigger.Trigger;
 import forge.game.trigger.TriggerHandler;
@@ -45,7 +47,7 @@ public class AddTurnEffect extends SpellAbilityEffect {
                 ExtraTurn extra = p.getGame().getPhaseHandler().addExtraTurn(p);
                 if (sa.hasParam("ExtraTurnDelayedTrigger")) {
                     final Trigger delTrig = TriggerHandler.parseTrigger(sa.getSVar(sa.getParam("ExtraTurnDelayedTrigger")), sa.getHostCard(), true);
-                    SpellAbility overridingSA = AbilityFactory.getAbility(sa.getSVar(sa.getParam("ExtraTurnDelayedTriggerExcute")), sa.getHostCard());
+                    SpellAbility overridingSA = AbilityFactory.getAbility(sa.getSVar(sa.getParam("ExtraTurnDelayedTriggerExecute")), sa.getHostCard());
                     overridingSA.setActivatingPlayer(sa.getActivatingPlayer());
                     delTrig.setOverridingAbility(overridingSA);
                     delTrig.setSpawningAbility(sa.copy(sa.getHostCard(), true));
@@ -67,16 +69,17 @@ public class AddTurnEffect extends SpellAbilityEffect {
     public static void createCantSetSchemesInMotionEffect(SpellAbility sa) {
         final Card hostCard = sa.getHostCard();
         final Game game = hostCard.getGame();
-        final String name = hostCard.getName() + "'s Effect";
+        final String name = hostCard.getDisplayName() + "'s Effect";
         final String image = hostCard.getImageKey();
 
         final Card eff = createEffect(sa, sa.getActivatingPlayer(), name, image);
 
-        String stEffect = "Mode$ CantSetSchemesInMotion | EffectZone$ Command | Description$ Schemes can't be set in Motion";
-
-        eff.addStaticAbility(stEffect);
+        String strRe = "Event$ SetInMotion | EffectZone$ Command | Layer$ CantHappen | Description$ Schemes can't be set in Motion";
+        ReplacementEffect re = ReplacementHandler.parseReplacement(strRe, eff, true);
+        eff.addReplacementEffect(re);
 
         game.getAction().moveToCommand(eff, sa);
+        game.getEndOfTurn().addUntil(() -> game.getAction().exileEffect(eff));
     }
 
 }

@@ -18,10 +18,10 @@
 package forge.game.spellability;
 
 import java.util.Map;
+import java.util.List;
+import com.google.common.collect.Lists;
 
-import forge.card.CardStateName;
 import forge.game.IHasSVars;
-import forge.game.ability.AbilityFactory;
 import forge.game.ability.ApiType;
 import forge.game.ability.SpellAbilityEffect;
 import forge.game.card.Card;
@@ -49,7 +49,7 @@ public final class AbilitySub extends SpellAbility implements java.io.Serializab
      * @param parent
      *            a {@link forge.game.spellability.SpellAbility} object.
      */
-    public final void setParent(final SpellAbility parent) {
+    public void setParent(final SpellAbility parent) {
         this.parent = parent;
     }
 
@@ -61,7 +61,7 @@ public final class AbilitySub extends SpellAbility implements java.io.Serializab
      * @return a {@link forge.game.spellability.SpellAbility} object.
      */
     @Override
-    public final SpellAbility getParent() {
+    public SpellAbility getParent() {
         return this.parent;
     }
 
@@ -80,19 +80,13 @@ public final class AbilitySub extends SpellAbility implements java.io.Serializab
 
         api = api0;
         if (params0 != null) {
-            originalMapParams.putAll(params0);
             mapParams.putAll(params0);
         }
 
         effect = api.getSpellEffect();
 
-        if (api.equals(ApiType.Mana) || api.equals(ApiType.ManaReflected)) {
-            this.setManaPart(new AbilityManaPart(this, mapParams));
-        }
-
-        if (api.equals(ApiType.ChangeZone) || api.equals(ApiType.ChangeZoneAll)) {
-            AbilityFactory.adjustChangeZoneTarget(mapParams, this);
-        }
+        effect.buildSpellAbility(this);
+        originalMapParams.putAll(mapParams);
     }
 
     @Override
@@ -106,16 +100,17 @@ public final class AbilitySub extends SpellAbility implements java.io.Serializab
     }
 
     @Override
-    protected IHasSVars getSVarFallback() {
-        if (getCardState() != null && getCardStateName().equals(CardStateName.RightSplit)) {
-            return getCardState();
+    protected List<IHasSVars> getSVarFallback(final String name) {
+        // fused or spliced
+        if (getRootAbility().getCardState() != getCardState()) {
+            return Lists.newArrayList(getCardState());
         }
-        return super.getSVarFallback();
+        return super.getSVarFallback(name);
     }
 
     /** {@inheritDoc} */
     @Override
-    public final Object clone() {
+    public Object clone() {
         try {
             return super.clone();
         } catch (final Exception ex) {

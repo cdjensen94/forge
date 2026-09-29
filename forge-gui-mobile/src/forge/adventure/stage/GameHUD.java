@@ -2,16 +2,28 @@ package forge.adventure.stage;
 
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.Input;
-import com.badlogic.gdx.audio.Music;
-import com.badlogic.gdx.files.FileHandle;
 import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.graphics.Pixmap;
 import com.badlogic.gdx.graphics.Texture;
+import com.badlogic.gdx.graphics.g2d.Batch;
+import com.badlogic.gdx.graphics.g2d.TextureRegion;
+import com.badlogic.gdx.math.MathUtils;
 import com.badlogic.gdx.math.Vector2;
-import com.badlogic.gdx.scenes.scene2d.*;
+import com.badlogic.gdx.math.Vector3;
+import com.badlogic.gdx.scenes.scene2d.Action;
+import com.badlogic.gdx.scenes.scene2d.Actor;
+import com.badlogic.gdx.scenes.scene2d.Group;
+import com.badlogic.gdx.scenes.scene2d.InputEvent;
+import com.badlogic.gdx.scenes.scene2d.Stage;
+import com.badlogic.gdx.scenes.scene2d.Touchable;
 import com.badlogic.gdx.scenes.scene2d.actions.Actions;
 import com.badlogic.gdx.scenes.scene2d.actions.SequenceAction;
-import com.badlogic.gdx.scenes.scene2d.ui.*;
+import com.badlogic.gdx.scenes.scene2d.ui.Button;
+import com.badlogic.gdx.scenes.scene2d.ui.Dialog;
+import com.badlogic.gdx.scenes.scene2d.ui.Image;
+import com.badlogic.gdx.scenes.scene2d.ui.ScrollPane;
+import com.badlogic.gdx.scenes.scene2d.ui.ScrollPane.ScrollPaneStyle;
+import com.badlogic.gdx.scenes.scene2d.ui.Touchpad;
 import com.badlogic.gdx.scenes.scene2d.utils.ActorGestureListener;
 import com.badlogic.gdx.scenes.scene2d.utils.ChangeListener;
 import com.badlogic.gdx.scenes.scene2d.utils.TextureRegionDrawable;
@@ -23,21 +35,34 @@ import com.badlogic.gdx.utils.viewport.ScalingViewport;
 import com.github.tommyettinger.textra.TextraButton;
 import com.github.tommyettinger.textra.TextraLabel;
 import com.github.tommyettinger.textra.TypingLabel;
+
+import java.util.EnumSet;
+
 import forge.Forge;
+import forge.adventure.character.EnemySprite;
 import forge.adventure.character.CharacterSprite;
 import forge.adventure.data.AdventureQuestData;
 import forge.adventure.data.ItemData;
 import forge.adventure.player.AdventurePlayer;
-import forge.adventure.scene.*;
-import forge.adventure.util.*;
+import forge.adventure.scene.DeckSelectScene;
+import forge.adventure.scene.GameScene;
+import forge.adventure.scene.InventoryScene;
+import forge.adventure.scene.MapViewScene;
+import forge.adventure.scene.QuestLogScene;
+import forge.adventure.scene.Scene;
+import forge.adventure.scene.TileMapScene;
+import forge.adventure.util.AdventureQuestController;
+import forge.adventure.util.Config;
+import forge.adventure.util.Controls;
+import forge.adventure.util.Current;
+import forge.adventure.util.KeyBinding;
+import forge.adventure.util.NavArrowActor;
+import forge.adventure.util.UIActor;
 import forge.adventure.world.WorldSave;
 import forge.deck.Deck;
 import forge.gui.GuiBase;
-import forge.localinstance.properties.ForgePreferences;
-import forge.model.FModel;
 import forge.sound.MusicPlaylist;
 import forge.sound.SoundSystem;
-import org.apache.commons.lang3.tuple.Pair;
 
 /**
  * Stage to handle everything rendered in the HUD
@@ -47,11 +72,13 @@ public class GameHUD extends Stage {
     static public GameHUD instance;
     private final GameStage gameStage;
     private final Image avatar, miniMapPlayer;
-    private final TextraLabel lifePoints;
-    private final TextraLabel money;
-    private final TextraLabel shards;
-    private final TextraLabel keys;
-    private TextraLabel notificationText = Controls.newTextraLabel("");
+    private final TypingLabel keyCollection;
+    private final TypingLabel lifePoints;
+    private final TypingLabel money;
+    private final TypingLabel shards;
+    private final TypingLabel enemyCounterText;
+    private final Image enemyCounterBackground;
+    private final TextraLabel notificationText = Controls.newTextraLabel("");
     private final Image miniMap, gamehud, mapborder, avatarborder, blank;
     private final InputEvent eventTouchDown, eventTouchUp;
     private final TextraButton deckActor, openMapActor, menuActor, logbookActor, inventoryActor, exitToWorldMapActor, bookmarkActor;
@@ -60,19 +87,30 @@ public class GameHUD extends Stage {
     private final Console console;
     float TOUCHPAD_SCALE = 70f, referenceX;
     float opacity = 1f;
-    private boolean debugMap, updatelife;
+    private boolean debugMap, transluscent, hidden;
 
     private final Dialog dialog;
     private boolean dialogOnlyInput;
     private final Array<TextraButton> dialogButtonMap = new Array<>();
     private final Array<TextraButton> abilityButtonMap = new Array<>();
-    private final Array<String> questKeys = new Array<>();
+    private final Array<NavArrowActor> hiddenEnemyChevrons = new Array<>();
+    private final Vector2 chevronStageCoordinates = new Vector2();
+    private final Vector2 chevronNavigation = new Vector2();
+    private final Vector3 playerProjectedCoordinates = new Vector3();
     private String lifepointsTextColor = "";
-    private final ScrollPane scrollPane;
     private final ScrollPane notificationPane;
+    private final Group mapGroup = new Group();
+    private final Group hudGroup = new Group();
+    private final Group menuGroup = new Group();
+    private final Group avatarGroup = new Group();
+    private final Vector2 touchDownCoords = new Vector2();
+    private final Vector2 touchDownDirection = new Vector2();
+    private final Vector2 touchDraggedDirection = new Vector2();
+    private int viewWidth = 150;
+    private int viewHeight = 150;
 
     private GameHUD(GameStage gameStage) {
-        super(new ScalingViewport(Scaling.stretch, Scene.getIntendedWidth(), Scene.getIntendedHeight()), gameStage.getBatch());
+        super(new ScalingViewport(Scaling.stretch, Scene.getIntendedWidth(), Scene.getIntendedHeight()), Forge.getGraphics().getBatch());
         instance = this;
         this.gameStage = gameStage;
 
@@ -108,18 +146,14 @@ public class GameHUD extends Stage {
                 if (MapStage.getInstance().isInMap()) {
                     if (MapStage.getInstance().isPaused())
                         return;
-                    MapStage.getInstance().getPlayerSprite().getMovementDirection().x += ((Touchpad) actor).getKnobPercentX();
-                    MapStage.getInstance().getPlayerSprite().getMovementDirection().y += ((Touchpad) actor).getKnobPercentY();
+                    MapStage.getInstance().setTouchKnobInput(((Touchpad) actor).getKnobPercentX(), ((Touchpad) actor).getKnobPercentY());
                 } else {
                     if (WorldStage.getInstance().isPaused())
                         return;
-                    WorldStage.getInstance().getPlayerSprite().getMovementDirection().x += ((Touchpad) actor).getKnobPercentX();
-                    WorldStage.getInstance().getPlayerSprite().getMovementDirection().y += ((Touchpad) actor).getKnobPercentY();
+                    WorldStage.getInstance().setTouchKnobInput(((Touchpad) actor).getKnobPercentX(), ((Touchpad) actor).getKnobPercentY());
                 }
             }
         });
-        if (GuiBase.isAndroid()) //add touchpad for android
-            ui.addActor(touchpad);
 
         avatar = ui.findActor("avatar");
         ui.onButtonPress("menu", this::menu);
@@ -128,33 +162,58 @@ public class GameHUD extends Stage {
         ui.onButtonPress("deck", this::openDeck);
         ui.onButtonPress("exittoworldmap", this::exitToWorldMap);
         ui.onButtonPress("bookmark", this::bookmark);
+        keyCollection = ui.findActor("keyCollection");
+        keyCollection.skipToTheEnd();
         lifePoints = ui.findActor("lifePoints");
+        lifePoints.skipToTheEnd();
         shards = ui.findActor("shards");
+        shards.skipToTheEnd();
         money = ui.findActor("money");
-        shards.setText("[%95][+Shards] 0");
-        money.setText("[%95][+Gold] ");
-        lifePoints.setText("[%95][+Life] 20/20");
-        keys = Controls.newTextraLabel("");
-        scrollPane = new ScrollPane(keys);
-        scrollPane.setPosition(2, 2);
-        scrollPane.setStyle(Controls.getSkin().get("translucent", ScrollPane.ScrollPaneStyle.class));
-        addActor(scrollPane);
-        AdventurePlayer.current().onLifeChange(() -> lifePoints.setText("[%95][+Life]" + lifepointsTextColor + " " + AdventurePlayer.current().getLife() + "/" + AdventurePlayer.current().getMaxLife()));
-        AdventurePlayer.current().onShardsChange(() -> shards.setText("[%95][+Shards] " + AdventurePlayer.current().getShards()));
-        AdventurePlayer.current().onEquipmentChanged(this::updateAbility);
+        money.skipToTheEnd();
+        shards.setText("[%95][+Shards]");
+        money.setText("[%95][+Gold]");
+        lifePoints.setText("[%95][+Life]");
+        enemyCounterText = Controls.newTypingLabel(Forge.getLocalizer().getMessage("lblRemainingEnemies", String.valueOf(0)));
+        enemyCounterText.setColor(Color.BLACK);
+        enemyCounterText.skipToTheEnd();
+        enemyCounterText.setVisible(false);
 
-        WorldSave.getCurrentSave().getPlayer().onGoldChange(() -> money.setText("[%95][+Gold] " + AdventurePlayer.current().getGold()));
+        ScrollPaneStyle paperStyle = Controls.getSkin().get("paper", ScrollPaneStyle.class);
+        enemyCounterBackground = new Image(paperStyle.background);
+        enemyCounterBackground.setVisible(false);
+        AdventurePlayer.current().onLifeChange(() -> {
+            String effect = "{EMERGE}";
+            String effectEnd = "{ENDEMERGE}";
+            String heartbeat = "";
+            //colored lifepoints
+            if (Current.player().getLife() >= Current.player().getMaxLife()) {
+                //color green if max life
+                lifepointsTextColor = "[GREEN]";
+            } else if (Current.player().getLife() <= 5) {
+                //color red if critical
+                effect = "";
+                effectEnd = "";
+                heartbeat = "{HEARTBEAT=0.5;0.5}";
+                lifepointsTextColor = "{ENDHEARTBEAT}[RED]";
+            } else {
+                lifepointsTextColor = "[WHITE]";
+            }
+            lifePoints.restart("[%95]" + heartbeat + "[+Life]" + lifepointsTextColor + effect + " " + AdventurePlayer.current().getLife() + effectEnd + "/" + AdventurePlayer.current().getMaxLife());
+        });
+        AdventurePlayer.current().onShardsChange(() -> shards.restart("[%95][+Shards]{EMERGE} " + AdventurePlayer.current().getShards() + "{ENDEMERGE}"));
+        AdventurePlayer.current().onGoldChange(() -> money.restart("[%95][+Gold]{EMERGE} " + AdventurePlayer.current().getGold() + "{ENDEMERGE}"));
+        AdventurePlayer.current().onEquipmentChanged(this::updateAbility);
         addActor(ui);
         addActor(miniMapPlayer);
+        addActor(enemyCounterBackground);
+        addActor(enemyCounterText);
         console = new Console();
         console.setBounds(0, GuiBase.isAndroid() ? getHeight() : 0, getWidth(), getHeight() / 2);
         console.setVisible(false);
         ui.addActor(console);
-        if (GuiBase.isAndroid()) {
-            avatar.addListener(new ConsoleToggleListener());
-            avatarborder.addListener(new ConsoleToggleListener());
-            gamehud.addListener(new ConsoleToggleListener());
-        }
+        avatar.addListener(new ConsoleToggleListener());
+        avatarborder.addListener(new ConsoleToggleListener());
+        gamehud.addListener(new ConsoleToggleListener());
         WorldSave.getCurrentSave().onLoad(this::enter);
 
         eventTouchDown = new InputEvent();
@@ -166,17 +225,46 @@ public class GameHUD extends Stage {
 
         notificationPane = new ScrollPane(notificationText);
         notificationPane.setTouchable(Touchable.childrenOnly);
-        notificationPane.setBounds(5, GuiBase.isAndroid() ? getHeight() : -notificationText.getPrefHeight(), getWidth()*0.4f, 25);
+        notificationPane.setBounds(5, GuiBase.isAndroid() ? getHeight() : -notificationText.getPrefHeight(), getWidth() * 0.4f, 25);
         notificationPane.setStyle(Controls.getSkin().get("paper", ScrollPane.ScrollPaneStyle.class));
         notificationPane.getColor().a = 0f;
 
         ui.addActor(notificationPane);
+        //move touchpad here so z-index is over notificationPane and we can still move the player
+        if (GuiBase.isAndroid()) //add touchpad for android
+            ui.addActor(touchpad);
+        //MAP
+        mapGroup.addActor(miniMap);
+        mapGroup.addActor(mapborder);
+        mapGroup.addActor(openMapActor);
+        mapGroup.addActor(miniMapPlayer);
+        ui.addActor(mapGroup);
+        //HUD
+        hudGroup.addActor(gamehud);
+        hudGroup.addActor(keyCollection);
+        hudGroup.addActor(lifePoints);
+        hudGroup.addActor(shards);
+        hudGroup.addActor(money);
+        hudGroup.addActor(blank);
+        ui.addActor(hudGroup);
+        //MENU
+        menuGroup.addActor(deckActor);
+        menuGroup.addActor(menuActor);
+        menuGroup.addActor(logbookActor);
+        menuGroup.addActor(inventoryActor);
+        menuGroup.addActor(exitToWorldMapActor);
+        menuGroup.addActor(bookmarkActor);
+        ui.addActor(menuGroup);
+        //AVATAR
+        avatarGroup.addActor(avatar);
+        avatarGroup.addActor(avatarborder);
+        ui.addActor(avatarGroup);
     }
 
     private void openMap() {
         if (console.isVisible())
             return;
-        if (Forge.restrictAdvMenus)
+        if (Forge.advFreezePlayerControls)
             return;
         Forge.switchScene(MapViewScene.instance());
     }
@@ -184,7 +272,7 @@ public class GameHUD extends Stage {
     private void logbook() {
         if (console.isVisible())
             return;
-        if (Forge.restrictAdvMenus)
+        if (Forge.advFreezePlayerControls)
             return;
         Forge.switchScene(QuestLogScene.instance(Forge.getCurrentScene()));
     }
@@ -200,6 +288,8 @@ public class GameHUD extends Stage {
     @Override
     public boolean touchUp(int screenX, int screenY, int pointer, int button) {
         touchpad.setVisible(false);
+        MapStage.getInstance().setTouchKnobInput(0, 0);
+        WorldStage.getInstance().setTouchKnobInput(0, 0);
         MapStage.getInstance().getPlayerSprite().setMovementDirection(Vector2.Zero);
         WorldStage.getInstance().getPlayerSprite().setMovementDirection(Vector2.Zero);
         return super.touchUp(screenX, screenY, pointer, button);
@@ -207,17 +297,18 @@ public class GameHUD extends Stage {
 
     @Override
     public boolean touchDragged(int screenX, int screenY, int pointer) {
-        Vector2 c = new Vector2();
-        screenToStageCoordinates(c.set(screenX, screenY));
+        screenToStageCoordinates(touchDraggedDirection.set(screenX, screenY));
 
-        float x = (c.x - miniMap.getX()) / miniMap.getWidth();
-        float y = (c.y - miniMap.getY()) / miniMap.getHeight();
+        float x = (touchDraggedDirection.x - miniMap.getX()) / miniMap.getWidth();
+        float y = (touchDraggedDirection.y - miniMap.getY()) / miniMap.getHeight();
         //map bounds
-        if (Controls.actorContainsVector(miniMap, c)) {
+        if (Controls.actorContainsVector(miniMap, touchDraggedDirection)) {
             touchpad.setVisible(false);
-
-            if (debugMap)
+            if (mapGroup.isVisible() && debugMap) {
                 WorldStage.getInstance().getPlayerSprite().setPosition(x * WorldSave.getCurrentSave().getWorld().getWidthInPixels(), y * WorldSave.getCurrentSave().getWorld().getHeightInPixels());
+            } else if (!mapGroup.isVisible()) {
+                return false;
+            }
 
             return true;
         }
@@ -226,38 +317,40 @@ public class GameHUD extends Stage {
 
     @Override
     public boolean touchDown(int screenX, int screenY, int pointer, int button) {
-        Vector2 c = new Vector2();
-        Vector2 touch = new Vector2();
-        screenToStageCoordinates(touch.set(screenX, screenY));
-        screenToStageCoordinates(c.set(screenX, screenY));
+        screenToStageCoordinates(touchDownCoords.set(screenX, screenY));
+        screenToStageCoordinates(touchDownDirection.set(screenX, screenY));
 
-        float x = (c.x - miniMap.getX()) / miniMap.getWidth();
-        float y = (c.y - miniMap.getY()) / miniMap.getHeight();
-        if (Controls.actorContainsVector(gamehud, c)) {
+        float x = (touchDownDirection.x - miniMap.getX()) / miniMap.getWidth();
+        float y = (touchDownDirection.y - miniMap.getY()) / miniMap.getHeight();
+        if (Controls.actorContainsVector(gamehud, touchDownDirection)) {
             super.touchDown(screenX, screenY, pointer, button);
             return true;
         }
-        if (Controls.actorContainsVector(miniMap, c)) {
-            if (debugMap)
+        if (Controls.actorContainsVector(miniMap, touchDownDirection)) {
+            if (mapGroup.isVisible() && debugMap) {
                 WorldStage.getInstance().getPlayerSprite().setPosition(x * WorldSave.getCurrentSave().getWorld().getWidthInPixels(), y * WorldSave.getCurrentSave().getWorld().getHeightInPixels());
+            } else if (!mapGroup.isVisible()) {
+                // in this case, we want to send an action to the scene, which happens in the caller
+                return false;
+            }
             return true;
         }
         //auto follow touchpad
-        if (GuiBase.isAndroid() && !MapStage.getInstance().getDialogOnlyInput() && !console.isVisible()) {
-            if (!(Controls.actorContainsVector(avatar, touch)) // not inside avatar bounds
-                    && !(Controls.actorContainsVector(miniMap, touch)) // not inside map bounds
-                    && !(Controls.actorContainsVector(gamehud, touch)) //not inside gamehud bounds
-                    && !(Controls.actorContainsVector(menuActor, touch)) //not inside menu button
-                    && !(Controls.actorContainsVector(deckActor, touch)) //not inside deck button
-                    && !(Controls.actorContainsVector(openMapActor, touch)) //not inside openmap button
-                    && !(Controls.actorContainsVector(logbookActor, touch)) //not inside stats button
-                    && !(Controls.actorContainsVector(inventoryActor, touch)) //not inside inventory button
-                    && !(Controls.actorContainsVector(exitToWorldMapActor, touch)) //not inside exit button
-                    && !(Controls.actorContainsVector(bookmarkActor, touch)) //not inside bookmark button
-                    && !(Controls.actorContainsVector(abilityButtonMap, touch)) //not inside abilityButtonMap
-                    && (Controls.actorContainsVector(ui, touch)) //inside display bounds
+        if (GuiBase.isAndroid() && !MapStage.getInstance().isDialogOnlyInput() && !console.isVisible()) {
+            if (!(Controls.actorContainsVector(avatar, touchDownCoords)) // not inside avatar bounds
+                    && !(Controls.actorContainsVector(miniMap, touchDownCoords)) // not inside map bounds
+                    && !(Controls.actorContainsVector(gamehud, touchDownCoords)) //not inside gamehud bounds
+                    && !(Controls.actorContainsVector(menuActor, touchDownCoords)) //not inside menu button
+                    && !(Controls.actorContainsVector(deckActor, touchDownCoords)) //not inside deck button
+                    && !(Controls.actorContainsVector(openMapActor, touchDownCoords)) //not inside openmap button
+                    && !(Controls.actorContainsVector(logbookActor, touchDownCoords)) //not inside stats button
+                    && !(Controls.actorContainsVector(inventoryActor, touchDownCoords)) //not inside inventory button
+                    && !(Controls.actorContainsVector(exitToWorldMapActor, touchDownCoords)) //not inside exit button
+                    && !(Controls.actorContainsVector(bookmarkActor, touchDownCoords)) //not inside bookmark button
+                    && !(Controls.actorContainsVector(abilityButtonMap, touchDownCoords)) //not inside abilityButtonMap
+                    && (Controls.actorContainsVector(ui, touchDownCoords)) //inside display bounds
                     && pointer < 1) { //not more than 1 pointer
-                touchpad.setBounds(touch.x - TOUCHPAD_SCALE / 2, touch.y - TOUCHPAD_SCALE / 2, TOUCHPAD_SCALE, TOUCHPAD_SCALE);
+                touchpad.setBounds(touchDownCoords.x - TOUCHPAD_SCALE / 2, touchDownCoords.y - TOUCHPAD_SCALE / 2, TOUCHPAD_SCALE, TOUCHPAD_SCALE);
                 touchpad.setVisible(true);
                 touchpad.setResetOnTouchUp(true);
                 return super.touchDown(screenX, screenY, pointer, button);
@@ -268,97 +361,31 @@ public class GameHUD extends Stage {
 
     @Override
     public void draw() {
-        updatelife = false;
-        int yPos = (int) gameStage.player.getY();
-        int xPos = (int) gameStage.player.getX();
         act(Gdx.graphics.getDeltaTime()); //act the Hud
+        updateHiddenEnemyChevrons();
         super.draw(); //draw the Hud
-        int xPosMini = (int) (((float) xPos / (float) WorldSave.getCurrentSave().getWorld().getTileSize() / (float) WorldSave.getCurrentSave().getWorld().getWidthInTiles()) * miniMap.getWidth());
-        int yPosMini = (int) (((float) yPos / (float) WorldSave.getCurrentSave().getWorld().getTileSize() / (float) WorldSave.getCurrentSave().getWorld().getHeightInTiles()) * miniMap.getHeight());
-        miniMapPlayer.setPosition(miniMap.getX() + xPosMini - miniMapPlayer.getWidth() / 2, miniMap.getY() + yPosMini - miniMapPlayer.getHeight() / 2);
 
-        miniMapPlayer.setVisible(miniMap.isVisible() &&
-                !Controls.actorContainsVector(notificationPane, new Vector2(miniMapPlayer.getX(),miniMapPlayer.getY()))
-                && (!Controls.actorContainsVector(console, new Vector2(miniMapPlayer.getX(),miniMapPlayer.getY()))
-                || !console.isVisible())); // prevent drawing on top of console or notifications
-        //colored lifepoints
-        if (Current.player().getLife() >= Current.player().getMaxLife()) {
-            //color green if max life
-            if (!lifepointsTextColor.equals("[GREEN]")) {
-                lifepointsTextColor = "[GREEN]";
-                updatelife = true;
-            }
-        } else if (Current.player().getLife() <= 5) {
-            //color red if critical
-            if (!lifepointsTextColor.equals("[RED]")) {
-                lifepointsTextColor = "[RED]";
-                updatelife = true;
-            }
-        } else {
-            if (!lifepointsTextColor.equals("")) {
-                lifepointsTextColor = "";
-                updatelife = true;
-            }
-        }
-        if (updatelife) {
-            updatelife = false;
-            lifePoints.setText("[%95][+Life]" + lifepointsTextColor + " " + AdventurePlayer.current().getLife() + "/" + AdventurePlayer.current().getMaxLife());
-        }
-        if (!MapStage.getInstance().isInMap())
-            updateMusic();
-        else
-            SoundSystem.instance.pause();
     }
 
     Texture miniMapTexture;
-    Texture miniMapToolTipTexture;
-    Pixmap miniMapToolTipPixmap;
+    TextureRegion miniMapRegion;
     public boolean fromWorldMap = false;
 
     public void enter() {
-        questKeys.clear();
-        if (miniMapTexture != null)
-            miniMapTexture.dispose();
-        miniMapTexture = new Texture(WorldSave.getCurrentSave().getWorld().getBiomeImage());
-        if (miniMapToolTipTexture != null)
-            miniMapToolTipTexture.dispose();
-        if (miniMapToolTipPixmap != null)
-            miniMapToolTipPixmap.dispose();
-        miniMapToolTipPixmap = new Pixmap((int) (miniMap.getWidth() * 3), (int) (miniMap.getHeight() * 3), Pixmap.Format.RGBA8888);
-        miniMapToolTipPixmap.drawPixmap(WorldSave.getCurrentSave().getWorld().getBiomeImage(), 0, 0, WorldSave.getCurrentSave().getWorld().getBiomeImage().getWidth(), WorldSave.getCurrentSave().getWorld().getBiomeImage().getHeight(), 0, 0, miniMapToolTipPixmap.getWidth(), miniMapToolTipPixmap.getHeight());
-        miniMapToolTipTexture = new Texture(miniMapToolTipPixmap);
-        miniMap.setDrawable(new TextureRegionDrawable(miniMapTexture));
+        updateKeys();
+        Pixmap biomeImage = WorldSave.getCurrentSave().getWorld().getBiomeImage();
+        miniMapTexture = Forge.getAssets().getNewMiniMapTexture(biomeImage);
+        miniMapRegion = new TextureRegion(miniMapTexture, 0, 0, viewWidth, viewHeight);
+        miniMap.setDrawable(new TextureRegionDrawable(miniMapRegion));
         avatar.setDrawable(new TextureRegionDrawable(Current.player().avatar()));
         Deck deck = AdventurePlayer.current().getSelectedDeck();
-        if (AdventurePlayer.current().hasItem("Red Key"))
-            questKeys.add("[+RedKey]");
-        if (AdventurePlayer.current().hasItem("Green Key"))
-            questKeys.add("[+GreenKey]");
-        if (AdventurePlayer.current().hasItem("Blue Key"))
-            questKeys.add("[+BlueKey]");
-        if (AdventurePlayer.current().hasItem("Black Key"))
-            questKeys.add("[+BlackKey]");
-        if (AdventurePlayer.current().hasItem("White Key"))
-            questKeys.add("[+WhiteKey]");
-        if (AdventurePlayer.current().hasItem("Strange Key"))
-            questKeys.add("[+StrangeKey]");
-        if (!questKeys.isEmpty()) {
-            keys.setText(String.join("\n", questKeys));
-            scrollPane.setSize(keys.getWidth() + 8, keys.getHeight() + 5);
-            scrollPane.layout();
-            keys.layout();
-            scrollPane.getColor().a = opacity;
-        } else {
-            keys.setText("");
-            scrollPane.getColor().a = 0;
-        }
 
         switch (GameScene.instance().getAdventurePlayerLocation(false, false)) {
             case "capital":
             case "town":
-                if(MapStage.getInstance().isInMap()) {
+                if (MapStage.getInstance().isInMap()) {
                     int rep = TileMapScene.instance().getPointOfInterestChanges().getMapReputation();
-                    String reputationText = TileMapScene.instance().rootPoint.getDisplayName() + "\nReputation: " + (rep > 0 ? "[GREEN]" : rep < 0 ? "[RED]" : "[WHITE]") + rep + "[/]";
+                    String reputationText = TileMapScene.instance().rootPoint.getDisplayName() + "\n" + Forge.getLocalizer().getMessage("advReputation") + ": " + (rep > 0 ? "[GREEN]" : rep < 0 ? "[RED]" : "[WHITE]") + rep + "[/]";
                     if (fromWorldMap) {
                         addNotification(reputationText);
                         fromWorldMap = false;
@@ -382,13 +409,7 @@ public class GameHUD extends Stage {
         } else {
             deckActor.setColor(menuActor.getColor());
         }
-        if (MapStage.getInstance().isInMap()) {
-            SoundSystem.instance.pause();
-            playAudio();
-        } else {
-            unloadAudio();
-            SoundSystem.instance.resume(); // resume World BGM
-        }
+        updateBGM();
         //unequip and reequip abilities
         updateAbility();
         restorePlayerCollision();
@@ -405,6 +426,113 @@ public class GameHUD extends Stage {
         }
         if (MapStage.getInstance().isInMap())
             updateBookmarkActor(MapStage.getInstance().getChanges().isBookmarked());
+        updateEnemyCounter();
+        avatarGroup.setZIndex(ui.getChildren().size);
+    }
+
+    void updateKeys() {
+        String keys = "";
+        keys += AdventurePlayer.current().hasItem("Red Key") ? "[+RedKey]\n" : "[+Dot]\n";
+        keys += AdventurePlayer.current().hasItem("Green Key") ? "[+GreenKey]\n" : "[+Dot]\n";
+        keys += AdventurePlayer.current().hasItem("Blue Key") ? "[+BlueKey]\n" : "[+Dot]\n";
+        keys += AdventurePlayer.current().hasItem("Black Key") ? "[+BlackKey]\n" : "[+Dot]\n";
+        keys += AdventurePlayer.current().hasItem("White Key") ? "[+WhiteKey]\n" : "[+Dot]\n";
+        keys += AdventurePlayer.current().hasItem("Strange Key") ? "[+StrangeKey]" : "[+Dot]";
+        keyCollection.setText(keys);
+    }
+
+    public void updateEnemyCounter() {
+        if (MapStage.getInstance().isInMap() && AdventureQuestController.instance().hasClearQuestActive()) {
+            int remaining = MapStage.getInstance().getRemainingEnemyCount();
+            enemyCounterText.setText(Forge.getLocalizer().getMessage("lblRemainingEnemies", String.valueOf(remaining)));
+            enemyCounterText.setVisible(true);
+            enemyCounterBackground.setVisible(true);
+
+            float paddingX = 4f;
+            float paddingY = 1.5f;
+            float margin = 2f;
+            float textWidth = enemyCounterText.getPrefWidth();
+            float textHeight = Math.max(enemyCounterText.getPrefHeight(), 12f);
+            float bgWidth = textWidth + paddingX * 2f;
+            float bgHeight = textHeight + paddingY * 2f;
+
+            float bgX = getWidth() - bgWidth - margin;
+            float bgY = margin;
+
+            enemyCounterBackground.setBounds(bgX, bgY, bgWidth, bgHeight);
+            enemyCounterText.setBounds(bgX + paddingX, bgY + paddingY, textWidth, textHeight);
+        } else {
+            enemyCounterText.setVisible(false);
+            enemyCounterBackground.setVisible(false);
+        }
+    }
+
+    private void hideHiddenEnemyChevrons() {
+        for (NavArrowActor chevron : hiddenEnemyChevrons) {
+            chevron.setVisible(false);
+        }
+    }
+
+    private NavArrowActor getChevronActor(int index) {
+        while (hiddenEnemyChevrons.size <= index) {
+            NavArrowActor chevron = new NavArrowActor();
+            chevron.setTouchable(Touchable.disabled);
+            chevron.setVisible(false);
+            hiddenEnemyChevrons.add(chevron);
+            addActor(chevron);
+        }
+        return hiddenEnemyChevrons.get(index);
+    }
+
+    private void positionChevron(NavArrowActor chevron, EnemySprite enemy, int index) {
+        playerProjectedCoordinates.set(MapStage.getInstance().player.getX() + MapStage.getInstance().player.getWidth() * 0.5f,
+                MapStage.getInstance().player.getY() + MapStage.getInstance().player.getHeight() * 0.5f, 0f);
+        MapStage.getInstance().getCamera().project(playerProjectedCoordinates, 0f, 0f, Gdx.graphics.getWidth(), Gdx.graphics.getHeight());
+        chevronStageCoordinates.set(playerProjectedCoordinates.x, playerProjectedCoordinates.y);
+        screenToStageCoordinates(chevronStageCoordinates);
+
+        chevronNavigation.set(enemy.pos()).sub(MapStage.getInstance().player.pos());
+        if (chevronNavigation.isZero(0.01f)) {
+            chevronNavigation.set(1f, 0f);
+        } else {
+            chevronNavigation.nor();
+        }
+
+        Vector2 side = new Vector2(-chevronNavigation.y, chevronNavigation.x);
+        int lane = index / 2;
+        float spread = (index % 2 == 0 ? 1f : -1f) * lane * 9f;
+        float offsetFromPlayer = 18f;
+        float pointerX = chevronStageCoordinates.x + chevronNavigation.x * offsetFromPlayer + side.x * spread;
+        float pointerY = chevronStageCoordinates.y + chevronNavigation.y * offsetFromPlayer + side.y * spread;
+
+        chevron.navTargetAngle = chevronNavigation.angleDeg();
+        chevron.setPosition(pointerX, pointerY);
+        chevron.setVisible(true);
+    }
+
+    private void updateHiddenEnemyChevrons() {
+        if (!Config.instance().getSettingData().drawChevronsToHiddenEnemiesInClearQuest
+                || hidden
+                || !MapStage.getInstance().isInMap()
+                || !AdventureQuestController.instance().hasClearQuestActive()
+                || MapStage.getInstance().getRemainingEnemyCount() <= 0) {
+            hideHiddenEnemyChevrons();
+            return;
+        }
+
+        int chevronIndex = 0;
+        for (EnemySprite enemy : MapStage.getInstance().enemies) {
+            if (!enemy.hidden || enemy.getStage() == null || enemy.defeatDialog != null) {
+                continue;
+            }
+            NavArrowActor chevron = getChevronActor(chevronIndex);
+            positionChevron(chevron, enemy, chevronIndex);
+            chevronIndex++;
+        }
+
+        while (chevronIndex < hiddenEnemyChevrons.size) {
+            hiddenEnemyChevrons.get(chevronIndex++).setVisible(false);
+        }
     }
 
     void clearAbility() {
@@ -436,6 +564,8 @@ public class GameHUD extends Stage {
             TextraButton button = Controls.newTextButton("[%90][+" + data.iconName + "][+Shards][BLACK]" + data.shardsNeeded, () -> {
                 if (console.isVisible())
                     return;
+                if (Forge.advFreezePlayerControls)
+                    return;
                 boolean isInPoi = MapStage.getInstance().isInMap();
                 if (!(isInPoi && data.usableInPoi || !isInPoi && data.usableOnWorldMap))
                     return;
@@ -444,136 +574,172 @@ public class GameHUD extends Stage {
                 Current.player().addShards(-data.shardsNeeded);
                 ConsoleCommandInterpreter.getInstance().command(data.commandOnUse);
                 AdventureQuestController.instance().updateItemUsed(data);
-            });
-            button.setStyle(Controls.getSkin().get("menu", TextButton.TextButtonStyle.class));
+            }, "menu");
             abilityButtonMap.add(button);
         }
     }
 
-    private Pair<FileHandle, Music> audio = null;
-
-    public void switchAudio() {
+    public void updateBGM() {
         if (MapStage.getInstance().isInMap()) {
-            pauseMusic();
-            playAudio();
+
+            switch (GameScene.instance().getAdventurePlayerLocation(false, false)) {
+                case "capital":
+                case "town":
+                    changeBGM(MusicPlaylist.TOWN);
+                    break;
+                case "dungeon":
+                case "cave":
+                    changeBGM(MusicPlaylist.CAVE);
+                    break;
+                case "castle":
+                    changeBGM(MusicPlaylist.CASTLE);
+                    break;
+                default:
+                    break;
+            }
         }
+        else
+            switch (GameScene.instance().getAdventurePlayerLocation(false, false)) {
+                case "green":
+                    changeBGM(MusicPlaylist.GREEN);
+                    break;
+                case "red":
+                    changeBGM(MusicPlaylist.RED);
+                    break;
+                case "blue":
+                    changeBGM(MusicPlaylist.BLUE);
+                    break;
+                case "black":
+                    changeBGM(MusicPlaylist.BLACK);
+                    break;
+                case "white":
+                    changeBGM(MusicPlaylist.WHITE);
+                    break;
+                case "waste":
+                    changeBGM(MusicPlaylist.COLORLESS);
+                    break;
+                default:
+                    break;
+            }
     }
 
-    public void playAudio() {
-        switch (GameScene.instance().getAdventurePlayerLocation(false, false)) {
-            case "capital":
-            case "town":
-                setAudio(MusicPlaylist.TOWN);
-                break;
-            case "dungeon":
-            case "cave":
-                setAudio(MusicPlaylist.CAVE);
-                break;
-            case "castle":
-                setAudio(MusicPlaylist.CASTLE);
-                break;
-            default:
-                break;
+    private static final EnumSet<MusicPlaylist> PLAYLIST_OVERWORLD = EnumSet.of(MusicPlaylist.WHITE, MusicPlaylist.BLUE, MusicPlaylist.BLACK, MusicPlaylist.RED, MusicPlaylist.GREEN, MusicPlaylist.COLORLESS);
+
+    void changeBGM(MusicPlaylist playlist) {
+        MusicPlaylist currentPlaylist = SoundSystem.instance.getCurrentPlaylist();
+        if (playlist == currentPlaylist) {
+            return;
         }
-        if (audio != null) {
-            audio.getRight().setLooping(true);
-            audio.getRight().play();
-            audio.getRight().setVolume(FModel.getPreferences().getPrefInt(ForgePreferences.FPref.UI_VOL_MUSIC) / 100f);
+        //If we're going from an interior to an exterior or vice versa, skip the fade out.
+        if(PLAYLIST_OVERWORLD.contains(playlist) != PLAYLIST_OVERWORLD.contains(currentPlaylist)) {
+            if(SoundSystem.instance.getShelvedPlaylist() == playlist)
+                fadeTransition = 0.2f; // Resuming from the middle - do a little bit of fade in to reduce the abruptness.
+            else
+                fadeTransition = 1f; // Playing from the start, no fade needed.
+            SoundSystem.instance.setBackgroundMusic(playlist, true);
+            fadeAudio(fadeTransition * fadeDialog);
+            targetPlaylist = null;
         }
+        else //Otherwise, fade from one to the other.
+            targetPlaylist = playlist;
     }
+
+    //Fade for transitioning between playlists.
+    MusicPlaylist targetPlaylist = null;
+    float fadeTransition = 1f;
+
+    //Fade for dimming background music while a character with dialog is talking.
+    float fadeDialog = 1f;
+    float targetFadeDialog = 1f;
 
     public void fadeAudio(float value) {
-        if (audio != null) {
-            audio.getRight().setVolume((FModel.getPreferences().getPrefInt(ForgePreferences.FPref.UI_VOL_MUSIC) * value) / 100f);
-        }
-    }
-
-    public boolean audioIsPlaying() {
-        if (audio == null)
-            return false;
-        return audio.getRight().isPlaying();
+        SoundSystem.instance.fadeModifier(value);
     }
 
     @Override
     public void act(float delta) {
         super.act(delta);
-        if (fade < targetfade) {
-            fade += (delta / 2);
-            if (fade > targetfade)
-                fade = targetfade;
-            fadeAudio(fade);
-        } else if (fade > targetfade) {
-            fade -= (delta / 2);
-            if (fade < targetfade)
-                fade = targetfade;
-            fadeAudio(fade);
+
+        updateBGM();
+
+        updateAudioFades(delta);
+
+        if (!mapGroup.isVisible())
+            return;
+        // player position
+        int yPos = (int) gameStage.player.getY();
+        int xPos = (int) gameStage.player.getX();
+        int xPosMini = (int) (((float) xPos / (float) WorldSave.getCurrentSave().getWorld().getTileSize() / (float) WorldSave.getCurrentSave().getWorld().getWidthInTiles()) * miniMap.getWidth());
+        int yPosMini = (int) (((float) yPos / (float) WorldSave.getCurrentSave().getWorld().getTileSize() / (float) WorldSave.getCurrentSave().getWorld().getHeightInTiles()) * miniMap.getHeight());
+
+        miniMapPlayer.setVisible(miniMap.isVisible() &&
+                !Controls.actorContainsVector(notificationPane, new Vector2(miniMapPlayer.getX(), miniMapPlayer.getY()))
+                && (!Controls.actorContainsVector(console, new Vector2(miniMapPlayer.getX(), miniMapPlayer.getY()))
+                || !console.isVisible())); // prevent drawing on top of console or notifications
+
+        if (isDebugMap()) {
+            // Full size map for debugging
+            miniMapPlayer.setPosition(miniMap.getX() + xPosMini - miniMapPlayer.getWidth() / 2, miniMap.getY() + yPosMini - miniMapPlayer.getHeight() / 2);
+            miniMapRegion.setRegion(0, 0, miniMapTexture.getWidth(), miniMapTexture.getHeight());
+            ((TextureRegionDrawable) miniMap.getDrawable()).setRegion(miniMapRegion);
+        } else {
+            // Radar Map
+            miniMapPlayer.setPosition(miniMap.getX(1), miniMap.getY(1), 1);
+            float percentX = gameStage.player.getX() / WorldSave.getCurrentSave().getWorld().getWidthInPixels();
+            float percentY = gameStage.player.getY() / WorldSave.getCurrentSave().getWorld().getHeightInPixels();
+            int pixelX = (int) (percentX * miniMapTexture.getWidth());
+            int pixelY = (int) (percentY * miniMapTexture.getHeight());
+            pixelY = miniMapTexture.getHeight() - pixelY;
+            int sourceX = pixelX - (viewWidth / 2);
+            int sourceY = pixelY - (viewHeight / 2);
+            sourceX = MathUtils.clamp(sourceX, 0, miniMapTexture.getWidth() - viewWidth);
+            sourceY = MathUtils.clamp(sourceY, 0, miniMapTexture.getHeight() - viewHeight);
+            miniMapRegion.setRegion(sourceX, sourceY, viewWidth, viewHeight);
+            ((TextureRegionDrawable) miniMap.getDrawable()).setRegion(miniMapRegion);
         }
     }
 
-    float fade = 1f;
-    float targetfade = 1f;
+    private void updateAudioFades(float delta) {
+        boolean fadeChanged = false;
+
+        //If the targetPlaylist is set, we'll fade out the BGM, switch over, and fade back in.
+        if (targetPlaylist != null) {
+            fadeTransition -= delta * 1.5f;
+            if (fadeTransition < -0.3) {
+                SoundSystem.instance.setBackgroundMusic(targetPlaylist, true);
+                targetPlaylist = null;
+            }
+            fadeChanged = true;
+        }
+        else if(fadeTransition < 1f) {
+            fadeTransition = Math.min(1f, Math.max(fadeTransition + delta * 1.5f, 0.2f));
+            fadeChanged = true;
+        }
+
+        if (fadeDialog < targetFadeDialog) {
+            fadeDialog = Math.min(fadeDialog + delta * 0.5f, targetFadeDialog);
+            fadeChanged = true;
+        } else if (fadeDialog > targetFadeDialog) {
+            fadeDialog = Math.max(fadeDialog - delta * 0.5f, targetFadeDialog);
+            fadeChanged = true;
+        }
+        if(fadeChanged) {
+            fadeAudio(Math.max(0f, fadeTransition) * fadeDialog);
+        }
+    }
 
     public void fadeIn() {
-        targetfade = 1f;
+        targetFadeDialog = 1f;
     }
 
     public void fadeOut() {
-        targetfade = 0.1f;
-    }
-
-    public void stopAudio() {
-        if (audio != null) {
-            audio.getRight().stop();
-        }
-    }
-
-    public void pauseMusic() {
-        if (audio != null) {
-            audio.getRight().pause();
-        }
-        SoundSystem.instance.pause();
-    }
-
-    public void unloadAudio() {
-        if (audio != null) {
-            audio.getRight().setOnCompletionListener(null);
-            audio.getRight().stop();
-            Forge.getAssets().manager().unload(audio.getLeft().path());
-        }
-        audio = null;
-        currentAudioPlaylist = null;
-    }
-
-    private MusicPlaylist currentAudioPlaylist = null;
-
-    private void setAudio(MusicPlaylist playlist) {
-        if (playlist.equals(currentAudioPlaylist))
-            return;
-        //System.out.println("Playlist: "+playlist);
-        unloadAudio();
-        //System.out.println("Playlist: "+playlist);
-        audio = getMusic(playlist);
-    }
-
-    private Pair<FileHandle, Music> getMusic(MusicPlaylist playlist) {
-        String filename = playlist.getNewRandomFilename();
-        if (filename == null)
-            return null;
-        FileHandle file = Gdx.files.absolute(filename);
-        Music music = Forge.getAssets().getMusic(file);
-        if (music != null) {
-            currentAudioPlaylist = playlist;
-            return Pair.of(file, music);
-        } else {
-            currentAudioPlaylist = null;
-            return null;
-        }
+        targetFadeDialog = 0.1f;
     }
 
     private void openDeck() {
         if (console.isVisible())
             return;
-        if (Forge.restrictAdvMenus)
+        if (Forge.advFreezePlayerControls)
             return;
         Forge.switchScene(DeckSelectScene.instance());
     }
@@ -581,9 +747,9 @@ public class GameHUD extends Stage {
     private void openInventory() {
         if (console.isVisible())
             return;
-        if (Forge.restrictAdvMenus)
+        if (Forge.advFreezePlayerControls)
             return;
-        WorldSave.getCurrentSave().header.createPreview();
+        WorldSave.requestPreview();
         Forge.switchScene(InventoryScene.instance());
     }
 
@@ -594,7 +760,7 @@ public class GameHUD extends Stage {
             return;
         if (!MapStage.getInstance().canEscape())
             return;
-        if (Forge.restrictAdvMenus)
+        if (Forge.advFreezePlayerControls)
             return;
         dialog.getButtonTable().clear();
         dialog.getContentTable().clear();
@@ -618,7 +784,7 @@ public class GameHUD extends Stage {
             return;
         if (!MapStage.getInstance().canEscape())
             return;
-        if (Forge.restrictAdvMenus)
+        if (Forge.advFreezePlayerControls)
             return;
         if (MapStage.getInstance().isInMap()) {
             if (MapStage.getInstance().getChanges().isBookmarked()) {
@@ -648,6 +814,7 @@ public class GameHUD extends Stage {
     }
 
     private void exitDungeonCallback() {
+        MapStage.getInstance().onBeginLeavingDungeon();
         hideDialog(true);
     }
 
@@ -658,14 +825,9 @@ public class GameHUD extends Stage {
     private void menu() {
         if (console.isVisible())
             return;
-        if (Forge.restrictAdvMenus)
+        if (Forge.advFreezePlayerControls)
             return;
         gameStage.openMenu();
-    }
-
-    private void setVisibility(Actor actor, boolean visible) {
-        if (actor != null)
-            actor.setVisible(visible);
     }
 
     private void setDisabled(Actor actor, boolean value, String enabled, String disabled) {
@@ -678,42 +840,80 @@ public class GameHUD extends Stage {
     private void setAlpha(Actor actor, boolean visible) {
         if (actor != null) {
             if (visible)
-                actor.getColor().a = 1f;
+                actor.addAction(Actions.alpha(1f, 0.5f));
             else
-                actor.getColor().a = 0.4f;
+                actor.addAction(Actions.alpha(actor == mapGroup ? 0f : 0.4f, 0.5f));
         }
     }
 
     public void showHideMap(boolean visible) {
-        setVisibility(miniMap, visible);
-        setVisibility(mapborder, visible);
-        setVisibility(openMapActor, visible);
-        setVisibility(miniMapPlayer, visible);
-        setVisibility(gamehud, visible);
-        setVisibility(lifePoints, visible);
-        setVisibility(shards, visible);
-        setVisibility(money, visible);
-        setVisibility(blank, visible);
-        setDisabled(exitToWorldMapActor, !MapStage.getInstance().isInMap(), "[%120][+ExitToWorldMap]", "---");
-        setDisabled(bookmarkActor, !MapStage.getInstance().isInMap(), "[%120][+Bookmark]", "---");
-        setAlpha(avatarborder, visible);
-        setAlpha(avatar, visible);
-        setAlpha(deckActor, visible);
-        setAlpha(menuActor, visible);
-        setAlpha(logbookActor, visible);
-        setAlpha(inventoryActor, visible);
-        setAlpha(exitToWorldMapActor, visible);
-        setAlpha(bookmarkActor, visible);
+        transluscent = !visible;
+        setAlpha(mapGroup, visible);
+        mapGroup.setVisible(visible);
+        setAlpha(hudGroup, visible);
+        setAlpha(menuGroup, visible);
+        setAlpha(avatarGroup, visible);
+
+        setDisabled(exitToWorldMapActor, !MapStage.getInstance().isInMap(), "[%120][+ExitToWorldMap]", "\u2613");
+        setDisabled(bookmarkActor, !MapStage.getInstance().isInMap(), "[%120][+Bookmark]", "\u2613");
+
         for (TextraButton button : abilityButtonMap) {
             setAlpha(button, visible);
         }
         opacity = visible ? 1f : 0.4f;
     }
 
+    public void setHUDOpacity(boolean translucent) {
+        if (translucent) {
+            if (!MapStage.getInstance().isInMap())
+                return; //WorldStage opacity issue
+            setAlpha(hudGroup, false);
+            setAlpha(menuGroup, false);
+            setAlpha(avatarGroup, false);
+            for (TextraButton button : abilityButtonMap) {
+                setAlpha(button, false);
+            }
+            transluscent = true;
+        } else {
+            setAlpha(hudGroup, true);
+            setAlpha(menuGroup, true);
+            setAlpha(avatarGroup, true);
+            for (TextraButton button : abilityButtonMap) {
+                setAlpha(button, true);
+            }
+            transluscent = false;
+        }
+    }
+
+    public void showHideHUD(boolean hide) {
+        if (hide) {
+            hudGroup.addAction(Actions.fadeOut(0.5f));
+            menuGroup.addAction(Actions.fadeOut(0.5f));
+            if (!MapStage.getInstance().isInMap()) {
+                mapGroup.addAction(Actions.fadeOut(0.5f));
+                mapGroup.addAction(Actions.visible(false));
+            }
+            if (MapStage.getInstance().isInMap())
+                avatarGroup.addAction(Actions.alpha(0.4f, 0.5f));
+            hidden = true;
+        } else {
+            float alpha = MapStage.getInstance().isInMap() ? 0.4f : 1f;
+            avatarGroup.addAction(Actions.alpha(alpha, 0.5f));
+            hudGroup.addAction(Actions.alpha(alpha, 0.5f));
+            menuGroup.addAction(Actions.alpha(alpha, 0.5f));
+            if (!MapStage.getInstance().isInMap()) {
+                mapGroup.addAction(Actions.fadeIn(0.5f));
+                mapGroup.addAction(Actions.visible(true));
+            }
+            hidden = false;
+        }
+    }
+
     void toggleConsole() {
         console.toggle();
         if (console.isVisible()) {
             clearAbility();
+            console.setZIndex(ui.getChildren().size);
         } else {
             updateAbility();
         }
@@ -722,6 +922,12 @@ public class GameHUD extends Stage {
     @Override
     public boolean keyUp(int keycode) {
         ui.pressUp(keycode);
+    
+        Button pressedButton = ui.buttonPressed(keycode);
+        if (pressedButton != null) {
+            pressedButton.fire(eventTouchUp);
+        }
+
         return super.keyUp(keycode);
     }
 
@@ -735,16 +941,17 @@ public class GameHUD extends Stage {
             toggleConsole();
             return true;
         }
-        if (keycode == Input.Keys.BACK) {
+        if (KeyBinding.Back.isPressed(keycode)) {
             if (console.isVisible()) {
                 toggleConsole();
+                return true;
             }
         }
         if (console.isVisible())
             return true;
         Button pressedButton = ui.buttonPressed(keycode);
         if (pressedButton != null) {
-            performTouch(pressedButton);
+            pressedButton.fire(eventTouchDown);
         }
         return super.keyDown(keycode);
     }
@@ -780,6 +987,10 @@ public class GameHUD extends Stage {
         debugMap = b;
     }
 
+    public boolean isDebugMap() {
+        return debugMap;
+    }
+
     public void playerIdle() {
         if (MapStage.getInstance().isInMap()) {
             MapStage.getInstance().startPause(1f);
@@ -799,7 +1010,9 @@ public class GameHUD extends Stage {
         dialog.show(this, Actions.show());
         dialog.setPosition((this.getWidth() - dialog.getWidth()) / 2, (this.getHeight() - dialog.getHeight()) / 2);
         dialogOnlyInput = true;
-        if (Forge.hasGamepad() && !dialogButtonMap.isEmpty())
+        gameStage.hudIsShowingDialog(true);
+        MapStage.getInstance().hudIsShowingDialog(true);
+        if (Forge.hasExternalInput() && !dialogButtonMap.isEmpty())
             this.setKeyboardFocus(dialogButtonMap.first());
     }
 
@@ -809,14 +1022,17 @@ public class GameHUD extends Stage {
             @Override
             public boolean act(float v) {
                 if (exitDungeon) {
-                    MapStage.getInstance().exitDungeon();
-                    setDisabled(exitToWorldMapActor, true, "[%120][+ExitToWorldMap]", "---");
-                    setDisabled(bookmarkActor, true, "[%120][+Bookmark]", "---");
+                    MapStage.getInstance().exitDungeon(false, false);
+                    setDisabled(exitToWorldMapActor, true, "[%120][+ExitToWorldMap]", "\u2613");
+                    setDisabled(bookmarkActor, true, "[%120][+Bookmark]", "\u2613");
                 }
                 return true;
             }
         }));
+
         dialogOnlyInput = false;
+        gameStage.hudIsShowingDialog(false);
+        MapStage.getInstance().hudIsShowingDialog(false);
     }
 
     private void selectNextDialogButton() {
@@ -861,39 +1077,20 @@ public class GameHUD extends Stage {
 
         @Override
         public boolean longPress(Actor actor, float x, float y) {
-            toggleConsole();
+            if (GuiBase.isAndroid())
+                toggleConsole();
             return super.longPress(actor, x, y);
         }
-    }
 
-    public void updateMusic() {
-        switch (GameScene.instance().getAdventurePlayerLocation(false, false)) {
-            case "green":
-                changeBGM(MusicPlaylist.GREEN);
-                break;
-            case "red":
-                changeBGM(MusicPlaylist.RED);
-                break;
-            case "blue":
-                changeBGM(MusicPlaylist.BLUE);
-                break;
-            case "black":
-                changeBGM(MusicPlaylist.BLACK);
-                break;
-            case "white":
-                changeBGM(MusicPlaylist.WHITE);
-                break;
-            case "waste":
-                changeBGM(MusicPlaylist.COLORLESS);
-                break;
-            default:
-                break;
-        }
-    }
-
-    void changeBGM(MusicPlaylist playlist) {
-        if (!audioIsPlaying() && !playlist.equals(SoundSystem.instance.getCurrentPlaylist())) {
-            SoundSystem.instance.setBackgroundMusic(playlist);
+        @Override
+        public void tap(InputEvent event, float x, float y, int count, int button) {
+            if (console.isVisible())
+                return;
+            if (count > 1 && button == 0)
+                showHideHUD(!hidden);
+            else if (button == 0)
+                setHUDOpacity(!transluscent);
+            super.tap(event, x, y, count, button);
         }
     }
 
@@ -927,13 +1124,13 @@ public class GameHUD extends Stage {
                 notificationText.setWrap(false);
                 notificationText.setText(text);
                 notificationText.setColor(Color.BLACK);
-                notificationText.setWidth(Math.min(notificationText.getPrefWidth(), Forge.isLandscapeMode()?getWidth() * 0.25f : getWidth() - 25));
+                notificationText.setWidth(Math.min(notificationText.getPrefWidth(), Forge.isLandscapeMode() ? getWidth() * 0.25f : getWidth() - 25));
                 notificationText.setWrap(true);
                 notificationText.layout();
 
                 notificationPane.setSize(notificationText.getWidth() + 10, notificationText.getPrefHeight() + 20);
 
-                notificationPane.setPosition(5, Forge.isLandscapeMode()? -notificationPane.getHeight(): getHeight());
+                notificationPane.setPosition(5, Forge.isLandscapeMode() ? -notificationPane.getHeight() : getHeight());
 
                 notificationPane.getColor().a = 1f;
                 notificationPane.layout();
@@ -948,23 +1145,33 @@ public class GameHUD extends Stage {
             newNotification = Actions.after(Actions.sequence(preconfigureNotification,
                     Actions.moveTo(5, 0, 2f),
                     Actions.delay(10f),
-                    Actions.alpha(0f,3f),
-                    Actions.sizeTo(0,0)));
+                    Actions.alpha(0f, 3f),
+                    Actions.sizeTo(0, 0)));
         } else {
             newNotification = Actions.after(Actions.sequence(preconfigureNotification,
                     Actions.moveToAligned(5, getHeight(), Align.topLeft, 2f),
                     Actions.delay(10f),
-                    Actions.alpha(0f,3f),
-                    Actions.sizeTo(0,0)));
+                    Actions.alpha(0f, 3f),
+                    Actions.sizeTo(0, 0)));
         }
 
         notificationPane.addAction(newNotification);
     }
 
-    public void clearNotifications(){
+    public void clearNotifications() {
         notificationText.setText("");
-        notificationPane.setBounds(5, Forge.isLandscapeMode() ? -notificationText.getPrefHeight() : getHeight(), getWidth()*0.4f, 25);
+        notificationPane.setBounds(5, Forge.isLandscapeMode() ? -notificationText.getPrefHeight() : getHeight(), getWidth() * 0.4f, 25);
         notificationPane.setStyle(Controls.getSkin().get("paper", ScrollPane.ScrollPaneStyle.class));
         notificationPane.getColor().a = 0f;
     }
+
+    public Batch getBatch() {
+        return gameStage.getBatch();
+    }
+
+    @Override
+    public void dispose() {
+        super.dispose();
+    }
+
 }

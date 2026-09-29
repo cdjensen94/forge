@@ -1,20 +1,15 @@
 package forge.ai.simulation;
 
 import forge.ai.ComputerUtilAbility;
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.List;
-import java.util.NoSuchElementException;
-
-import org.apache.commons.math3.util.CombinatoricsUtils;
-
 import forge.ai.ComputerUtilCost;
 import forge.ai.simulation.GameStateEvaluator.Score;
 import forge.game.card.Card;
 import forge.game.card.CardCollection;
 import forge.game.spellability.AbilitySub;
 import forge.game.spellability.SpellAbility;
+import org.apache.commons.math3.util.CombinatoricsUtils;
+
+import java.util.*;
 
 public class SpellAbilityChoicesIterator {
     private final SimulationController controller;
@@ -47,7 +42,7 @@ public class SpellAbilityChoicesIterator {
         this.controller = controller;
     }
 
-    public List<AbilitySub> chooseModesForAbility(List<AbilitySub> choices, int min, int num, boolean allowRepeat) {
+    public List<AbilitySub> chooseModesForAbility(SpellAbility sa, List<AbilitySub> choices, int min, int num, boolean allowRepeat) {
         if (modeIterator == null) {
             // Skip modes that don't have legal targets.
             modesMap = new ArrayList<>();
@@ -240,8 +235,7 @@ public class SpellAbilityChoicesIterator {
         // TODO this should also iterate over all possible values
         // (currently no additional complexity to keep performance reasonable)
         if (sa.costHasManaX()) {
-            Integer x = ComputerUtilCost.getMaxXValue(sa, sa.getActivatingPlayer(), sa.isTrigger());
-            sa.setXManaCostPaid(x);
+            Integer x = ComputerUtilCost.setMaxXValue(sa, sa.getActivatingPlayer(), sa.isTrigger());
             controller.getLastDecision().xMana = x;
         }
     }

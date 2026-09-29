@@ -1,37 +1,30 @@
 package forge.download;
 
-import java.awt.Desktop;
-import java.io.File;
-import java.io.IOException;
-import java.net.InetSocketAddress;
-import java.net.MalformedURLException;
-import java.net.Socket;
-import java.net.URI;
-import java.net.URISyntaxException;
-import java.net.URL;
-import java.util.List;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
-
-import javax.swing.SwingUtilities;
-
-import org.apache.commons.lang3.StringUtils;
-
-import com.google.common.collect.ImmutableList;
-
 import forge.gui.GuiBase;
 import forge.gui.download.GuiDownloadZipService;
 import forge.gui.util.SOptionPane;
 import forge.localinstance.properties.ForgePreferences;
 import forge.model.FModel;
-import forge.util.BuildInfo;
-import forge.util.FileUtil;
-import forge.util.Localizer;
-import forge.util.WaitCallback;
+import forge.util.*;
+import org.apache.commons.lang3.StringUtils;
+
+import javax.swing.*;
+import java.awt.*;
+import java.io.File;
+import java.io.IOException;
+import java.net.*;
+import java.text.SimpleDateFormat;
+import java.util.Date;
+import java.util.List;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+import static forge.localinstance.properties.ForgeConstants.GITHUB_SNAPSHOT_URL;
+import static forge.localinstance.properties.ForgeConstants.RELEASE_URL;
 
 public class AutoUpdater {
-    private final String SNAPSHOT_VERSION_INDEX = "https://downloads.cardforge.org/dailysnapshots/";
-    private final String RELEASE_VERSION_INDEX = "https://releases.cardforge.org/";
     private static final boolean VERSION_FROM_METADATA = true;
     private static final Localizer localizer = Localizer.getInstance();
 
@@ -44,28 +37,28 @@ public class AutoUpdater {
     private String versionUrlString;
     private String packageUrl;
     private String packagePath;
+    private String buildDate = "";
+    private Date snapsBuildDate;
 
     public AutoUpdater(boolean loading) {
-        // What do I need? Preferences? Splashscreen? UI? Skins?
         isLoading = loading;
         updateChannel = FModel.getPreferences().getPref(ForgePreferences.FPref.AUTO_UPDATE);
         buildVersion = BuildInfo.getVersionString();
     }
 
-    public boolean updateAvailable() {
-        // TODO Check if an update is available, and add a UI element to notify the user.
-        return verifyUpdateable();
+    public Date getSnapsBuildDate() {
+        return snapsBuildDate;
     }
 
-    public boolean attemptToUpdate() {
+    public boolean attemptToUpdate(CompletableFuture<String> cf) {
         if (!verifyUpdateable()) {
             return false;
         }
         try {
-            if (downloadUpdate()) {
+            if (downloadUpdate(cf)) {
                 extractAndRestart();
             }
-        } catch(IOException | URISyntaxException e) {
+        } catch (IOException | URISyntaxException | ExecutionException | InterruptedException e) {
             return false;
         }
         return true;
@@ -76,7 +69,7 @@ public class AutoUpdater {
         restartForge();
     }
 
-    private boolean verifyUpdateable() {
+    public boolean verifyUpdateable() {
         if (buildVersion.contains("GIT")) {
             //return false;
         }
@@ -86,7 +79,7 @@ public class AutoUpdater {
             return false;
         } else if (updateChannel.equals("none")) {
             String message = localizer.getMessage("lblYouHaventSetUpdateChannel");
-            List<String> options = ImmutableList.of("Cancel", "release", "snapshot");
+            List<String> options = List.of(localizer.getMessageorUseDefault("lblCancel", "Cancel"), localizer.getMessageorUseDefault("lblRelease", "Release"), localizer.getMessageorUseDefault("lblSnapshot", "Snapshot"));
             int option = SOptionPane.showOptionDialog(message, localizer.getMessage("lblManualCheck"), null, options, 0);
             if (option < 1) {
                 return false;
@@ -95,21 +88,20 @@ public class AutoUpdater {
         }
 
         if (buildVersion.contains("SNAPSHOT")) {
-            if (!updateChannel.equals("snapshot")) {
+            if (!updateChannel.equalsIgnoreCase(localizer.getMessageorUseDefault("lblSnapshot", "Snapshot"))) {
                 System.out.println("Snapshot build versions must use snapshot update channel to work");
                 return false;
             }
 
-            versionUrlString = SNAPSHOT_VERSION_INDEX + "version.txt";
+            versionUrlString = GITHUB_SNAPSHOT_URL + "version.txt";
         } else {
-            if (!updateChannel.equals("release")) {
+            if (!updateChannel.equalsIgnoreCase(localizer.getMessageorUseDefault("lblRelease", "Release"))) {
                 System.out.println("Release build versions must use release update channel to work");
                 return false;
             }
-            versionUrlString = RELEASE_VERSION_INDEX + "forge/forge-gui-desktop/version.txt";
+            versionUrlString = RELEASE_URL + "forge/forge-gui-desktop/version.txt";
         }
 
-        // Check the internet connection
         if (!testNetConnection()) {
             return false;
         }
@@ -119,8 +111,16 @@ public class AutoUpdater {
     }
 
     private boolean testNetConnection() {
+        // test against the host updates are actually fetched from;
+        // releases.cardforge.org is no longer reachable and blocked all updates
+        String host;
+        try {
+            host = new URL(versionUrlString).getHost();
+        } catch (MalformedURLException e) {
+            host = "github.com";
+        }
         try (Socket socket = new Socket()) {
-            InetSocketAddress address = new InetSocketAddress("releases.cardforge.org", 443);
+            InetSocketAddress address = new InetSocketAddress(host, 443);
             socket.connect(address, 1000);
             return true;
         } catch (IOException e) {
@@ -131,17 +131,22 @@ public class AutoUpdater {
     private boolean compareBuildWithLatestChannelVersion() {
         try {
             retrieveVersion();
-
+            if (buildVersion.contains("SNAPSHOT")) {
+                URL url = new URL(GITHUB_SNAPSHOT_URL + "build.txt");
+                SimpleDateFormat simpleDateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+                snapsBuildDate = simpleDateFormat.parse(FileUtil.readFileToString(url));
+                buildDate = BuildInfo.getTimestamp().toString();
+                return BuildInfo.verifyTimestamp(snapsBuildDate);
+            }
             if (StringUtils.isEmpty(version) ) {
                 return false;
             }
-
             if (buildVersion.equals(version)) {
                 return false;
             }
         }
         catch (Exception e) {
-            e.printStackTrace();
+            SOptionPane.showOptionDialog(e.getMessage(), localizer.getMessage("lblError"), null, List.of("Ok"));
             return false;
         }
         // If version doesn't match, it's assummably newer.
@@ -149,21 +154,21 @@ public class AutoUpdater {
     }
 
     private void retrieveVersion() throws MalformedURLException {
-        if (VERSION_FROM_METADATA && updateChannel.equals("release")) {
+        if (VERSION_FROM_METADATA && updateChannel.equalsIgnoreCase(localizer.getMessageorUseDefault("lblRelease", "Release"))) {
             extractVersionFromMavenRelease();
         } else {
             URL versionUrl = new URL(versionUrlString);
             version = FileUtil.readFileToString(versionUrl);
         }
-        if (updateChannel.equals("release")) {
-            packageUrl = RELEASE_VERSION_INDEX + "forge/forge-gui-desktop/" + version + "/forge-gui-desktop-" + version + ".tar.bz2";
+        if (updateChannel.equalsIgnoreCase(localizer.getMessageorUseDefault("lblRelease", "Release"))) {
+            packageUrl = RELEASE_URL + "forge/forge-gui-desktop/" + version + "/forge-gui-desktop-" + version + ".tar.bz2";
         } else {
-            packageUrl = SNAPSHOT_VERSION_INDEX + "forge-gui-desktop-" + version + ".tar.bz2";
+            packageUrl = GITHUB_SNAPSHOT_URL + "forge-installer-" + version + ".jar";
         }
     }
 
     private void extractVersionFromMavenRelease() throws MalformedURLException {
-        String RELEASE_MAVEN_METADATA = RELEASE_VERSION_INDEX + "forge/forge-gui-desktop/maven-metadata.xml";
+        String RELEASE_MAVEN_METADATA = RELEASE_URL + "forge/forge-gui-desktop/maven-metadata.xml";
         URL metadataUrl = new URL(RELEASE_MAVEN_METADATA);
         String xml = FileUtil.readFileToString(metadataUrl);
 
@@ -174,16 +179,18 @@ public class AutoUpdater {
         }
     }
 
-    private boolean downloadUpdate() throws URISyntaxException, IOException {
+    private boolean downloadUpdate(CompletableFuture<String> cf) throws URISyntaxException, IOException, ExecutionException, InterruptedException {
         // TODO Change the "auto" to be more auto.
         if (isLoading) {
             // We need to preload enough of a Skins to show a dialog and a button if we're in loading
             // splashScreen.prepareForDialogs();
             return downloadFromBrowser();
         }
-
-        String message = localizer.getMessage("lblNewVersionForgeAvailableUpdateConfirm", version, buildVersion);
-        final List<String> options = ImmutableList.of(localizer.getMessage("lblUpdateNow"), localizer.getMessage("lblUpdateLater"));
+        String logs = snapsBuildDate == null ? "" : cf.get();
+        String v = snapsBuildDate == null ? version : version + TextUtil.enclosedParen(snapsBuildDate.toString());
+        String b = buildDate.isEmpty() ? buildVersion : buildVersion + TextUtil.enclosedParen(buildDate);
+        String message = localizer.getMessage("lblNewVersionForgeAvailableUpdateConfirm", v, b) + logs;
+        final List<String> options = List.of(localizer.getMessage("lblUpdateNow"), localizer.getMessage("lblUpdateLater"));
         if (SOptionPane.showOptionDialog(message, localizer.getMessage("lblNewVersionAvailable"), null, options, 0) == 0) {
             return downloadFromForge();
         }
@@ -204,16 +211,16 @@ public class AutoUpdater {
     }
 
     private boolean downloadFromForge() {
-        System.out.println("Downloading update from " + packageUrl + " to tmp/");
+        System.out.println("Downloading update from " + packageUrl + " to Downloads folder");
         WaitCallback<Boolean> callback = new WaitCallback<Boolean>() {
             @Override
             public void run() {
-                GuiBase.getInterface().download(new GuiDownloadZipService("Auto Updater", localizer.getMessage("lblNewVersionDownloading"), packageUrl, "tmp/", null, null) {
+                GuiBase.getInterface().download(new GuiDownloadZipService("Auto Updater", localizer.getMessage("lblNewVersionDownloading"), packageUrl, System.getProperty("user.home") + "/Downloads/", null, null) {
                     @Override
                     public void downloadAndUnzip() {
-                        packagePath = download(version + "-upgrade.tar.bz2");
+                        packagePath = download(version + "-upgrade.jar");
                         if (packagePath != null) {
-                            extractAndRestart();
+                            restartAndUpdate(packagePath);
                         }
                     }
                 }, this);
@@ -224,7 +231,29 @@ public class AutoUpdater {
 
         return false;
     }
-
+    private void restartAndUpdate(String packagePath) {
+        if (SOptionPane.showOptionDialog(localizer.getMessage("lblForgeUpdateMessage", packagePath), localizer.getMessage("lblRestart"), null, List.of(localizer.getMessage("lblOK")), 0) == 0) {
+            final Desktop desktop = Desktop.isDesktopSupported() ? Desktop.getDesktop() : null;
+            if (desktop != null) {
+                try {
+                    File installer = new File(packagePath);
+                    if (installer.exists()) {
+                        if (packagePath.endsWith(".jar")) {
+                            installer.setExecutable(true, false);
+                            desktop.open(installer);
+                        } else {
+                            desktop.open(installer.getParentFile());
+                        }
+                    }
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            } else {
+                System.out.println(packagePath);
+            }
+            System.exit(0);
+        }
+    }
     private void extractUpdate() {
         // TODO Something like https://stackoverflow.com/questions/315618/how-do-i-extract-a-tar-file-in-java
         final Desktop desktop = Desktop.isDesktopSupported() ? Desktop.getDesktop() : null;

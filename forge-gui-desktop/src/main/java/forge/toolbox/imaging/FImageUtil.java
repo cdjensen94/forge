@@ -94,24 +94,8 @@ public final class FImageUtil {
             PaperCard card = ImageUtil.getPaperCardFromImageKey(key);
             if (altState) {
                 imageKey = card.getCardAltImageKey();
-            } else if (!specColor.equals("")) {
-                switch (specColor) {
-                    case "white":
-                        imageKey = card.getCardWSpecImageKey();
-                        break;
-                    case "blue":
-                        imageKey = card.getCardUSpecImageKey();
-                        break;
-                    case "black":
-                        imageKey = card.getCardBSpecImageKey();
-                        break;
-                    case "red":
-                        imageKey = card.getCardRSpecImageKey();
-                        break;
-                    case "green":
-                        imageKey = card.getCardGSpecImageKey();
-                        break;
-                }
+            } else if (!specColor.isEmpty()) {
+                imageKey = ImageUtil.getImageKey(card, specColor, true);
             } else {
                 imageKey = card.getCardImageKey();
             }
@@ -119,7 +103,7 @@ public final class FImageUtil {
         if(altState) {
             imageKey = imageKey.substring(0, imageKey.length() - ImageKeys.BACKFACE_POSTFIX.length());
             imageKey += "full.jpg";
-        } else if (!specColor.equals("")) {
+        } else if (!specColor.isEmpty()) {
             imageKey = imageKey.substring(0, imageKey.length() - ImageKeys.SPECFACE_W.length());
             imageKey += "full.jpg";
         }

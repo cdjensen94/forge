@@ -2,6 +2,7 @@ package forge.toolbox;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.Predicate;
 
 import forge.Forge;
 import forge.Graphics;
@@ -9,7 +10,6 @@ import forge.assets.FSkinColor;
 import forge.assets.FSkinFont;
 import forge.assets.FSkinTexture;
 import forge.screens.FScreen;
-import forge.toolbox.FEvent.FEventHandler;
 import forge.toolbox.FList.DefaultListItemRenderer;
 import forge.toolbox.FList.ListItemRenderer;
 import forge.util.Utils;
@@ -135,6 +135,19 @@ public class FGroupList<E> extends FScrollPane {
         renderer = renderer0;
     }
 
+    public void setItemFilter(Predicate<E> filter) {
+        for (ListGroup group : groups) {
+            boolean anyVisible = false;
+            for (ListItem item : group.items) {
+                boolean visible = filter == null || filter.test(item.value);
+                item.setVisible(visible);
+                anyVisible |= visible;
+            }
+            group.setVisible(anyVisible);
+        }
+        revalidate();
+    }
+
     public FSkinFont getFont() {
         return font;
     }
@@ -176,12 +189,9 @@ public class FGroupList<E> extends FScrollPane {
                 header = null;
             }
             else {
-                header = add(new FLabel.ButtonBuilder().text(name0).command(new FEventHandler() {
-                    @Override
-                    public void handleEvent(FEvent e) {
-                        isCollapsed = !isCollapsed;
-                        FGroupList.this.revalidate();
-                    }
+                header = add(new FLabel.ButtonBuilder().text(name0).command(e -> {
+                    isCollapsed = !isCollapsed;
+                    FGroupList.this.revalidate();
                 }).build());
             }
             setVisible(false); //hide by default unless it has items
@@ -208,7 +218,15 @@ public class FGroupList<E> extends FScrollPane {
                 height += GROUP_HEADER_HEIGHT;
             }
             if (!isCollapsed) {
-                height += renderer.getItemHeight() * items.size() + 1; //+1 so bottom border not cut off
+                int visibleCount = 0;
+                for (ListItem item : items) {
+                    if (item.isVisible()) {
+                        visibleCount++;
+                    }
+                }
+                if (visibleCount > 0) {
+                    height += renderer.getItemHeight() * visibleCount + 1; //+1 so bottom border not cut off
+                }
             }
             return height;
         }
@@ -224,6 +242,9 @@ public class FGroupList<E> extends FScrollPane {
             float itemHeight = renderer.getItemHeight();
 
             for (ListItem item : items) {
+                if (!item.isVisible()) {
+                    continue;
+                }
                 item.setBounds(0, y, width, itemHeight);
                 y += itemHeight;
             }

@@ -19,16 +19,19 @@ package forge;
 
 import com.google.common.io.Files;
 import forge.card.CardRules;
+import forge.card.ICardFace;
 import forge.util.BuildInfo;
 import forge.util.FileUtil;
 import forge.util.Localizer;
 import forge.util.ThreadUtil;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.time.StopWatch;
 
 import java.io.*;
 import java.nio.charset.Charset;
 import java.util.*;
 import java.util.concurrent.*;
+import java.util.function.BiFunction;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 
@@ -68,7 +71,8 @@ public class CardStorageReader {
     private transient File cardsfolder;
 
     private transient ZipFile zip;
-    private transient Map<String, ZipEntry> zipEntriesMap;
+    private final transient NavigableMap<String, ZipEntry> zipEntriesByCardName;
+    private final transient NavigableMap<String, File> cardFilesByCardName;
     private final transient Charset charset;
 
     private final boolean loadCardsLazily;
@@ -101,7 +105,20 @@ public class CardStorageReader {
         }
 
         this.charset = Charset.forName(CardStorageReader.DEFAULT_CHARSET_NAME);
+
+        if (loadCardsLazily) {
+            zipEntriesByCardName = zip == null ? Collections.emptyNavigableMap()
+                    : buildCardNameIndex(getZipEntries(), this::loadCard);
+            cardFilesByCardName = buildCardNameIndex(collectCardFiles(new ArrayList<>(), cardsfolder), this::loadCard);
+        } else {
+            zipEntriesByCardName = Collections.emptyNavigableMap();
+            cardFilesByCardName = Collections.emptyNavigableMap();
+        }
     } // CardReader()
+
+    boolean isLoadingCardsLazily() {
+        return loadCardsLazily;
+    }
 
     private List<CardRules> loadCardsInRange(final List<File> files, final int from, final int to) {
         final CardRules.Reader rulesReader = new CardRules.Reader();
@@ -148,78 +165,96 @@ public class CardStorageReader {
             }
             chars[charIndex++] = c;
         }
+        if (charIndex == 0) {
+            return "";
+        }
         if (chars[charIndex - 1] == '_') {
             charIndex--;
         }
         return new String(chars, 0, charIndex);
     }
-    
-    private ZipEntry findZipEntryForCard(String transformedName) {
-        if (zip == null) {
+
+    public final CardRules attemptToLoadCard(String cardName) {
+        final String transformedName = transformName(StringUtils.stripAccents(cardName));
+        if (transformedName.isEmpty()) {
             return null;
         }
 
-        if (zipEntriesMap == null) {
-            zipEntriesMap = new HashMap<>();
-            for (ZipEntry entry : getZipEntries()) {
-                zipEntriesMap.put(entry.getName(), entry);
-            }
-        }
-
-        transformedName = transformedName.charAt(0) + "/" + transformedName;
-        ZipEntry entry = zipEntriesMap.get(transformedName + CardStorageReader.CARD_FILE_DOT_EXTENSION);
-        if (entry == null) {
-            // Double faced cards file naming convention currently has both names - so try to prefix match.
-            // TODO: Consider changing the naming convention for DFCs.
-            for (String fileName : zipEntriesMap.keySet()) {
-                if (fileName.startsWith(transformedName)) {
-                    entry = zipEntriesMap.get(fileName);
-                    break;
-                }
-            }
-        }
-        return entry;
-    }
-    
-    private File findFileForCard(String transformedName) {
-        String folder = cardsfolder.getAbsolutePath() + "/" + transformedName.charAt(0);
-        File file = new File(folder + "/" + transformedName + CardStorageReader.CARD_FILE_DOT_EXTENSION);
-        if (!file.exists()) {
-            file = null;
-            // Double faced cards file naming convention currently has both names - so try to prefix match.
-            // TODO: Consider changing the naming convention for DFCs.
-            String[] fileNames = new File(folder).list();
-            if (fileNames != null) {
-                for (String fileName : new File(folder).list()) {
-                    if (fileName.startsWith(transformedName)) {
-                        file = new File(folder, fileName);
-                        break;
-                    }
-                }
-            }
-        }
-        return file;
-    }
-
-    public final CardRules attemptToLoadCard(String cardName) {
-        String transformedName = transformName(cardName);
-        CardRules rules = null;
-
-        // TODO: Should CardRules.Reader object be cached?
-        ZipEntry entry = findZipEntryForCard(transformedName);
+        final CardRules.Reader rulesReader = new CardRules.Reader();
+        final ZipEntry entry = zipEntriesByCardName.get(transformedName);
         if (entry != null) {
-            rules = loadCard(new CardRules.Reader(), entry);
-        } else {
-            File file = findFileForCard(transformedName);
-            if (file != null) {
-                rules = loadCard(new CardRules.Reader(), file);
+            return loadCard(rulesReader, entry);
+        }
+        final File file = cardFilesByCardName.get(transformedName);
+        if (file != null) {
+            return loadCard(rulesReader, file);
+        }
+        return null;
+    }
+
+    private <T> NavigableMap<String, T> buildCardNameIndex(List<T> sources, BiFunction<CardRules.Reader, T, CardRules> loader) {
+        final StopWatch sw = new StopWatch();
+        sw.start();
+        final NavigableMap<String, T> index = new TreeMap<>();
+        final Map<String, T> placeholderNames = new TreeMap<>();
+        final CardRules.Reader rulesReader = new CardRules.Reader();
+        for (T source : sources) {
+            final CardRules rules;
+            try {
+                rules = loader.apply(rulesReader, source);
+            } catch (RuntimeException e) {
+                continue; // a script that cannot be parsed cannot satisfy a lookup either
+            }
+            if (rules == null) {
+                continue;
+            }
+            for (String name : primaryNamesOf(rules)) {
+                putName(index, name, source);
+            }
+            for (String name : rules.getPlaceholderFaceNames()) {
+                putName(placeholderNames, name, source);
             }
         }
+        for (Map.Entry<String, T> e : placeholderNames.entrySet()) {
+            index.putIfAbsent(e.getKey(), e.getValue());
+        }
+        sw.stop();
+        System.out.printf("Lazy card database: indexed %d card names from %d files in %d ms%n", index.size(), sources.size(), sw.getTime());
+        return index;
+    }
 
-        return rules;
+    private <T> void putName(Map<String, T> index, String name, T source) {
+        final String key = transformName(StringUtils.stripAccents(name));
+        if (!key.isEmpty()) {
+            index.putIfAbsent(key, source);
+        }
+    }
+
+    private static List<String> primaryNamesOf(CardRules rules) {
+        final List<String> names = new ArrayList<>();
+        names.add(rules.getPreInitName());
+        for (ICardFace face : rules.getAllFaces()) {
+            if (face != null) {
+                names.add(face.getName());
+            }
+        }
+        // getDisplayNameForVariant needs concrete faces, which placeholders lack.
+        if (rules.getPlaceholderFaceNames().isEmpty() && rules.getSupportedFunctionalVariants() != null) {
+            for (String variant : rules.getSupportedFunctionalVariants()) {
+                names.add(rules.getDisplayNameForVariant(variant));
+            }
+        }
+        return names;
     }
 
     public final Iterable<CardRules> loadCards() {
+        if (loadCardsLazily) {
+            return Collections.emptyList();
+        }
+        return readAllCards();
+    }
+
+    public final Iterable<CardRules> readAllCards() {
         final Localizer localizer = Localizer.getInstance();
 
         progressObserver.setOperationName(localizer.getMessage("splash.loading.examining-cards"), true);
@@ -227,20 +262,9 @@ public class CardStorageReader {
         // Iterate through txt files or zip archive.
         // Report relevant numbers to progress monitor model.
 
-        final Set<CardRules> result = new TreeSet<>(new Comparator<CardRules>() {
-            @Override
-            public int compare(final CardRules o1, final CardRules o2) {
-                if (loadingTokens) {
-                    return String.CASE_INSENSITIVE_ORDER.compare(o1.getNormalizedName(), o2.getNormalizedName());
-                }
-                return String.CASE_INSENSITIVE_ORDER.compare(o1.getName(), o2.getName());
-            }
-        });
+        final Set<CardRules> result;
+        result = new TreeSet<>(Comparator.comparing(CardRules::getNormalizedName, String.CASE_INSENSITIVE_ORDER));
 
-        if (loadCardsLazily) {
-            return result;
-        }
- 
         final List<File> allFiles = collectCardFiles(new ArrayList<>(), this.cardsfolder);
         if (!allFiles.isEmpty()) {
             int fileParts = zip == null ? NUMBER_OF_PARTS : 1 + NUMBER_OF_PARTS / 3;
@@ -255,7 +279,7 @@ public class CardStorageReader {
             sw.start();
             executeLoadTask(result, taskFiles, cdlFiles);
             sw.stop();
-            final long timeOnParse = sw.getTime();
+            final long timeOnParse = sw.getTime(TimeUnit.SECONDS);
             System.out.printf("Read cards: %s files in %d ms (%d parts) %s%n", allFiles.size(), timeOnParse, taskFiles.size(), useThreadPool ? "using thread pool" : "in same thread");
         }
 
@@ -269,7 +293,7 @@ public class CardStorageReader {
             sw.start();
             executeLoadTask(result, taskZip, cdlZip);
             sw.stop();
-            final long timeOnParse = sw.getTime();
+            final long timeOnParse = sw.getTime(TimeUnit.SECONDS);
             System.out.printf("Read cards: %s archived files in %d ms (%d parts) %s%n", this.zip.size(), timeOnParse, taskZip.size(), useThreadPool ? "using thread pool" : "in same thread");
         }
 
@@ -306,7 +330,11 @@ public class CardStorageReader {
                     result.addAll(c.call());
                 }
             }
-        } catch (InterruptedException | ExecutionException e) {
+        } catch (InterruptedException e) {
+            // Propagate so callers don't cache a partially-loaded card set as if it were complete.
+            Thread.currentThread().interrupt();
+            throw new RuntimeException(e);
+        } catch (ExecutionException e) {
             e.printStackTrace();
         } catch (final Exception e) { // this clause comes from non-threaded branch
             throw new RuntimeException(e);
@@ -321,14 +349,11 @@ public class CardStorageReader {
         for (int iPart = 0; iPart < maxParts; iPart++) {
             final int from = iPart * filesPerPart;
             final int till = iPart == maxParts - 1 ? totalFiles : from + filesPerPart;
-            tasks.add(new Callable<List<CardRules>>() {
-                @Override
-                public List<CardRules> call() throws Exception{
-                    final List<CardRules> res = loadCardsInRangeFromZip(entries, from, till);
-                    cdl.countDown();
-                    progressObserver.report(maxParts - (int)cdl.getCount(), maxParts);
-                    return res;
-                }
+            tasks.add(() -> {
+                final List<CardRules> res = loadCardsInRangeFromZip(entries, from, till);
+                cdl.countDown();
+                progressObserver.report(maxParts - (int)cdl.getCount(), maxParts);
+                return res;
             });
         }
         return tasks;
@@ -342,13 +367,16 @@ public class CardStorageReader {
         for (int iPart = 0; iPart < maxParts; iPart++) {
             final int from = iPart * filesPerPart;
             final int till = iPart == maxParts - 1 ? totalFiles : from + filesPerPart;
-            tasks.add(new Callable<List<CardRules>>() {
-                @Override
-                public List<CardRules> call() throws Exception{
+            tasks.add(() -> {
+                try {
                     final List<CardRules> res = loadCardsInRange(allFiles, from, till);
+                    return res;
+                } catch (Exception ex) {
+                    throw ex;
+                } finally {
+                    // make sure to continue loading when using multiple threads
                     cdl.countDown();
                     progressObserver.report(maxParts - (int)cdl.getCount(), maxParts);
-                    return res;
                 }
             });
         }
@@ -390,25 +418,16 @@ public class CardStorageReader {
      * @return a new Card instance
      */
     protected final CardRules loadCard(final CardRules.Reader reader, final File file) {
-        FileInputStream fileInputStream = null;
-        try {
-            fileInputStream = new FileInputStream(file);
+        try (InputStream fileInputStream = java.nio.file.Files.newInputStream(file.toPath())) {
             reader.reset();
             final List<String> lines = readScript(fileInputStream);
-            return reader.readCard(lines, Files.getNameWithoutExtension(file.getName()));
+            CardRules rules = reader.readCard(lines, Files.getNameWithoutExtension(file.getName()));
+            rules.setPath(file.getPath());
+            return rules;
         } catch (final FileNotFoundException ex) {
             throw new RuntimeException("CardReader : run error -- file not found: " + file.getPath(), ex);
         } catch (final Exception ex) {
-            System.out.println("Error loading cardscript " + file.getName() + ". Please close Forge and resolve this.");
-            throw ex;
-        } finally {
-            try {
-                assert fileInputStream != null;
-                fileInputStream.close();
-            } catch (final IOException ignored) {
-                // 11:08
-                // PM
-            }
+            throw new RuntimeException("Error loading cardscript " + file.getName() + ". Please close Forge and resolve this.", ex);
         }
     }
 
@@ -421,24 +440,13 @@ public class CardStorageReader {
      * @return a new Card instance
      */
     protected final CardRules loadCard(final CardRules.Reader rulesReader, final ZipEntry entry) {
-        InputStream zipInputStream = null;
-        try {
-            zipInputStream = this.zip.getInputStream(entry);
+        try (InputStream zipInputStream = this.zip.getInputStream(entry)) {
             rulesReader.reset();
-
-            return rulesReader.readCard(readScript(zipInputStream), Files.getNameWithoutExtension(entry.getName()));
+            CardRules rules = rulesReader.readCard(readScript(zipInputStream), Files.getNameWithoutExtension(entry.getName()));
+            rules.setPath(entry.getName());
+            return rules;
         } catch (final IOException exn) {
             throw new RuntimeException(exn);
-            // PM
-        } finally {
-            try {
-                if (zipInputStream != null) {
-                    zipInputStream.close();
-                }
-            } catch (final IOException ignored) {
-                // 11:08
-                // PM
-            }
         }
     }
 

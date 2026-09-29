@@ -23,13 +23,15 @@ import java.util.HashMap;
 import java.util.Map.Entry;
 
 import javax.swing.SwingUtilities;
-import javax.swing.event.ListSelectionEvent;
-import javax.swing.event.ListSelectionListener;
 
 import forge.Singletons;
+import forge.deck.CardPool;
+import forge.deck.Deck;
 import forge.deck.DeckBase;
 import forge.deck.DeckProxy;
+import forge.deck.DeckSection;
 import forge.deck.io.DeckPreferences;
+import forge.game.GameType;
 import forge.gui.UiCommand;
 import forge.gui.framework.EDocID;
 import forge.gui.framework.FScreen;
@@ -38,13 +40,18 @@ import forge.item.InventoryItem;
 import forge.itemmanager.ItemManager;
 import forge.screens.deckeditor.controllers.ACEditorBase;
 import forge.screens.deckeditor.controllers.CEditorConstructed;
+import forge.screens.deckeditor.controllers.CEditorDraftingProcess;
+import forge.screens.deckeditor.controllers.CEditorLimited;
+import forge.screens.deckeditor.controllers.CEditorNetworkDraft;
 import forge.screens.deckeditor.controllers.CEditorQuestCardShop;
 import forge.screens.deckeditor.controllers.CProbabilities;
 import forge.screens.deckeditor.controllers.CStatistics;
 import forge.screens.deckeditor.controllers.DeckController;
 import forge.screens.deckeditor.views.*;
 import forge.screens.match.controllers.CDetailPicture;
+import forge.toolbox.FComboBox;
 import forge.util.ItemPool;
+import forge.util.Localizer;
 
 /**
  * Constructs instance of deck editor UI controller, used as a single point of
@@ -138,6 +145,72 @@ public enum CDeckEditorUI implements ICDoc {
         }
     }
 
+    public void changeFormat(final GameType target) {
+        if (!isFormatDropdownGameType(target)) { return; }
+        if (childController == null) { return; }
+        if (childController.getGameType() == target) { return; }
+
+        Deck snapshot = childController.getDeckController().getCurrentDeckInEditor();
+        if (snapshot == null) { snapshot = new Deck(); }
+
+        if (target == GameType.Constructed && snapshot.has(DeckSection.Commander)) {
+            CardPool main = snapshot.getOrCreate(DeckSection.Main);
+            CardPool cmdr = snapshot.get(DeckSection.Commander);
+            if (cmdr != null && !cmdr.isEmpty()) {
+                main.addAll(cmdr);
+                cmdr.clear();
+            }
+        }
+
+        final CEditorConstructed newEditor = new CEditorConstructed(cDetailPicture, target);
+        setEditorController(newEditor);
+        newEditor.getDeckController().setModel(snapshot);
+    }
+
+    static boolean isFormatDropdownGameType(final GameType gt) {
+        return gt == GameType.Constructed || gt == GameType.Commander
+                || gt == GameType.Oathbreaker || gt == GameType.Brawl
+                || gt == GameType.TinyLeaders;
+    }
+
+    private void syncFormatDropdown() {
+        if (childController == null) { return; }
+        final FComboBox<GameType> cb = VCurrentDeck.SINGLETON_INSTANCE.getCbFormat();
+        final GameType gt = childController.getGameType();
+        if (isFormatDropdownGameType(gt)) {
+            if (cb.getSelectedItem() != gt) {
+                cb.setSelectedItem(gt);
+            }
+            cb.setEnabled(true);
+        } else {
+            cb.setEnabled(false);
+        }
+        syncTabCaption(gt);
+    }
+
+    /**
+     * The format dropdown lives inside the deck panel, so the navigation bar alone
+     * gives no clue which format the open editor is building for. Mirror the
+     * selected format in the tab caption. Only the Constructed screen hosts the
+     * dropdown; every other editor keeps the caption it was built with.
+     */
+    private void syncTabCaption(final GameType gt) {
+        if (childController.getScreen() != FScreen.DECK_EDITOR_CONSTRUCTED) { return; }
+        FScreen.DECK_EDITOR_CONSTRUCTED.setTabCaption(
+                Localizer.getInstance().getMessage(formatTabCaptionKey(gt)));
+    }
+
+    private static String formatTabCaptionKey(final GameType gt) {
+        if (gt == null) { return "lblDeckEditorWithSpaces"; }
+        switch (gt) {
+            case Commander:   return "lblCommanderDeckEditor";
+            case Oathbreaker: return "lblOathbreakerDeckEditor";
+            case Brawl:       return "lblBrawlDeckEditor";
+            case TinyLeaders: return "lblTinyLeadersDeckEditor";
+            default:          return "lblDeckEditorWithSpaces";
+        }
+    }
+
     @SuppressWarnings("unchecked")
     public <T extends InventoryItem> void incrementDeckQuantity(final T item, final int delta) {
         if (item == null || delta == 0) { return; }
@@ -186,6 +259,10 @@ public enum CDeckEditorUI implements ICDoc {
 
     @SuppressWarnings("unchecked")
     public void addSelectedCards(final boolean toAlternate, final int number) {
+        if (childController == null || childController.getCatalogManager() == null) {
+            return;
+        }
+
         moveSelectedItems(childController.getCatalogManager(), new _MoveAction() {
             @Override public <T extends InventoryItem> void move(final Iterable<Entry<T, Integer>> items) {
                 ((ACEditorBase<T, ?>)childController).addItems(items, toAlternate);
@@ -211,6 +288,14 @@ public enum CDeckEditorUI implements ICDoc {
         Singletons.getControl().getForgeMenu().setProvider(childController0);
 
         if (childController == null) { return; }
+
+        // Draft log panel is shown for any editor involved in a limited flow —
+        // the shared pool editor, the network drafting controller, or the offline
+        // one. Add new editor classes here if they should display the draft log.
+        boolean isLimitedEditor = childController instanceof CEditorLimited
+                || childController instanceof CEditorNetworkDraft
+                || childController instanceof CEditorDraftingProcess;
+        vEditorLog.setDraftLogVisible(isLimitedEditor);
 
         final ItemManager<? extends InventoryItem> catView  = childController.getCatalogManager();
         final ItemManager<? extends InventoryItem> deckView = childController.getDeckManager();
@@ -253,34 +338,16 @@ public enum CDeckEditorUI implements ICDoc {
                 }
             });
 
-            catView.setItemActivateCommand(new UiCommand() {
-                @Override
-                public void run() {
-                    addSelectedCards(false, 1);
-                }
-            });
-            deckView.setItemActivateCommand(new UiCommand() {
-                @Override
-                public void run() {
-                    removeSelectedCards(false, 1);
-                }
-            });
+            catView.setItemActivateCommand((UiCommand) () -> addSelectedCards(false, 1));
+            deckView.setItemActivateCommand((UiCommand) () -> removeSelectedCards(false, 1));
 
             catView.setContextMenuBuilder(childController.createContextMenuBuilder(true));
             deckView.setContextMenuBuilder(childController.createContextMenuBuilder(false));
 
             //set card when selection changes
-            catView.addSelectionListener(new ListSelectionListener() {
-                @Override public void valueChanged(final ListSelectionEvent e) {
-                    setCard(catView.getSelectedItem());
-                }
-            });
+            catView.addSelectionListener(e -> setCard(catView.getSelectedItem()));
 
-            deckView.addSelectionListener(new ListSelectionListener() {
-                @Override public void valueChanged(final ListSelectionEvent e) {
-                    setCard(deckView.getSelectedItem());
-                }
-            });
+            deckView.addSelectionListener(e -> setCard(deckView.getSelectedItem()));
 
             catView.setAllowMultipleSelections(true);
             deckView.setAllowMultipleSelections(true);
@@ -292,12 +359,9 @@ public enum CDeckEditorUI implements ICDoc {
 
         catView.applyFilters();
 
-        SwingUtilities.invokeLater(new Runnable() {
-            @Override
-            public void run() {
-                catView.focus();
-            }
-        });
+        syncFormatDropdown();
+
+        SwingUtilities.invokeLater(catView::focus);
     }
 
     @Override

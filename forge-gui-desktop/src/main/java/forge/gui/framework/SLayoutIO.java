@@ -1,31 +1,5 @@
 package forge.gui.framework;
 
-import java.awt.BorderLayout;
-import java.awt.Dimension;
-import java.awt.Point;
-import java.awt.Rectangle;
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileNotFoundException;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.util.Collection;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map.Entry;
-import java.util.concurrent.atomic.AtomicBoolean;
-
-import javax.swing.border.EmptyBorder;
-import javax.xml.stream.XMLEventFactory;
-import javax.xml.stream.XMLEventReader;
-import javax.xml.stream.XMLEventWriter;
-import javax.xml.stream.XMLInputFactory;
-import javax.xml.stream.XMLOutputFactory;
-import javax.xml.stream.XMLStreamException;
-import javax.xml.stream.events.Attribute;
-import javax.xml.stream.events.StartElement;
-import javax.xml.stream.events.XMLEvent;
-
 import forge.Singletons;
 import forge.gui.FThreads;
 import forge.gui.SOverlayUtils;
@@ -35,12 +9,26 @@ import forge.localinstance.properties.ForgeConstants;
 import forge.toolbox.FAbsolutePositioner;
 import forge.toolbox.SaveOpenDialog;
 import forge.toolbox.SaveOpenDialog.Filetypes;
-import forge.util.CollectionSuppliers;
 import forge.util.ThreadUtil;
-import forge.util.maps.HashMapOfLists;
-import forge.util.maps.MapOfLists;
 import forge.view.FFrame;
 import forge.view.FView;
+
+import javax.swing.border.EmptyBorder;
+import javax.xml.stream.*;
+import javax.xml.stream.events.Attribute;
+import javax.xml.stream.events.StartElement;
+import javax.xml.stream.events.XMLEvent;
+
+import com.google.common.collect.ListMultimap;
+import com.google.common.collect.MultimapBuilder;
+
+import java.awt.*;
+import java.io.*;
+import java.util.Collection;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map.Entry;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * Handles layout saving and loading.
@@ -88,13 +76,11 @@ public final class SLayoutIO {
             FView.SINGLETON_INSTANCE.getPnlContent().removeAll();
             // let it redraw everything first
 
-            FThreads.invokeInEdtLater(new Runnable() {
-                @Override
-                public void run() {
-                    SLayoutIO.loadLayout(loadFile);
-                    SLayoutIO.saveLayout(null);
-                    SOverlayUtils.hideOverlay();
-                }
+            FThreads.invokeInEdtLater(() -> {
+                SLayoutIO.loadLayout(loadFile);
+                Singletons.getControl().getCurrentScreen().getView().populate();
+                SLayoutIO.saveLayout(null);
+                SOverlayUtils.hideOverlay();
             });
         }
     }
@@ -103,22 +89,18 @@ public final class SLayoutIO {
         SOverlayUtils.genericOverlay();
         FView.SINGLETON_INSTANCE.getPnlContent().removeAll();
 
-        FThreads.invokeInEdtLater(new Runnable(){
-            @Override public void run() {
-                SLayoutIO.loadLayout(null);
-                SOverlayUtils.hideOverlay();
-            }
+        FThreads.invokeInEdtLater(() -> {
+            SLayoutIO.loadLayout(null);
+            Singletons.getControl().getCurrentScreen().getView().populate();
+            SOverlayUtils.hideOverlay();
         });
     }
 
     public static void saveWindowLayout() {
         if (saveWindowRequested.getAndSet(true)) { return; }
-        ThreadUtil.delay(500, new Runnable() {
-            @Override
-            public void run() {
-                finishSaveWindowLayout();
-                saveWindowRequested.set(false);
-            }
+        ThreadUtil.delay(500, () -> {
+            finishSaveWindowLayout();
+            saveWindowRequested.set(false);
         });
     }
     
@@ -131,10 +113,8 @@ public final class SLayoutIO {
         final FileLocation file = ForgeConstants.WINDOW_LAYOUT_FILE;
         final String fWriteTo = file.userPrefLoc;
         final XMLOutputFactory out = XMLOutputFactory.newInstance();
-        FileOutputStream fos = null;
         XMLEventWriter writer = null;
-        try {
-            fos = new FileOutputStream(fWriteTo);
+        try (FileOutputStream fos = new FileOutputStream(fWriteTo)) {
             writer = out.createXMLEventWriter(fos);
 
             writer.add(EF.createStartDocument());
@@ -147,20 +127,14 @@ public final class SLayoutIO {
             writer.add(EF.createAttribute(Property.max, window.isMaximized() ? "1" : "0"));
             writer.add(EF.createAttribute(Property.fs, window.isFullScreen() ? "1" : "0"));
             writer.add(EF.createEndElement("", "", "layout"));
-            writer.flush(); 
+            writer.flush();
             writer.add(EF.createEndDocument());
-        } catch (FileNotFoundException e) {
-            // TODO Auto-generated catch block ignores the exception, but sends it to System.err and probably forge.log.
-            e.printStackTrace();
-        } catch (XMLStreamException e) {
+        } catch (XMLStreamException | IOException e) {
             // TODO Auto-generated catch block ignores the exception, but sends it to System.err and probably forge.log.
             e.printStackTrace();
         } finally {
-            if (writer != null ) {
-                try { writer.close(); } catch (XMLStreamException e) {}
-            }
-            if ( fos != null ) {
-                try { fos.close(); } catch (IOException e) {}
+            if (writer != null) {
+                try { writer.close(); } catch (XMLStreamException ignored) {}
             }
         }
     }
@@ -280,13 +254,9 @@ public final class SLayoutIO {
      */
     public static void saveLayout(final File f0) {
         if( saveRequested.getAndSet(true) ) return; 
-        ThreadUtil.delay(100, new Runnable() {
-            
-            @Override
-            public void run() {
-                save(f0);
-                saveRequested.set(false);
-            }
+        ThreadUtil.delay(100, () -> {
+            save(f0);
+            saveRequested.set(false);
         });
     }
 
@@ -305,12 +275,9 @@ public final class SLayoutIO {
         }
 
         final XMLOutputFactory out = XMLOutputFactory.newInstance();
-        FileOutputStream fos = null;
         XMLEventWriter writer = null;
-        try {
+        try(FileOutputStream fos = new FileOutputStream(fWriteTo);) {
             String layoutSerial = getLayoutSerial(file.defaultLoc);
-
-            fos = new FileOutputStream(fWriteTo);
             writer = out.createXMLEventWriter(fos);
             final List<DragCell> cells = FView.SINGLETON_INSTANCE.getDragCells();
 
@@ -345,18 +312,12 @@ public final class SLayoutIO {
             }
             writer.flush(); 
             writer.add(EF.createEndDocument());
-        } catch (FileNotFoundException e) {
-            // TODO Auto-generated catch block ignores the exception, but sends it to System.err and probably forge.log.
-            e.printStackTrace();
-        } catch (XMLStreamException e) {
+        } catch (XMLStreamException | IOException e) {
             // TODO Auto-generated catch block ignores the exception, but sends it to System.err and probably forge.log.
             e.printStackTrace();
         } finally {
             if ( writer != null )
                 try { writer.close(); } catch (XMLStreamException e) {}
-
-            if ( fos != null )
-                try { fos.close(); } catch (IOException e) {}
         }
     }
 
@@ -415,7 +376,7 @@ public final class SLayoutIO {
         final FView view = FView.SINGLETON_INSTANCE;
         String defaultLayoutSerial = "";
         String userLayoutSerial = "";
-        Boolean resetLayout = false;
+        boolean resetLayout = false;
         FScreen screen = Singletons.getControl().getCurrentScreen();
         FAbsolutePositioner.SINGLETON_INSTANCE.hideAll();
         view.getPnlInsets().removeAll();
@@ -427,7 +388,7 @@ public final class SLayoutIO {
         FileLocation file = screen.getLayoutFile();
         if (file != null) {
             // Read a model for new layout
-            MapOfLists<LayoutInfo, EDocID> model = null;
+            ListMultimap<LayoutInfo, EDocID> model = null;
             boolean usedCustomPrefsFile = false;
             FileInputStream fis = null;
 
@@ -502,10 +463,10 @@ public final class SLayoutIO {
             }
     
             // Apply new layout
-            for (Entry<LayoutInfo, Collection<EDocID>> kv : model.entrySet()) {
+            for (Entry<LayoutInfo, Collection<EDocID>> kv : model.asMap().entrySet()) {
                 LayoutInfo layoutInfo = kv.getKey();
                 DragCell cell = new DragCell();
-                cell.setRoughBounds(layoutInfo.getBounds());
+                cell.setRoughBounds(layoutInfo.bounds());
                 FView.SINGLETON_INSTANCE.addDragCell(cell); 
                 for(EDocID edoc : kv.getValue()) {
                     try {
@@ -518,8 +479,8 @@ public final class SLayoutIO {
                         System.err.println("Failed to get doc for " + edoc); 
                     }
                 }
-                if (layoutInfo.getSelectedId() != null) {
-                    cell.setSelected(layoutInfo.getSelectedId().getDoc());
+                if (layoutInfo.selectedId() != null) {
+                    cell.setSelected(layoutInfo.selectedId().getDoc());
                 }
             }
         }
@@ -528,26 +489,9 @@ public final class SLayoutIO {
         SResizingUtil.resizeWindow();
     }
 
-    private static class LayoutInfo
-    {
-        private final RectangleOfDouble bounds;
-        private final EDocID selectedId;
+    private record LayoutInfo(RectangleOfDouble bounds, EDocID selectedId) { }
 
-        public LayoutInfo(RectangleOfDouble bounds0, EDocID selectedId0) {
-            this.bounds = bounds0;
-            this.selectedId = selectedId0;
-        }
-        
-        public RectangleOfDouble getBounds() {
-            return this.bounds;
-        }
-        
-        public EDocID getSelectedId() {
-            return this.selectedId;
-        }
-    }
-
-    private static MapOfLists<LayoutInfo, EDocID> readLayout(final XMLEventReader reader) throws XMLStreamException
+    private static ListMultimap<LayoutInfo, EDocID> readLayout(final XMLEventReader reader) throws XMLStreamException
     {
         XMLEvent event;
         StartElement element;
@@ -555,8 +499,8 @@ public final class SLayoutIO {
         Attribute attribute;
         EDocID selectedId = null;
         double x0 = 0, y0 = 0, w0 = 0, h0 = 0;
-        
-        MapOfLists<LayoutInfo, EDocID> model = new HashMapOfLists<>(CollectionSuppliers.arrayLists());
+
+        ListMultimap<LayoutInfo, EDocID> model = MultimapBuilder.hashKeys().arrayListValues().build();
         
         LayoutInfo currentKey = null;
         while (null != reader && reader.hasNext()) {
@@ -581,7 +525,7 @@ public final class SLayoutIO {
                 }
                 else if (element.getName().getLocalPart().equals(Property.doc)) {
                     event = reader.nextEvent();
-                    model.add(currentKey, EDocID.valueOf(event.asCharacters().getData()));
+                    model.put(currentKey, EDocID.valueOf(event.asCharacters().getData()));
                 }
             }
         }

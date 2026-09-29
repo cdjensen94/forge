@@ -1,11 +1,6 @@
 package forge.itemmanager.filters;
 
-import java.awt.event.ItemEvent;
-import java.awt.event.ItemListener;
-
 import javax.swing.JPanel;
-
-import com.google.common.base.Predicate;
 
 import forge.gui.UiCommand;
 import forge.item.InventoryItem;
@@ -16,6 +11,8 @@ import forge.toolbox.FComboBoxWrapper;
 import forge.toolbox.FLabel;
 import forge.toolbox.FTextField;
 import forge.toolbox.LayoutHelper;
+
+import java.util.function.Predicate;
 
 
 public class TokenSearchFilter extends TextSearchFilter<PaperToken> {
@@ -57,12 +54,9 @@ public class TokenSearchFilter extends TextSearchFilter<PaperToken> {
         cbSearchMode.addItem("in");
         cbSearchMode.addItem("not in");
         cbSearchMode.addTo(widget);
-        cbSearchMode.addItemListener(new ItemListener() {
-            @Override
-            public void itemStateChanged(ItemEvent arg0) {
-                if (!txtSearch.isEmpty()) {
-                    applyChange();
-                }
+        cbSearchMode.addItemListener(arg0 -> {
+            if (!txtSearch.isEmpty()) {
+                applyChange();
             }
         });
 
@@ -92,12 +86,7 @@ public class TokenSearchFilter extends TextSearchFilter<PaperToken> {
     private FLabel addButton(JPanel widget, String text) {
         FLabel button = new FLabel.Builder().text(text).hoverable().selectable().selected().build();
 
-        button.setCommand(new UiCommand() {
-            @Override
-            public void run() {
-                applyChange();
-            }
-        });
+        button.setCommand((UiCommand) this::applyChange);
 
         widget.add(button);
         return button;
@@ -106,18 +95,13 @@ public class TokenSearchFilter extends TextSearchFilter<PaperToken> {
     @Override
     protected Predicate<PaperToken> buildPredicate() {
         // Don't filter anything out for now.
-        return new Predicate<PaperToken>() {
-            @Override
-            public boolean apply(PaperToken paperToken) {
-                return true;
-            }
-        };
+        return paperToken -> true;
     }
 
     @Override
     protected <U extends InventoryItem> boolean showUnsupportedItem(U item) {
         //fallback to regular item text filter if item not PaperCard
-        boolean result = btnName.isSelected() && SFilterUtil.buildItemTextFilter(txtSearch.getText()).apply(item);
+        boolean result = btnName.isSelected() && SFilterUtil.buildItemTextFilter(txtSearch.getText()).test(item);
         if (cbSearchMode.getSelectedIndex() != 0) { //invert result if needed
             result = !result;
         }

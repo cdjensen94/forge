@@ -107,7 +107,7 @@ ScryfallCode=OTC
 99 R Haughty Djinn @Mike Jordana
 100 R Midnight Clock @Alexander Forssberg
 101 M Mind's Dilation @Iain McCaig
-102 U Murmuring Mystic @Mark Winters
+102 C Murmuring Mystic @Mark Winters
 103 R Octavia, Living Thesis @Simon Dominic
 104 C Opt @Dan Murayama Scott
 105 C Ponder @Dan Murayama Scott
@@ -149,7 +149,7 @@ ScryfallCode=OTC
 141 R Misfortune Teller @Nils Hamm
 142 U Morbid Opportunist @Tyler Walpole
 143 M Nashi, Moon Sage's Scion @Valera Lutfullina
-144 R Nighthawk Scavenger @Heonhwa Choe
+144 R Nighthawk Scavenger @Heonhwa
 145 R Ogre Slumlord @Trevor Claxton
 146 R Painful Truths @Winona Nelson
 147 R Predators' Hour @Tomas Duchek
@@ -162,7 +162,7 @@ ScryfallCode=OTC
 154 M Arcane Bombardment @Marta Nael
 155 C Big Score @Gaboleps
 156 C Bitter Reunion @Jake Murray
-157 M Bloodthirsty Adversary @Heonhwa Choe
+157 M Bloodthirsty Adversary @Heonhwa
 158 R Captain Lannery Storm @Chris Rallis
 159 R Captivating Crew @Winona Nelson
 160 R Chaos Warp @Trevor Claxton
@@ -174,7 +174,7 @@ ScryfallCode=OTC
 166 M Finale of Promise @Jaime Jones
 167 U Glittering Stockpile @Brock Grossman
 168 R Grenzo, Havoc Raiser @Svetlin Velinov
-169 C Guttersnipe @Andrey Kuzinskiy
+169 U Guttersnipe @Andrey Kuzinskiy
 170 U Humble Defector @Slawomir Maniak
 171 C Impulsive Pilferer @Nicholas Gregory
 172 R Laurine, the Diversion @Andrey Kuzinskiy
@@ -266,7 +266,7 @@ ScryfallCode=OTC
 258 R Idol of Oblivion @Piotr Dura
 259 C Izzet Signet @Raoul Vitale
 260 U Lightning Greaves @Jeremy Jarvis
-261 C Orzhov Signet @Martina Pilcerova
+261 U Orzhov Signet @Martina Pilcerova
 262 R Perennial Behemoth @Wayne Reynolds
 263 U Perpetual Timepiece @Cliff Childs
 264 U Prismatic Lens @Alan Pollack
@@ -293,7 +293,7 @@ ScryfallCode=OTC
 285 C Desert of the Indomitable @James Paick
 286 C Desert of the True @Jung Park
 287 R Desolate Mire @Rockey Chen
-288 C Dimir Aqueduct @John Avon
+288 U Dimir Aqueduct @John Avon
 289 R Dragonskull Summit @Jon Foster
 290 R Drowned Catacomb @Jung Park
 291 U Dunes of the Dead @E. M. Gist
@@ -350,30 +350,34 @@ ScryfallCode=OTC
 342 R Yavimaya Coast @Jesper Ejsing
 
 [tokens]
-b_1_1_assassin_deathtouch_haste
-b_1_1_rat
-b_2_2_rogue
-b_2_2_zombie
-c_10_10_eldrazi
-c_1_1_a_soldier
-c_1_1_a_thopter_flying
-c_1_1_eldrazi_scion_sac
-c_a_blood_draw
-c_a_food_sac
-g_0_1_plant
-g_1_1_insect
-g_2_2_boar
-g_3_3_ape
-g_4_2_plant_warrior_reach
-g_5_3_elemental
-r_0_2_dragon_egg_defender_hatches_dragon
-r_1_1_elemental
-r_2_2_dragon_flying_firebreathing
-r_4_4_dragon_elemental_flying_prowess
-rg_5_5_elemental
-rgw_1_1_sand_warrior
-u_1_1_bird_illusion_flying
-u_2_2_drake_flying
-u_x_x_shark_flying
-w_4_4_angel_flying
-wb_2_1_inkling_flying
+1 c_10_10_eldrazi @Jack Wang
+2 c_1_1_eldrazi_scion_sac @Izzy
+3 w_4_4_angel_flying @Magali Villeneuve
+4 u_1_1_bird_illusion_flying @James Paick
+5 u_2_2_drake_flying @Svetlin Velinov
+6 u_x_x_shark_flying @Caio Monteiro
+7 b_1_1_assassin_deathtouch_haste @Josu Hernaiz
+8 b_1_1_rat @Mike Bierek
+9 b_2_2_rogue @Maria Poliakova
+10 b_2_2_zombie @Igor Kieryluk
+11 r_2_2_dragon_flying_firebreathing @Lars Grant-West
+12 r_0_2_dragon_egg_defender_hatches_dragon @Jehan Choo
+13 r_4_4_dragon_elemental_flying_prowess @Andrea Piparo
+14 r_1_1_elemental @Winona Nelson
+15 g_3_3_ape @Lars Grant-West
+16 g_2_2_boar @James Ryman
+17 g_5_3_elemental @Nils Hamm
+18 g_1_1_insect @Christopher Moeller
+19 g_0_1_plant @Jakub Kasper
+20 g_4_2_plant_warrior_reach @Xabi Gaztelua
+21 rg_5_5_elemental @Brad Rigney
+22 wb_2_1_inkling_flying @Scott Murphy
+23 rgw_1_1_sand_warrior @Piotr Foksowicz
+24 c_a_blood_draw @Miranda Meeks
+25 c_a_food_sac @Lucas Graciano
+26 c_1_1_a_soldier @Kev Walker
+27 c_1_1_a_thopter_flying @Svetlin Velinov
+
+[other]
+28 manifest @Jason A. Engle
+29 monarch @Volkan Baǵa

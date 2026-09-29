@@ -2,7 +2,6 @@
 Code=CNS
 Date=2014-06-06
 Name=Conspiracy
-Code2=CNS
 Type=Draft
 BoosterCovers=3
 Booster=10 Common:!fromSheet("CNS Draft Matters"), 3 Uncommon:!fromSheet("CNS Draft Matters"), 1 RareMythic:!fromSheet("CNS Draft Matters"), 1 fromSheet("CNS Draft Matters")
@@ -47,7 +46,7 @@ ScryfallCode=CNS
 36 U Treasonous Ogre @Randy Gallegos
 37 U Predator's Howl @Ralph Horsley
 38 R Realm Seekers @Mike Sass
-39 U Selvala's Charge @Dan Scott
+39 U Selvala's Charge @Dan Murayama Scott
 40 C Selvala's Enforcer @Jesper Ejsing
 41 R Brago, King Eternal @Karla Ortiz
 42 M Dack Fayden @Eric Deschamps
@@ -58,7 +57,7 @@ ScryfallCode=CNS
 47 R Grenzo, Dungeon Warden @Lucas Graciano
 48 R Magister of Worth @John Stanko
 49 M Marchesa, the Black Rose @Matt Stewart
-50 U Marchesa's Smuggler @Dan Scott
+50 U Marchesa's Smuggler @Dan Murayama Scott
 51 R Selvala, Explorer Returned @Tyler Jacobson
 52 U Woodvine Elemental @Mike Bierek
 53 R Aether Searcher @James Paick
@@ -66,7 +65,7 @@ ScryfallCode=CNS
 55 R Canal Dredger @John Avon
 56 M Coercive Portal @Yeong-Hao Han
 57 R Cogwork Grinder @Jasper Sandner
-58 C Cogwork Librarian @Dan Scott
+58 C Cogwork Librarian @Dan Murayama Scott
 59 C Cogwork Spy @Tomasz Jedruszek
 60 U Cogwork Tracker @Alex Horley-Orlandelli
 61 R Deal Broker @Cliff Childs
@@ -248,11 +247,14 @@ ScryfallCode=CNS
 1 Worldknit|CNS
 
 [tokens]
-w_1_1_spirit_flying
-b_x_x_demon_flying
-b_2_2_zombie
-r_4_4_ogre
-g_3_3_elephant
-g_1_1_squirrel
-g_2_2_wolf
-c_1_1_a_construct_defender
+1 w_1_1_spirit_flying @Jeff Simpson
+2 b_x_x_demon_flying @Evan Shipard
+3 b_2_2_zombie @Lucas Graciano
+4 r_4_4_ogre @Dave Kendall
+5 g_3_3_elephant @Lars Grant-West
+6 g_1_1_squirrel @Daniel Ljunggren
+7 g_2_2_wolf @Raoul Vitale
+8 c_1_1_a_construct_defender @Adam Paquette
+
+[other]
+9 emblem_dack_fayden @Eric Deschamps

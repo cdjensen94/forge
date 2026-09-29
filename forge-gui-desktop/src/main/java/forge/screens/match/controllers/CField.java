@@ -20,19 +20,24 @@ package forge.screens.match.controllers;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.awt.event.MouseListener;
+import java.util.function.BiConsumer;
+import java.util.function.Function;
 
-import com.google.common.base.Function;
+import javax.swing.ButtonGroup;
+import javax.swing.JPopupMenu;
+import javax.swing.JRadioButtonMenuItem;
+import javax.swing.SwingUtilities;
 
 import forge.game.player.PlayerView;
 import forge.game.zone.ZoneType;
-import forge.gamemodes.match.input.Input;
-import forge.gamemodes.match.input.InputPayMana;
 import forge.gui.framework.ICDoc;
-import forge.player.PlayerControllerHuman;
+import forge.interfaces.IGameController;
 import forge.screens.match.CMatchUI;
 import forge.screens.match.ZoneAction;
 import forge.screens.match.views.VField;
 import forge.toolbox.MouseTriggerEvent;
+import forge.util.Localizer;
+import forge.view.arcane.FloatingZone;
 
 /**
  * Controls Swing components of a player's field instance.
@@ -47,48 +52,70 @@ public class CField implements ICDoc {
     private final MouseListener madAvatar = new MouseAdapter() {
         @Override
         public void mousePressed(final MouseEvent e) {
-            matchUI.getGameController().selectPlayer(player, new MouseTriggerEvent(e));
+            if (SwingUtilities.isRightMouseButton(e)) {
+                matchUI.showFullControl(player, e);
+            } else {
+                matchUI.getGameController().selectPlayer(player, new MouseTriggerEvent(e));
+            }
         }
     };
 
     /**
      * Controls Swing components of a player's field instance.
-     *
-     * @param player0 &emsp; {@link forge.game.player.Player}
-     * @param v0 &emsp; {@link forge.screens.match.views.VField}
-     * @param playerViewer
      */
     public CField(final CMatchUI matchUI, final PlayerView player0, final VField v0) {
         this.matchUI = matchUI;
         this.player = player0;
         this.view = v0;
 
-        final ZoneAction handAction      = new ZoneAction(matchUI, player, ZoneType.Hand);
-        final ZoneAction libraryAction   = new ZoneAction(matchUI, player, ZoneType.Library);
-        final ZoneAction exileAction     = new ZoneAction(matchUI, player, ZoneType.Exile);
-        final ZoneAction graveAction     = new ZoneAction(matchUI, player, ZoneType.Graveyard);
-        final ZoneAction flashBackAction = new ZoneAction(matchUI, player, ZoneType.Flashback);
-        final ZoneAction commandAction   = new ZoneAction(matchUI, player, ZoneType.Command);
-        final ZoneAction anteAction      = new ZoneAction(matchUI, player, ZoneType.Ante);
-        final ZoneAction sideboardAction = new ZoneAction(matchUI, player, ZoneType.Sideboard);
-
-        final Function<Byte, Boolean> manaAction = new Function<Byte, Boolean>() {
-            @Override public final Boolean apply(final Byte colorCode) {
-                if (matchUI.getGameController() instanceof PlayerControllerHuman) {
-                    final PlayerControllerHuman controller = (PlayerControllerHuman) matchUI.getGameController();
-                    final Input ipm = controller.getInputQueue().getInput();
-                    if (ipm instanceof InputPayMana && ipm.getOwner().equals(player)) {
-                        final int oldMana = player.getMana(colorCode);
-                        controller.useMana(colorCode.byteValue());
-                        return Boolean.valueOf(oldMana != player.getMana(colorCode));
-                    }
-                }
+        final Function<Byte, Boolean> manaAction = colorCode -> {
+            IGameController controller = matchUI.getGameController(player);
+            // not a local human
+            if (controller == null) {
                 return Boolean.FALSE;
             }
+            final int oldMana = player.getMana(colorCode);
+            controller.useMana(colorCode);
+            return oldMana != player.getMana(colorCode);
         };
 
-        view.getDetailsPanel().setupMouseActions(handAction, libraryAction, exileAction, graveAction, flashBackAction,
-            commandAction, anteAction, sideboardAction, manaAction);
+        Function<ZoneType, Runnable> zoneActionFactory = (zone) -> new ZoneAction(matchUI, player, zone);
+
+        final BiConsumer<ZoneType, MouseEvent> zoneRightClick = (zone, e) -> {
+            final Localizer localizer = Localizer.getInstance();
+            final JPopupMenu popup = new JPopupMenu();
+            final ButtonGroup group = new ButtonGroup();
+            final boolean isOwn = matchUI.isLocalPlayer(player);
+            final boolean currentlyTabMode = FloatingZone.isTabMode(zone, isOwn);
+
+            final JRadioButtonMenuItem windowItem = new JRadioButtonMenuItem(localizer.getMessage("lblOpenInWindow"));
+            final JRadioButtonMenuItem tabItem = new JRadioButtonMenuItem(localizer.getMessage("lblAddTabToHandPanel"));
+            windowItem.setSelected(!currentlyTabMode);
+            tabItem.setSelected(currentlyTabMode);
+            group.add(windowItem);
+            group.add(tabItem);
+
+            windowItem.addActionListener(evt -> {
+                if (currentlyTabMode) {
+                    FloatingZone.setTabMode(zone, false, isOwn);
+                    FloatingZone.closeExisting(matchUI, player, zone);
+                    FloatingZone.showOrHide(matchUI, player, zone);
+                }
+            });
+            tabItem.addActionListener(evt -> {
+                if (!currentlyTabMode) {
+                    FloatingZone.setTabMode(zone, true, isOwn);
+                    FloatingZone.closeExisting(matchUI, player, zone);
+                    FloatingZone.showOrHide(matchUI, player, zone);
+                }
+            });
+
+            popup.add(windowItem);
+            popup.add(tabItem);
+            popup.show(e.getComponent(), e.getX(), e.getY());
+        };
+
+        view.getDetailsPanel().setupMouseActions(zoneActionFactory, zoneRightClick, manaAction);
     }
 
     public final CMatchUI getMatchUI() {
@@ -111,6 +138,7 @@ public class CField implements ICDoc {
 
     @Override
     public void update() {
+        view.updateTabLabel();
     }
 
 }

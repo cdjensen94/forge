@@ -3,21 +3,32 @@ package forge.adventure.stage;
 
 import com.badlogic.gdx.math.Vector2;
 import com.badlogic.gdx.utils.Array;
+import forge.Forge;
 import forge.StaticData;
 import forge.adventure.character.PlayerSprite;
-import forge.adventure.data.BiomeData;
-import forge.adventure.data.EnemyData;
-import forge.adventure.data.PointOfInterestData;
-import forge.adventure.data.WorldData;
+import forge.adventure.data.*;
 import forge.adventure.pointofintrest.PointOfInterest;
+import forge.adventure.scene.InnScene;
+import forge.adventure.scene.InventoryScene;
+import forge.adventure.util.AdventureEventController;
+import forge.adventure.util.CardUtil;
+import forge.adventure.util.Config;
 import forge.adventure.util.Current;
 import forge.adventure.util.Paths;
 import forge.adventure.world.WorldSave;
+import forge.card.CardEdition;
 import forge.card.ColorSet;
+import forge.deck.CardPool;
 import forge.deck.Deck;
 import forge.deck.DeckProxy;
 import forge.game.GameType;
+import forge.gui.FThreads;
 import forge.item.PaperCard;
+import forge.model.CardBlock;
+import forge.model.FModel;
+import forge.screens.CoverScreen;
+import forge.util.Aggregates;
+import forge.util.ScreenUtil;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -30,6 +41,9 @@ import java.util.regex.Pattern;
 public class ConsoleCommandInterpreter {
     private static ConsoleCommandInterpreter instance;
     Command root = new Command();
+    private final ArrayList<String> matchTokenList = new ArrayList<>(32);
+    private final StringBuilder completionBuilder = new StringBuilder(128);
+    private static final String[] emptyStringArray = new String[0];
 
     static class Command {
         HashMap<String, Command> children = new HashMap<>();
@@ -39,36 +53,43 @@ public class ConsoleCommandInterpreter {
     public String complete(String text) {
         String[] words = splitOnSpace(text);
         Command currentCommand = root;
-        StringBuilder completionString = new StringBuilder();
+
+        completionBuilder.setLength(0);
+
         for (String name : words) {
             if (!currentCommand.children.containsKey(name)) {
                 for (String key : currentCommand.children.keySet()) {
                     if (key.startsWith(name)) {
-                        return completionString + key + " ";
+                        // append directly
+                        completionBuilder.append(key).append(" ");
+                        return completionBuilder.toString();
                     }
                 }
                 break;
             }
-            completionString.append(name).append(" ");
+            completionBuilder.append(name).append(" ");
             currentCommand = currentCommand.children.get(name);
         }
         return text;
     }
 
     private String[] splitOnSpace(String text) {
-        List<String> matchList = new ArrayList<String>();
+        matchTokenList.clear();
+
         Pattern regex = Pattern.compile("[^\\s\"']+|\"([^\"]*)\"|'([^']*)'");
         Matcher regexMatcher = regex.matcher(text);
         while (regexMatcher.find()) {
             if (regexMatcher.group(1) != null) {
-                matchList.add(regexMatcher.group(1));
+                matchTokenList.add(regexMatcher.group(1));
             } else if (regexMatcher.group(2) != null) {
-                matchList.add(regexMatcher.group(2));
+                matchTokenList.add(regexMatcher.group(2));
             } else {
-                matchList.add(regexMatcher.group());
+                matchTokenList.add(regexMatcher.group());
             }
         }
-        return matchList.toArray(new String[0]);
+
+        // reuse
+        return matchTokenList.toArray(emptyStringArray);
     }
 
     public String command(String text) {
@@ -85,8 +106,9 @@ public class ConsoleCommandInterpreter {
             return "Command not found. Available commands:\n" + String.join(" ", Arrays.copyOfRange(words, 0, i)) + "\n" + String.join("\n", currentCommand.children.keySet());
         }
         String[] parameters = Arrays.copyOfRange(words, i, words.length);
-        for (int j = 0; j < parameters.length; j++)
-            parameters[j] = parameters[j].replaceAll("[\"']", "");
+        // this removes apostrophe...
+        /*for (int j = 0; j < parameters.length; j++)
+            parameters[j] = parameters[j].replaceAll("[\"']", "");*/
         return currentCommand.function.apply(parameters);
     }
 
@@ -119,7 +141,7 @@ public class ConsoleCommandInterpreter {
     private ConsoleCommandInterpreter() {
         registerCommand(new String[]{"teleport", "to"}, s -> {
             if (s.length < 2)
-                return "Command needs 2 parameter";
+                return "Command needs 2 parameters";
             try {
                 int x = Integer.parseInt(s[0]);
                 int y = Integer.parseInt(s[1]);
@@ -127,7 +149,7 @@ public class ConsoleCommandInterpreter {
                 WorldStage.getInstance().player.playEffect(Paths.EFFECT_TELEPORT, 10);
                 return "teleport to (" + s[0] + "," + s[1] + ")";
             } catch (Exception e) {
-                return "Exception occured, Invalid input";
+                return "Exception occurred, Invalid input";
             }
         });
         registerCommand(new String[]{"teleport", "to", "poi"}, s -> {
@@ -135,8 +157,14 @@ public class ConsoleCommandInterpreter {
             PointOfInterest poi = Current.world().findPointsOfInterest(s[0]);
             if (poi == null)
                 return "PoI " + s[0] + " not found";
-            WorldStage.getInstance().setPosition(poi.getPosition());
-            WorldStage.getInstance().player.playEffect(Paths.EFFECT_TELEPORT, 10);
+
+            Forge.advFreezePlayerControls = true;
+            FThreads.invokeInEdtNowOrLater(() -> Forge.setTransitionScreen(new CoverScreen(() -> {
+                Forge.advFreezePlayerControls = false;
+                WorldStage.getInstance().setPosition(new Vector2(poi.getPosition().x - 16f, poi.getPosition().y + 16f));
+                WorldStage.getInstance().loadPOI(poi);
+                Forge.clearTransitionScreen();
+            }, ScreenUtil.getInstance().takeScreenshot())));
             return "Teleported to " + s[0] + "(" + poi.getPosition() + ")";
         });
         registerCommand(new String[]{"spawn", "enemy"}, s -> {
@@ -158,15 +186,14 @@ public class ConsoleCommandInterpreter {
             return "Added " + amount + " gold";
         });
         registerCommand(new String[]{"give", "quest"}, s -> {
-            if (s.length<1) return "Command needs 1 parameter: QuestID";
+            if (s.length < 1) return "Command needs 1 parameter: QuestID";
             int ID;
-            try{
-                ID =Integer.parseInt(s[0]);
+            try {
+                ID = Integer.parseInt(s[0]);
+            } catch (Exception e) {
+                return "Can not convert " + s[0] + " to number";
             }
-            catch (Exception e){
-                return "Can not convert " +s[0]+" to number";
-            }
-            Current.player().addQuest(ID);
+            Current.player().addQuest(ID, false);
             return "Quest generated";
         });
         registerCommand(new String[]{"give", "shards"}, s -> {
@@ -193,33 +220,135 @@ public class ConsoleCommandInterpreter {
         });
         registerCommand(new String[]{"leave"}, s -> {
             if (!MapStage.getInstance().isInMap()) return "not on a map";
-            MapStage.getInstance().exitDungeon();
+            MapStage.getInstance().exitDungeon(false, false);
             return "Got out";
         });
         registerCommand(new String[]{"debug", "collision"}, s -> {
             currentGameStage().debugCollision(true);
-            return "Got out";
+            return "Debug collision ON";
         });
         registerCommand(new String[]{"give", "card"}, s -> {
-            //TODO: Specify optional amount.
             if (s.length < 1) return "Command needs 1 parameter: Card name.";
-            PaperCard card = StaticData.instance().getCommonCards().getCard(s[0]);
+            PaperCard card = StaticData.instance().fetchCard(s[0]);
             if (card == null) return "Cannot find card: " + s[0];
+            if (s.length >= 2) {
+                try {
+                    int amount = Integer.parseInt(s[1]);
+                    Current.player().addCard(card, amount);
+                    return String.format("Added %d cards: %s", amount, card.getName());
+                } catch (NumberFormatException ignored) {
+                }
+            }
             Current.player().addCard(card);
-            return "Added card: " + s[0];
+            return "Added card: " + card.getName();
         });
         registerCommand(new String[]{"give", "nosell", "card"}, s -> {
-            //TODO: Specify optional amount.
             if (s.length < 1) return "Command needs 1 parameter: Card name.";
-            PaperCard card = StaticData.instance().getCommonCards().getCard(s[0]);
+            PaperCard card = StaticData.instance().fetchCard(s[0]);
             if (card == null) return "Cannot find card: " + s[0];
+            if (s.length >= 2) {
+                try {
+                    int amount = Integer.parseInt(s[1]);
+                    Current.player().addCard(card.getNoSellVersion(), amount);
+                    return String.format("Added %d cards: %s", amount, card.getName());
+                } catch (NumberFormatException ignored) {
+                }
+            }
+            Current.player().addCard(card.getNoSellVersion());
+            return "Added card: " + card.getName();
+        });
+        registerCommand(new String[]{"give", "print"}, s -> {
+            if (s.length < 2) return "Command needs 2 parameters: Edition code, collector number.";
+            CardEdition edition = StaticData.instance().getCardEdition(s[0]);
+            if (edition == null) return "Cannot find edition: " + s[0];
+            CardEdition.EditionEntry cis = edition.getCardFromCollectorNumber(s[1]);
+            if (cis == null)
+                return String.format("Set '%s' does not have a card with collector number '%s'.", edition.getName(), s[1]);
+            PaperCard card = StaticData.instance().fetchCard(cis.name(), edition.getCode(), cis.collectorNumber());
+            if (card == null) {
+                //Found in the set, not supported.
+                return String.format("Failed to fetch (%s, %s, %s) - Not currently supported.", cis.name(), edition.getCode(), cis.collectorNumber());
+            }
+            if (s.length >= 3) {
+                try {
+                    int amount = Integer.parseInt(s[2]);
+                    Current.player().addCard(card, amount);
+                    return String.format("Added %d cards: %s", amount, card.getName());
+                } catch (NumberFormatException ignored) {
+                }
+            }
             Current.player().addCard(card);
-            Current.player().noSellCards.add(card);
-            return "Added card: " + s[0];
+            return "Added card: " + card.getName();
+        });
+        registerCommand(new String[]{"give", "set"}, s -> {
+            if (s.length < 1) return "Command needs 1 parameter: Edition code.";
+            CardEdition edition = StaticData.instance().getCardEdition(s[0]);
+            if (edition == null) return "Cannot find edition: " + s[0];
+
+            for (CardEdition.EditionEntry entry : edition.getObtainableCards()) {
+                PaperCard card = StaticData.instance().fetchCard(entry.name(), edition.getCode(), entry.collectorNumber());
+
+                if (card != null) {
+                    Current.player().addCard(card.getNoSellVersion(), 4);
+                } else {
+                    System.out.println("Card " + entry.name() + " (" + entry.collectorNumber() + ") does not exist.");
+                }
+            }
+
+            return "Added all cards from: " + edition.getCode();
+        });
+        registerCommand(new String[]{"give", "boosters"}, s -> {
+            if (s.length < 1)
+                return "Command needs at least 1 parameter: Edition code.";
+            CardEdition edition = StaticData.instance().getCardEdition(s[0]);
+            if (edition == null)
+                return "Cannot find edition: " + s[0];
+            if (!edition.hasBoosterTemplate())
+                return edition.getCode() + " doesn't have a booster template.";
+
+            int amount = 1;
+            if (s.length >= 2) {
+                try {
+                    amount = Integer.parseInt(s[1]);
+                } catch (NumberFormatException ignored) {
+                }
+            }
+
+            for (int i = 0; i < amount; i++) {
+                Current.player().addBooster(AdventureEventController.instance().generateBooster(edition.getCode()));
+            }
+
+            return "Added " + amount + " " + edition.getCode() + " booster(s)";
+        });
+        registerCommand(new String[]{"clearnosell"}, s -> {
+            CardPool cards = Current.player().getCards();
+            for (PaperCard c : cards.getFilteredPool(c -> c.getMarkedFlags().noSellValue).toFlatList()) {
+                cards.remove(c);
+            }
+            return "Removed all no-sell flagged cards.";
+        });
+        registerCommand(new String[]{"sanitize", "editions"}, s -> {
+            ConfigData configData = Config.instance().getConfigData();
+            if (configData.allowedEditions == null || configData.allowedEditions.length == 0)
+                return "No allowedEditions configured for this plane.";
+            int replaced = CardUtil.sanitizeCardPool(Current.player().getCards());
+            for (int i = 0; i < Current.player().getDeckCount(); i++) {
+                Deck d = Current.player().getDeck(i);
+                for (java.util.Map.Entry<forge.deck.DeckSection, CardPool> section : d) {
+                    replaced += CardUtil.sanitizeCardPool(section.getValue());
+                }
+            }
+            if (replaced == 0)
+                return "All cards already from allowed editions.";
+            return "Replaced " + replaced + " card(s) with allowed edition printings.";
         });
         registerCommand(new String[]{"give", "item"}, s -> {
             if (s.length < 1) return "Command needs 1 parameter: Item name.";
-            if (Current.player().addItem(s[0])) return "Added item " + s[0] + ".";
+            if (Current.player().addItem(s[0])) {
+                if (s[0].contains("Key"))
+                    GameHUD.getInstance().updateKeys();
+                return "Added item " + s[0] + ".";
+            }
             return "Cannot find item " + s[0];
         });
         registerCommand(new String[]{"fullHeal"}, s -> {
@@ -254,7 +383,7 @@ public class ConsoleCommandInterpreter {
         });
         registerCommand(new String[]{"dumpEnemyDeckColors"}, s -> {
             for (EnemyData E : new Array.ArrayIterator<>(WorldData.getAllEnemies())) {
-                Deck D = E.generateDeck(Current.player().isFantasyMode(), Current.player().isUsingCustomDeck() || Current.player().getDifficulty().name.equalsIgnoreCase("Hard"));
+                Deck D = E.generateDeck(Current.player().isFantasyMode(), Current.player().isUsingCustomDeck() || Current.player().isHardorInsaneDifficulty());
                 DeckProxy DP = new DeckProxy(D, "Constructed", GameType.Constructed, null);
                 ColorSet colorSet = DP.getColor();
                 System.out.printf("%s: Colors: %s (%s%s%s%s%s%s)\n", D.getName(), DP.getColor(),
@@ -270,9 +399,8 @@ public class ConsoleCommandInterpreter {
         });
         registerCommand(new String[]{"dumpEnemyDeckList"}, s -> {
             for (EnemyData E : new Array.ArrayIterator<>(WorldData.getAllEnemies())) {
-                Deck D = E.generateDeck(Current.player().isFantasyMode(), Current.player().isUsingCustomDeck() || Current.player().getDifficulty().name.equalsIgnoreCase("Hard"));
+                Deck D = E.generateDeck(Current.player().isFantasyMode(), Current.player().isUsingCustomDeck() || Current.player().isHardorInsaneDifficulty());
                 DeckProxy DP = new DeckProxy(D, "Constructed", GameType.Constructed, null);
-                ColorSet colorSet = DP.getColor();
                 System.out.printf("Deck: %s\n%s\n\n", D.getName(), DP.getDeck().getMain().toCardList("\n")
                 );
             }
@@ -280,17 +408,16 @@ public class ConsoleCommandInterpreter {
         });
         registerCommand(new String[]{"dumpEnemyColorIdentity"}, s -> {
             for (EnemyData E : new Array.ArrayIterator<>(WorldData.getAllEnemies())) {
-                Deck D = E.generateDeck(Current.player().isFantasyMode(), Current.player().isUsingCustomDeck() || Current.player().getDifficulty().name.equalsIgnoreCase("Hard"));
+                Deck D = E.generateDeck(Current.player().isFantasyMode(), Current.player().isUsingCustomDeck() || Current.player().isHardorInsaneDifficulty());
                 DeckProxy DP = new DeckProxy(D, "Constructed", GameType.Constructed, null);
-                ColorSet colorSet = DP.getColor();
-                System.out.printf("%s Colors: %s | Deck Colors: %s (%s)\n", E.name, E.colors, DP.getColorIdentity().toEnumSet().toString(), DP.getName()
-                );
+                System.out.printf("%s Colors: %s | Deck Colors: %s (%s)%s\n", E.name, E.colors, DP.getColorIdentity().toEnumSet().toString(), DP.getName()
+                        , E.boss ? " - BOSS" : "");
             }
             return "Enemy color Identity dumped to stdout.";
         });
         registerCommand(new String[]{"heal", "amount"}, s -> {
             if (s.length < 1) return "Command needs 1 parameter: Amount";
-            int N = 0;
+            int N;
             try {
                 N = Integer.parseInt(s[0]);
             } catch (Exception e) {
@@ -302,7 +429,7 @@ public class ConsoleCommandInterpreter {
         });
         registerCommand(new String[]{"heal", "percent"}, s -> {
             if (s.length < 1) return "Command needs 1 parameter: Amount";
-            float value = 0;
+            float value;
             try {
                 value = Float.parseFloat(s[0]);
             } catch (Exception e) {
@@ -329,50 +456,54 @@ public class ConsoleCommandInterpreter {
             Current.player().addShards(value);
             return "Player now has " + Current.player().getShards() + " shards";
         });
-        registerCommand(new String[]{"debug","map"}, s -> {
+        registerCommand(new String[]{"debug", "map"}, s -> {
             GameHUD.getInstance().setDebug(true);
             return "Debug map ON";
         });
         registerCommand(new String[]{"debug", "off"}, s -> {
-            GameHUD.getInstance().setDebug(true);
+            GameHUD.getInstance().setDebug(false);
             currentGameStage().debugCollision(false);
-            return "Debug  OFF";
+            return "Debug map and collision OFF";
         });
         registerCommand(new String[]{"remove", "enemy", "all"}, s -> {
-            //TODO: Remove all overworld enemies if not inside a map.
             if (!MapStage.getInstance().isInMap()) {
-                return "Only supported for PoI";
+                WorldStage ws = WorldStage.getInstance();
+                int enemiesCount = ws.enemies.size();
+                for (int i = 0; i < enemiesCount; i++) {
+                    ws.removeNearestEnemy();
+                }
+            } else {
+                MapStage.getInstance().removeAllEnemies();
             }
-            MapStage.getInstance().removeAllEnemies();
-            return "removed all enemies";
+            return "Removed all enemies";
         });
 
         registerCommand(new String[]{"hide"}, s -> {
             if (s.length < 1) return "Command needs 1 parameter: Amount";
-            float value = 0;
+            float value;
             try {
                 value = Float.parseFloat(s[0]);
             } catch (Exception e) {
                 return "Can not convert " + s[0] + " to float";
             }
             currentGameStage().hideFor(value);
-            return "removed all enemies";
+            return "Hiding";
         });
 
         registerCommand(new String[]{"fly"}, s -> {
             if (s.length < 1) return "Command needs 1 parameter: Amount";
-            float value = 0;
+            float value;
             try {
                 value = Float.parseFloat(s[0]);
             } catch (Exception e) {
                 return "Can not convert " + s[0] + " to float";
             }
             currentGameStage().flyFor(value);
-            return "removed all enemies";
+            return "Flying";
         });
         registerCommand(new String[]{"sprint"}, s -> {
             if (s.length < 1) return "Command needs 1 parameter: Amount";
-            float value = 0;
+            float value;
             try {
                 value = Float.parseFloat(s[0]);
             } catch (Exception e) {
@@ -397,6 +528,49 @@ public class ConsoleCommandInterpreter {
                 return "Only supported for PoI";
             MapStage.getInstance().deleteObject(id);
             return "Removed enemy " + s[0];
+        });
+        // this is for test purposes unless you want to crack your items
+        registerCommand(new String[]{"crack"}, s -> {
+            ItemData itemData = Current.player().getRandomEquippedItem();
+            String value = Current.player().isHardorInsaneDifficulty() ? "items" : "armor";
+            String message = "Ok, no equipped " + value + " to crack... :)";
+            if (itemData != null) {
+                itemData.isCracked = true;
+                Current.player().equip(itemData); //Unequipped the itemData
+                InventoryScene.instance().clearItemDescription();
+                message = itemData.name + " " + Forge.getLocalizer().getMessage("lblCracked");
+            }
+            return message;
+        });
+        registerCommand(new String[]{"set", "event"}, s -> {
+            if(s.length < 1) return "Command needs 1 parameter: Block name or edition code. ";
+            String blockName = s[0];
+            if(MapStage.getInstance().findLocalInn() == null)
+                return "Must be used within a town with an inn.";
+            CardBlock eventCardBlock = FModel.getBlocks().find(b -> b.getName().equalsIgnoreCase(blockName));
+            if(eventCardBlock == null) {
+                CardEdition edition = FModel.getMagicDb().getEditions().find(e -> e.getCode().equalsIgnoreCase(blockName) || e.getName().equalsIgnoreCase(blockName));
+                if(edition == null)
+                    return "Unable to find edition or block: " + blockName;
+                eventCardBlock = Aggregates.random(AdventureEventData.getValidDraftBlocks(List.of(edition)));
+                if(eventCardBlock == null)
+                    return "Unable to find a valid event block that exclusively contains edition " + edition.getName();
+            }
+            AdventureEventController.EventFormat eventFormat = s.length > 1 ? AdventureEventController.EventFormat.smartValueOf(s[1])
+                    : eventCardBlock.getName().contains("Jumpstart") ? AdventureEventController.EventFormat.Jumpstart : AdventureEventController.EventFormat.Draft;
+            if(eventFormat == null)
+                return "Unknown event format: " + s[1];
+            InnScene.replaceLocalEvent(eventFormat, eventCardBlock);
+            return "Replaced local event with " + eventFormat.name() + " - " + eventCardBlock.getName();
+        });
+        registerCommand(new String[]{"reset", "map"}, s -> {
+            if(!MapStage.getInstance().isInMap()) {
+                return "Can only be used in maps.";
+            }
+
+            MapStage.getInstance().clearOnExit();
+            
+            return "Exit the map to reset it.";
         });
     }
 }

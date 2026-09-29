@@ -18,7 +18,6 @@ import forge.game.replacement.ReplacementType;
 import forge.game.spellability.SpellAbility;
 import forge.game.trigger.TriggerType;
 import forge.game.zone.ZoneType;
-import forge.util.CardTranslation;
 import forge.util.Lang;
 import forge.util.Localizer;
 
@@ -26,6 +25,11 @@ import java.util.List;
 import java.util.Map;
 
 public class ExploreEffect extends SpellAbilityEffect {
+
+    @Override
+    public boolean movesCardToOrFromLibrary(final SpellAbility sa) {
+        return true;
+    }
 
     /* (non-Javadoc)
      * @see forge.game.ability.SpellAbilityEffect#getStackDescription(forge.game.spellability.SpellAbility)
@@ -82,13 +86,13 @@ public class ExploreEffect extends SpellAbilityEffect {
                         params.put("RevealedCard", r);
                         if (pl.getController().confirmAction(sa, null,
                                 Localizer.getInstance().getMessage("lblPutThisCardToYourGraveyard",
-                                        CardTranslation.getTranslatedName(r.getName())), r, params))
+                                        r.getTranslatedName()), r, params))
                             game.getAction().moveTo(ZoneType.Graveyard, r, sa, moveParams);
                     }
                 }
                 if (!revealedLand) {
                     // need to get newest game state to check if it is still on the battlefield
-                    // and the timestamp didnt change
+                    // and the timestamp didn't change
                     Card gamec = game.getCardState(c);
                     if (gamec.isInPlay() && gamec.equalsWithGameTimestamp(c)) {
                         c.addCounter(CounterEnumType.P1P1, 1, pl, table);
@@ -100,7 +104,7 @@ public class ExploreEffect extends SpellAbilityEffect {
                 final Map<AbilityKey, Object> runParams = AbilityKey.mapFromCard(c);
                 if (!top.isEmpty()) runParams.put(AbilityKey.Explored, top.getFirst());
                 game.getTriggerHandler().runTrigger(TriggerType.Explores, runParams, false);
-                table.replaceCounterEffect(game, sa, true);
+                table.replaceCounterEffect(game, sa);
                 triggerList.triggerChangesZoneAll(game, sa);
             }
         }

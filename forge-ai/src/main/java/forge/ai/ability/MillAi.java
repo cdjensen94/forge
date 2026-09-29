@@ -1,17 +1,8 @@
 package forge.ai.ability;
 
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.List;
-import java.util.Map;
-
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
-
-import forge.ai.ComputerUtil;
-import forge.ai.ComputerUtilCost;
-import forge.ai.SpecialCardAi;
-import forge.ai.SpellAbilityAi;
+import forge.ai.*;
 import forge.game.ability.AbilityUtils;
 import forge.game.card.Card;
 import forge.game.card.CardCollectionView;
@@ -25,20 +16,18 @@ import forge.game.player.PlayerPredicates;
 import forge.game.spellability.SpellAbility;
 import forge.game.zone.ZoneType;
 
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
+
 public class MillAi extends SpellAbilityAi {
 
     @Override
     protected boolean checkAiLogic(final Player ai, final SpellAbility sa, final String aiLogic) {
-        PhaseHandler ph = ai.getGame().getPhaseHandler();
-
-        if (aiLogic.equals("Main1")) {
-            return !ph.getPhase().isBefore(PhaseType.MAIN2) || sa.hasParam("ActivationPhases")
-                    || ComputerUtil.castSpellInMain1(ai, sa);
-        } else if (aiLogic.equals("EndOfOppTurn")) {
-            return ph.is(PhaseType.END_OF_TURN) && ph.getNextTurn().equals(ai);
-        } else if (aiLogic.equals("LilianaMill")) {
+        if (aiLogic.equals("LilianaMill")) {
+            // TODO convert to AICheckSVar
             // Only mill if a "Raise Dead" target is available, in case of control decks with few creatures
-            return CardLists.filter(ai.getCardsIn(ZoneType.Graveyard), CardPredicates.Presets.CREATURES).size() >= 1;
+            return CardLists.filter(ai.getCardsIn(ZoneType.Graveyard), CardPredicates.CREATURES).size() >= 1;
         }
         return true;
     }
@@ -61,11 +50,12 @@ public class MillAi extends SpellAbilityAi {
             // because they are also potentially useful for combat
             return ph.is(PhaseType.END_OF_TURN) && ph.getNextTurn().equals(ai);
         }
-        return true;
+        return !ph.getPhase().isBefore(PhaseType.MAIN2) || sa.hasParam("ActivationPhases")
+                || ComputerUtil.castSpellInMain1(ai, sa);
     }
-    
+
     @Override
-    protected boolean checkApiLogic(final Player ai, final SpellAbility sa) {
+    protected AiAbilityDecision checkApiLogic(final Player ai, final SpellAbility sa) {
         /*
          * TODO:
          * - logic in targetAI looks dodgy
@@ -74,17 +64,15 @@ public class MillAi extends SpellAbilityAi {
          * - check for Laboratory Maniac effect (needs to check for actual
          * effect due to possibility of "lose abilities" effect)
          */
-        if (ComputerUtil.preventRunAwayActivations(sa)) {
-            return false;   // prevents mill 0 infinite loop?
-        }
-        
+
         if (("You".equals(sa.getParam("Defined")) || "Player".equals(sa.getParam("Defined")))
                 && ai.getCardsIn(ZoneType.Library).size() < 10) {
-            return false;   // prevent self and each player mill when library is small
+            // prevent self and each player mill when library is small
+            return new AiAbilityDecision(0, AiPlayDecision.CantPlayAi);
         }
         
         if (sa.usesTargeting() && !targetAI(ai, sa, false)) {
-            return false;
+            return new AiAbilityDecision(0, AiPlayDecision.TargetingFailed);
         }
 
         if (sa.hasParam("NumCards") && (sa.getParam("NumCards").equals("X") || sa.getParam("NumCards").equals("Z"))
@@ -92,9 +80,11 @@ public class MillAi extends SpellAbilityAi {
             // Set PayX here to maximum value.
             final int cardsToDiscard = getNumToDiscard(ai, sa);
             sa.setXManaCostPaid(cardsToDiscard);
-            return cardsToDiscard > 0;
+            if (cardsToDiscard <= 0) {
+                return new AiAbilityDecision(0, AiPlayDecision.CantAffordX);
+            }
         }
-        return true;
+        return new AiAbilityDecision(100, AiPlayDecision.WillPlay);
     }
 
     private boolean targetAI(final Player ai, final SpellAbility sa, final boolean mandatory) {
@@ -159,13 +149,7 @@ public class MillAi extends SpellAbilityAi {
             }
 
             // select Player which would cause the most damage
-            // JAVA 1.8 use Map.Entry.comparingByValue()
-            Map.Entry<Player, Integer> max = Collections.max(list.entrySet(), new Comparator<Map.Entry<Player,Integer>>(){
-                @Override
-                public int compare(Map.Entry<Player, Integer> o1, Map.Entry<Player, Integer> o2) {
-                    return o1.getValue() - o2.getValue();
-                }
-            });
+            Map.Entry<Player, Integer> max = Collections.max(list.entrySet(), Map.Entry.comparingByValue());
 
             sa.getTargets().add(max.getKey());
         }
@@ -173,14 +157,14 @@ public class MillAi extends SpellAbilityAi {
     }
 
     @Override
-    public boolean chkAIDrawback(SpellAbility sa, Player aiPlayer) {
-        return targetAI(aiPlayer, sa, true);
+    public AiAbilityDecision chkDrawback(Player aiPlayer, SpellAbility sa) {
+        return targetAI(aiPlayer, sa, true) ? new AiAbilityDecision(100, AiPlayDecision.WillPlay) : new AiAbilityDecision(0, AiPlayDecision.CantPlayAi);
     }
 
     @Override
-    protected boolean doTriggerAINoCost(Player aiPlayer, SpellAbility sa, boolean mandatory) {
+    protected AiAbilityDecision doTriggerNoCost(Player aiPlayer, SpellAbility sa, boolean mandatory) {
         if (!targetAI(aiPlayer, sa, mandatory)) {
-            return false;
+            return new AiAbilityDecision(0, AiPlayDecision.CantPlayAi);
         }
 
         if (sa.hasParam("NumCards") && (sa.getParam("NumCards").equals("X") && sa.getSVar("X").equals("Count$xPaid"))) {
@@ -188,7 +172,7 @@ public class MillAi extends SpellAbilityAi {
             sa.setXManaCostPaid(getNumToDiscard(aiPlayer, sa));
         }
 
-        return true;
+        return new AiAbilityDecision(100, AiPlayDecision.WillPlay);
     }
     /* (non-Javadoc)
      * @see forge.card.ability.SpellAbilityAi#confirmAction(forge.game.player.Player, forge.card.spellability.SpellAbility, forge.game.player.PlayerActionConfirmMode, java.lang.String)
@@ -224,6 +208,6 @@ public class MillAi extends SpellAbilityAi {
             cardsToDiscard = Math.min(ai.getCardsIn(ZoneType.Library).size() - 5, cardsToDiscard);
         }
 
-        return Math.min(ComputerUtilCost.getMaxXValue(sa, ai, sa.isTrigger()), cardsToDiscard);
+        return Math.min(ComputerUtilCost.setMaxXValue(sa, ai, sa.isTrigger()), cardsToDiscard);
     }
 }

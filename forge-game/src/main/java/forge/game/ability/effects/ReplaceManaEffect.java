@@ -34,14 +34,14 @@ public class ReplaceManaEffect extends SpellAbilityEffect {
             // replace type and amount
             replaced = sa.getParam("ReplaceMana");
             if ("Any".equals(replaced)) {
-                byte rs = player.getController().chooseColor("Choose a color", sa, ColorSet.ALL_COLORS);
+                byte rs = player.getController().chooseColor("Choose a color", sa, ColorSet.WUBRG);
                 replaced = MagicColor.toShortString(rs);
             }
         } else if (sa.hasParam("ReplaceType")) {
             // replace color and colorless
             String color = sa.getParam("ReplaceType");
             if ("Any".equals(color)) {
-                byte rs = player.getController().chooseColor("Choose a color", sa, ColorSet.ALL_COLORS);
+                byte rs = player.getController().chooseColor("Choose a color", sa, ColorSet.WUBRG);
                 color = MagicColor.toShortString(rs);
             } else {
                 // convert in case Color Word used
@@ -72,7 +72,7 @@ public class ReplaceManaEffect extends SpellAbilityEffect {
             }
         } else if (sa.hasParam("ReplaceAmount")) {
             // replace amount = multiples
-            replaced = StringUtils.repeat(replaced, " ", Integer.valueOf(sa.getParam("ReplaceAmount")));
+            replaced = StringUtils.repeat(replaced, " ", Integer.parseInt(sa.getParam("ReplaceAmount")));
         }
         params.put(AbilityKey.Mana, replaced);
         // effect was updated

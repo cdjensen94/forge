@@ -2,7 +2,6 @@
 Code=AFR
 Date=2021-07-23
 Name=Dungeons & Dragons: Adventures in the Forgotten Realms
-Code2=AFR
 Type=Expansion
 ScryfallCode=AFR
 BoosterCovers=5
@@ -12,7 +11,7 @@ FatPackExtraSlots=20 BasicLands, 20 BasicLands+
 
 [cards]
 1 C +2 Mace @Jarel Threat
-2 C Arborea Pegasus @Justyna Gil
+2 C Arborea Pegasus @Justyna Dura
 3 U Blink Dog @Oriana Menendez
 4 M The Book of Exalted Deeds @Daniel Ljunggren
 5 C Celestial Unicorn @Johannes Voss
@@ -66,7 +65,7 @@ FatPackExtraSlots=20 BasicLands, 20 BasicLands+
 53 M Demilich @Daniel Zrom
 54 U Displacer Beast @Bryan Sola
 55 C Djinni Windseer @Livia Prima
-56 R Dragon Turtle @Dan Scott
+56 R Dragon Turtle @Dan Murayama Scott
 57 U Eccentric Apprentice @Campbell White
 58 U Feywild Trickster @Iris Compiet
 59 U Fly @Lie Setiawan
@@ -87,7 +86,7 @@ FatPackExtraSlots=20 BasicLands, 20 BasicLands+
 74 C Silver Raven @Joe Slucher
 75 C Soulknife Spy @Miguel Mercado
 76 U Split the Party @Zoltan Boros
-77 U Sudden Insight @Dan Scott
+77 U Sudden Insight @Dan Murayama Scott
 78 R Tasha's Hideous Laughter @Ilse Gort
 79 U Trickster's Talisman @Sam White
 80 R True Polymorph @Steve Prescott
@@ -175,14 +174,14 @@ FatPackExtraSlots=20 BasicLands, 20 BasicLands+
 162 C Swarming Goblins @Andrew Mar
 163 U Tiger-Tribe Hunter @Grzegorz Rutkowski
 164 C Unexpected Windfall @Alayna Danner
-165 C Valor Singer @Justyna Gil
+165 C Valor Singer @Justyna Dura
 166 R Wish @Ekaterina Burmak
 167 R Xorn @Yigit Koroglu
 168 C You Come to the Gnoll Camp @Billy Christian
 169 U You Find Some Prisoners @Lie Setiawan
 170 U You See a Pair of Goblins @Aaron Miller
 171 R Zalto, Fire Giant Duke @Zezhou Chen
-172 M Zariel, Archduke of Avernus @Heonhwa Choe
+172 M Zariel, Archduke of Avernus @Heonhwa
 173 C Bulette @Jason Kang
 174 C Bull's Strength @Gabor Szikszai
 175 U Choose Your Weapon @Olivier Bernard
@@ -262,7 +261,7 @@ FatPackExtraSlots=20 BasicLands, 20 BasicLands+
 249 C Mimic @Scott Murphy
 250 C Spare Dagger @Khurrum
 251 C Spiked Pit Trap @Deruchenko Alexander
-252 R Treasure Chest @Dan Scott
+252 R Treasure Chest @Dan Murayama Scott
 253 R Cave of the Frost Dragon @Johannes Voss
 254 R Den of the Bugbear @Johannes Voss
 255 R Dungeon Descent @Kasia 'Kafis' Zielińska
@@ -411,7 +410,7 @@ FatPackExtraSlots=20 BasicLands, 20 BasicLands+
 392 M The Deck of Many Things @Volkan Baǵa
 393 R Eye of Vecna @Irina Nordsol
 394 R Hand of Vecna @Irina Nordsol
-395 R Treasure Chest @Dan Scott
+395 R Treasure Chest @Dan Murayama Scott
 
 [buy a box]
 396 R Vorpal Sword @Alessandra Pisano
@@ -425,45 +424,51 @@ FatPackExtraSlots=20 BasicLands, 20 BasicLands+
 402 U Prosperous Innkeeper @Eric Deschamps
 
 [rebalanced]
-A7 U A-Cloister Gargoyle @Mark Zug
-A14 C A-Dwarfhold Champion @Miguel Mercado
-A32 U A-Plate Armor @Martina Pilcerova
-A53 M A-Demilich @Daniel Zrom
-A81 U A-Wizard Class @Marta Nael
-A87 M A-Acererak the Archlich @Andrey Kuzinskiy
-A95 U A-Death-Priest of Myrkul @Lius Lasahido
-A102 C A-Fates' Reversal @Alix Branwyn
-A115 C A-Precipitous Drop @Gabor Szikszai
-A118 C A-Sepulcher Ghoul @Jason A. Engle
-A130 C A-Armory Veteran @Caio Monteiro
-A180 U A-Druid Class @Svetlin Velinov
-A181 M A-Ellywick Tumblestrum @Anna Steinbauer
-A183 C A-Find the Path @Lindsey Look
-A196 R A-Ochre Jelly @Daarken
-A219 U A-Bruenor Battlehammer @Wayne Reynolds
-A231 U A-Shessra, Death's Whisper @Marie Magny
-A233 R A-Sorcerer Class @Alexander Mokhov
-A237 R A-Triumphant Adventurer @Alexander Mokhov
-A255 R A-Dungeon Descent @Kasia 'Kafis' Zielińska
-
-[dungeons]
-S Dungeon of the Mad Mage
-S Lost Mine of Phandelver
-S Tomb of Annihilation
+A-7 U A-Cloister Gargoyle @Mark Zug
+A-9 C A-Dawnbringer Cleric @Lie Setiawan
+A-14 C A-Dwarfhold Champion @Miguel Mercado
+A-32 U A-Plate Armor @Martina Pilcerova
+A-53 M A-Demilich @Daniel Zrom
+A-81 U A-Wizard Class @Marta Nael
+A-87 M A-Acererak the Archlich @Andrey Kuzinskiy
+A-95 U A-Death-Priest of Myrkul @Lius Lasahido
+A-102 C A-Fates' Reversal @Alix Branwyn
+A-115 C A-Precipitous Drop @Gabor Szikszai
+A-118 C A-Sepulcher Ghoul @Jason A. Engle
+A-130 C A-Armory Veteran @Caio Monteiro
+A-180 U A-Druid Class @Svetlin Velinov
+A-181 M A-Ellywick Tumblestrum @Anna Steinbauer
+A-183 C A-Find the Path @Lindsey Look
+A-196 R A-Ochre Jelly @Daarken
+A-219 U A-Bruenor Battlehammer @Wayne Reynolds
+A-226 U A-Krydle of Baldur's Gate @Bryan Sola
+A-231 U A-Shessra, Death's Whisper @Marie Magny
+A-233 R A-Sorcerer Class @Alexander Mokhov
+A-237 R A-Triumphant Adventurer @Alexander Mokhov
+A-255 R A-Dungeon Descent @Kasia 'Kafis' Zielińska
 
 [tokens]
-b_1_1_skeleton
-b_2_1_spider_menace_reach
-b_2_2_zombie
-the_atropal
-boo
-c_a_treasure_sac
-g_2_2_wolf
-guenhwyvar
-icingdeath_frost_tongue
-r_1_1_devil_burn
-r_1_1_goblin
-u_1_1_faerie_dragon_flying
-u_x_x_dog_illusion_cardsinhand
-vecna
-w_3_3_angel_flying
+1 w_3_3_angel_flying @Irina Nordsol
+2 icingdeath_frost_tongue @Kieran Yanner
+3 u_x_x_dog_illusion_cardsinhand @Mark Behm
+4 u_1_1_faerie_dragon_flying @Iris Compiet
+5 the_atropal @Nicholas Gregory
+6 b_1_1_skeleton @Svetlin Velinov
+7 b_2_1_spider_menace_reach @Joe Slucher
+8 vecna @Irina Nordsol
+9 b_2_2_zombie @Artur Treffner
+10 boo @Zoltan Boros
+11 r_1_1_devil_burn @Josh Hass
+12 r_1_1_goblin @Oriana Menendez
+13 guenhwyvar @Brian Valeza
+14 g_2_2_wolf @Daren Bader
+15 c_a_treasure_sac @Dan Murayama Scott
+20 dungeon_of_the_mad_mage
+21 lost_mine_of_phandelver
+22 tomb_of_annihilation
+
+[other]
+16 emblem_ellywick_tumblestrum @Anna Steinbauer
+17 emblem_lolth_spider_queen @Tyler Jacobson
+18 emblem_mordenkainen @Ryan Pancoast
+19 emblem_zariel_archduke_of_avernus @Heonhwa Choe

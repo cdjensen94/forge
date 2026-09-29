@@ -14,50 +14,96 @@ public class Reward {
         Item,
         Life,
         Shards,
-        CardPack
+        CardPack;
+        private final String labelKey = "lbl" + this.name();
+        /**
+         * @return The pre-cached localizer key name (e.g., "lblLife", "lblShards", "lblGold").
+         */
+        public String getLabelKey() {
+            return this.labelKey;
+        }
     }
+
     Type type;
     PaperCard card;
     ItemData item;
     Deck deck;
-    boolean isNoSell;
+    boolean isNoSell, isAutoSell;
     private final int count;
 
     public Reward(ItemData item) {
-        type      = Type.Item;
+        type = Type.Item;
         this.item = item;
-        count     = 1;
+        count = 1;
     }
+
     public Reward(int count) {
-        type       = Type.Gold;
+        type = Type.Gold;
         this.count = count;
     }
+
     public Reward(PaperCard card) {
-        this(card,false);
+        this(card, false);
     }
+
     public Reward(PaperCard card, boolean isNoSell) {
-        type      = Type.Card;
+        type = Type.Card;
         this.card = card;
-        count     = 0;
+        count = 0;
         this.isNoSell = isNoSell;
+        if(isNoSell)
+            this.card = card.getNoSellVersion();
     }
+
     public Reward(Type type, int count) {
-        this.type  = type;
+        this.type = type;
         this.count = count;
     }
+
     public Reward(Deck deck) {
         this(deck, false);
     }
+
     public Reward(Deck deck, boolean isNoSell) {
-        type      = Type.CardPack;
+        type = Type.CardPack;
         this.deck = deck;
-        count     = 0;
+        count = 0;
         this.isNoSell = isNoSell;
+        if(isNoSell)
+            deck.getTags().add("noSell");
+        //Could go through the deck and replace everything in it with the noSellValue version but the tag should
+        //handle that later.
     }
-    public PaperCard getCard() { return card;  }
-    public ItemData getItem()  { return item;  }
-    public Deck getDeck()      { return deck;  }
-    public Type getType()      { return type;  }
-    public int getCount()      { return count; }
-    public boolean isNoSell()      { return isNoSell; }
+
+    public PaperCard getCard() {
+        return card;
+    }
+
+    public ItemData getItem() {
+        return item;
+    }
+
+    public Deck getDeck() {
+        return deck;
+    }
+
+    public Type getType() {
+        return type;
+    }
+
+    public int getCount() {
+        return count;
+    }
+
+    public boolean isNoSell() {
+        return isNoSell;
+    }
+
+    public boolean isAutoSell() {
+        return isAutoSell;
+    }
+
+    public void setAutoSell(boolean val) {
+        isAutoSell = val;
+    }
 }

@@ -17,18 +17,17 @@
  */
 package forge.deck.io;
 
-import java.io.File;
-import java.io.FilenameFilter;
-import java.util.List;
-
-import org.apache.commons.lang3.StringUtils;
-
 import com.google.common.collect.ImmutableList;
-
 import forge.deck.Deck;
+import forge.deck.DeckBase;
 import forge.deck.DeckGroup;
 import forge.util.IItemSerializer;
 import forge.util.storage.StorageReaderFolder;
+import org.apache.commons.lang3.StringUtils;
+
+import java.io.File;
+import java.io.FilenameFilter;
+import java.util.List;
 
 /**
  * TODO: Write javadoc for this type.
@@ -45,7 +44,7 @@ public class DeckGroupSerializer extends StorageReaderFolder<DeckGroup> implemen
      * @param deckDir0 the deck dir0
      */
     public DeckGroupSerializer(final File deckDir0, String rootDir0) {
-        super(deckDir0, DeckGroup.FN_NAME_SELECTOR);
+        super(deckDir0, DeckBase::getName);
         rootDir = rootDir0;
     }
 
@@ -122,16 +121,12 @@ public class DeckGroupSerializer extends StorageReaderFolder<DeckGroup> implemen
      */
     @Override
     protected FilenameFilter getFileFilter() {
-        return new FilenameFilter() {
-
-            @Override
-            public boolean accept(final File dir, final String name) {
-                final File testSubject = new File(dir, name);
-                final boolean isVisibleFolder = testSubject.isDirectory() && !testSubject.isHidden();
-                final boolean hasGoodName = StringUtils.isNotEmpty(name) && !name.startsWith(".");
-                final File fileHumanDeck = new File(testSubject, DeckGroupSerializer.humanDeckFile);
-                return isVisibleFolder && hasGoodName && fileHumanDeck.exists();
-            }
+        return (dir, name) -> {
+            final File testSubject = new File(dir, name);
+            final boolean isVisibleFolder = testSubject.isDirectory() && !testSubject.isHidden();
+            final boolean hasGoodName = StringUtils.isNotEmpty(name) && !name.startsWith(".");
+            final File fileHumanDeck = new File(testSubject, DeckGroupSerializer.humanDeckFile);
+            return isVisibleFolder && hasGoodName && fileHumanDeck.exists();
         };
     }
 

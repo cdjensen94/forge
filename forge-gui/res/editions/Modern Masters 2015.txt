@@ -1,7 +1,7 @@
 [metadata]
-Name=Modern Masters 2015
 Code=MM2
 Date=2015-05-22
+Name=Modern Masters 2015
 Type=Reprint
 BoosterCovers=3
 Booster=11 Common, 3 Uncommon, 1 RareMythic
@@ -106,7 +106,7 @@ ScryfallCode=MM2
 93 U Scavenger Drake @Trevor Claxton
 94 C Scuttling Death @Thomas M. Baxa
 95 C Shrivel @Jung Park
-96 C Sickle Ripper @Dan Scott
+96 C Sickle Ripper @Dan Murayama Scott
 97 C Sign in Blood @Howard Lyon
 98 U Spread the Sickness @Jaime Jones
 99 R Surgical Extraction @Steven Belledin
@@ -141,7 +141,7 @@ ScryfallCode=MM2
 128 U Spitebellows @Larry MacDougall
 129 R Splinter Twin @Goran Josic
 130 U Stormblood Berserker @Min Yum
-131 R Thunderblust @Dan Scott
+131 R Thunderblust @Dan Murayama Scott
 132 C Tribal Flames @Zack Stella
 133 C Viashino Slaughtermaster @Raymond Swanland
 134 R Wildfire @Rob Alexander
@@ -155,7 +155,7 @@ ScryfallCode=MM2
 142 C Commune with Nature @Lars Grant-West
 143 U Cytoplast Root-Kin @Thomas M. Baxa
 144 C Gnarlid Pack @Johann Bodin
-145 U Karplusan Strider @Dan Scott
+145 U Karplusan Strider @Dan Murayama Scott
 146 C Kavu Primarch @Kev Walker
 147 C Kozilek's Predator @Steve Argyle
 148 C Matca Rioters @Steve Argyle
@@ -227,7 +227,7 @@ ScryfallCode=MM2
 214 C Flayer Husk @Igor Kieryluk
 215 C Frogmite @Terese Nielsen
 216 C Glint Hawk Idol @Dave Allsop
-217 C Gust-Skimmer @Dan Scott
+217 C Gust-Skimmer @Dan Murayama Scott
 218 C Kitesail @Cyril Van Der Haegen
 219 R Lodestone Golem @Chris Rahn
 220 R Lodestone Myr @Greg Staples
@@ -262,19 +262,19 @@ ScryfallCode=MM2
 249 U Simic Growth Chamber @John Avon
 
 [tokens]
-c_0_1_eldrazi_spawn_sac
-c_0_1_eldrazi_spawn_sac
-c_0_1_eldrazi_spawn_sac
-w_1_1_soldier
-w_1_1_spirit_flying
-b_1_1_faerie_rogue_flying
-b_0_0_phyrexian_germ
-b_1_1_thrull
-g_3_3_elephant
-g_1_1_insect
-g_1_1_saproling
-g_1_1_snake
-g_2_2_wolf
-bg_1_1_worm
-c_3_3_a_golem
-c_1_1_a_myr
+1 c_0_1_eldrazi_spawn_sac @Aleksi Briclot
+2 c_0_1_eldrazi_spawn_sac @Mark Tedin
+3 c_0_1_eldrazi_spawn_sac @Véronique Meignaud
+4 w_1_1_soldier @Greg Staples
+5 w_1_1_spirit_flying @Mike Sass
+6 b_1_1_faerie_rogue_flying @Dave Allsop
+7 b_0_0_germ @Igor Kieryluk
+8 b_1_1_thrull @Mark Tedin
+9 g_3_3_elephant @Lars Grant-West
+10 g_1_1_insect @Ron Spencer
+11 g_1_1_saproling @Warren Mahy
+12 g_1_1_snake @Austin Hsu
+13 g_2_2_wolf @Daren Bader
+14 bg_1_1_worm @Chuck Lukacs
+15 c_3_3_a_golem @Nic Klein
+16 c_1_1_a_myr @Ryan Pancoast

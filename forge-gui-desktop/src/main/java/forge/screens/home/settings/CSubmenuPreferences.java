@@ -6,15 +6,19 @@ import forge.StaticData;
 import forge.ai.AiProfileUtil;
 import forge.control.FControl.CloseAction;
 import forge.download.AutoUpdater;
-import forge.game.GameLogEntryType;
+import forge.game.GameLogVerbosity;
 import forge.gamemodes.net.server.FServerManager;
 import forge.gui.GuiBase;
 import forge.gui.UiCommand;
+import forge.gui.download.CdnUuidCache;
 import forge.gui.framework.FScreen;
 import forge.gui.framework.ICDoc;
 import forge.localinstance.properties.ForgeConstants;
+import forge.localinstance.properties.ForgeNetPreferences;
 import forge.localinstance.properties.ForgePreferences;
 import forge.localinstance.properties.ForgePreferences.FPref;
+import forge.localinstance.properties.IPreferences;
+import forge.menus.LayoutMenu;
 import forge.model.FModel;
 import forge.player.GamePlayerUtil;
 import forge.screens.deckeditor.CDeckEditorUI;
@@ -26,18 +30,18 @@ import forge.toolbox.FComboBoxPanel;
 import forge.toolbox.FLabel;
 import forge.toolbox.FOptionPane;
 import forge.util.Localizer;
+import forge.view.arcane.PlayArea;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 
 import javax.swing.*;
 import java.awt.*;
-import java.awt.event.ActionEvent;
-import java.awt.event.ActionListener;
 import java.awt.event.ItemEvent;
-import java.awt.event.ItemListener;
 import java.io.File;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Controls the preferences submenu in the home UI.
@@ -53,6 +57,7 @@ public enum CSubmenuPreferences implements ICDoc {
 
     private VSubmenuPreferences view;
     private ForgePreferences prefs;
+    private ForgeNetPreferences netPrefs;
     private boolean updating;
 
     private final List<Pair<JCheckBox, FPref>> lstControls = new ArrayList<>();
@@ -70,63 +75,51 @@ public enum CSubmenuPreferences implements ICDoc {
 
         this.view = VSubmenuPreferences.SINGLETON_INSTANCE;
         this.prefs = FModel.getPreferences();
+        this.netPrefs = FModel.getNetPreferences();
 
         // This updates variable right now and is not standard
-        view.getCbDevMode().addItemListener(new ItemListener() {
-            @Override
-            public void itemStateChanged(final ItemEvent arg0) {
-                if (updating) { return; }
-                // prevent changing DEV_MODE while network game running
-                if (FServerManager.getInstance().isMatchActive()) {
-                    System.out.println(localizer.getMessage("CantChangeDevModeWhileNetworkMath"));
-                    return;
-                }
-
-                final boolean toggle = view.getCbDevMode().isSelected();
-                prefs.setPref(FPref.DEV_MODE_ENABLED, String.valueOf(toggle));
-                ForgePreferences.DEV_MODE = toggle;
-                prefs.save();
+        view.getCbDevMode().addItemListener(arg0 -> {
+            if (updating) { return; }
+            // prevent changing DEV_MODE while network game running
+            if (FServerManager.getInstance().isMatchActive()) {
+                System.out.println(localizer.getMessage("CantChangeDevModeWhileNetworkMath"));
+                return;
             }
+
+            final boolean toggle = view.getCbDevMode().isSelected();
+            prefs.setPref(FPref.DEV_MODE_ENABLED, String.valueOf(toggle));
+            ForgePreferences.DEV_MODE = toggle;
+            prefs.save();
         });
 
         // This updates background track immediately and is not standard
-        view.getCbEnableMusic().addItemListener(new ItemListener() {
-            @Override
-            public void itemStateChanged(final ItemEvent arg0) {
-                if (updating) { return; }
+        view.getCbEnableMusic().addItemListener(arg0 -> {
+            if (updating) { return; }
 
-                final boolean toggle = view.getCbEnableMusic().isSelected();
-                prefs.setPref(FPref.UI_ENABLE_MUSIC, String.valueOf(toggle));
-                prefs.save();
-                SoundSystem.instance.changeBackgroundTrack();
-            }
-        });
-
-        // This updates Experimental Network Option
-        view.getCbUseExperimentalNetworkStream().addItemListener(new ItemListener() {
-            @Override
-            public void itemStateChanged(final ItemEvent arg0) {
-                if (updating) { return; }
-
-                final boolean toggle = view.getCbUseExperimentalNetworkStream().isSelected();
-                GuiBase.enablePropertyConfig(toggle);
-                prefs.setPref(FPref.UI_NETPLAY_COMPAT, String.valueOf(toggle));
-                prefs.save();
-            }
+            final boolean toggle = view.getCbEnableMusic().isSelected();
+            prefs.setPref(FPref.UI_ENABLE_MUSIC, String.valueOf(toggle));
+            prefs.save();
+            SoundSystem.instance.changeBackgroundTrack();
         });
 
         lstControls.clear(); // just in case
         lstControls.add(Pair.of(view.getCbAnte(), FPref.UI_ANTE));
         lstControls.add(Pair.of(view.getCbAnteMatchRarity(), FPref.UI_ANTE_MATCH_RARITY));
-        lstControls.add(Pair.of(view.getCbManaBurn(), FPref.UI_MANABURN));
+        lstControls.add(Pair.of(view.getCbAnteIncludeBasicLands(), FPref.UI_ANTE_INCLUDE_BASIC_LANDS));
+        lstControls.add(Pair.of(view.getCbManaBurn(), FPref.LEGACY_MANABURN));
+        lstControls.add(Pair.of(view.getCbOrderCombatants(), FPref.LEGACY_ORDER_COMBATANTS));
         lstControls.add(Pair.of(view.getCbScaleLarger(), FPref.UI_SCALE_LARGER));
         lstControls.add(Pair.of(view.getCbRenderBlackCardBorders(), FPref.UI_RENDER_BLACK_BORDERS));
+        lstControls.add(Pair.of(view.getCbShowActionableHighlights(), FPref.UI_SHOW_ACTIONABLE_HIGHLIGHTS));
+        lstControls.add(Pair.of(view.getCbShowAutoTapPreview(), FPref.UI_SHOW_AUTOTAP_PREVIEW));
+        lstControls.add(Pair.of(view.getCbShowLinkedExileCards(), FPref.UI_SHOW_LINKED_EXILE_CARDS));
         lstControls.add(Pair.of(view.getCbLargeCardViewers(), FPref.UI_LARGE_CARD_VIEWERS));
         lstControls.add(Pair.of(view.getCbSmallDeckViewer(), FPref.UI_SMALL_DECK_VIEWER));
         lstControls.add(Pair.of(view.getCbRandomArtInPools(), FPref.UI_RANDOM_ART_IN_POOLS));
         lstControls.add(Pair.of(view.getCbEnforceDeckLegality(), FPref.ENFORCE_DECK_LEGALITY));
         lstControls.add(Pair.of(view.getCbPerformanceMode(), FPref.PERFORMANCE_MODE));
         lstControls.add(Pair.of(view.getCbExperimentalRestore(), FPref.MATCH_EXPERIMENTAL_RESTORE));
+        lstControls.add(Pair.of(view.getCbOrderHand(), FPref.UI_ORDER_HAND));
         lstControls.add(Pair.of(view.getCbFilteredHands(), FPref.FILTERED_HANDS));
         lstControls.add(Pair.of(view.getCbCloneImgSource(), FPref.UI_CLONE_MODE_SOURCE));
         lstControls.add(Pair.of(view.getCbRemoveSmall(), FPref.DECKGEN_NOSMALL));
@@ -137,19 +130,18 @@ public enum CSubmenuPreferences implements ICDoc {
         lstControls.add(Pair.of(view.getCbEnableUnknownCards(), FPref.UI_LOAD_UNKNOWN_CARDS));
         lstControls.add(Pair.of(view.getCbEnableNonLegalCards(), FPref.UI_LOAD_NONLEGAL_CARDS));
         lstControls.add(Pair.of(view.getCbAllowCustomCardsDeckConformance(), FPref.ALLOW_CUSTOM_CARDS_IN_DECKS_CONFORMANCE));
-        lstControls.add(Pair.of(view.getCbUseExperimentalNetworkStream(), FPref.UI_NETPLAY_COMPAT));
         lstControls.add(Pair.of(view.getCbImageFetcher(), FPref.UI_ENABLE_ONLINE_IMAGE_FETCHER));
         lstControls.add(Pair.of(view.getCbDisableCardImages(), FPref.UI_DISABLE_CARD_IMAGES));
         lstControls.add(Pair.of(view.getCbDisplayFoil(), FPref.UI_OVERLAY_FOIL_EFFECT));
         lstControls.add(Pair.of(view.getCbRandomFoil(), FPref.UI_RANDOM_FOIL));
         lstControls.add(Pair.of(view.getCbEnableSounds(), FPref.UI_ENABLE_SOUNDS));
         lstControls.add(Pair.of(view.getCbAltSoundSystem(), FPref.UI_ALT_SOUND_SYSTEM));
-        lstControls.add(Pair.of(view.getCbSROptimize(), FPref.UI_SR_OPTIMIZE));
-        lstControls.add(Pair.of(view.getCbUiForTouchScreen(), FPref.UI_FOR_TOUCHSCREN));
+        lstControls.add(Pair.of(view.getCbSROptimize(), FPref.UI_SCREENREADER_OPTIMIZE));
+        lstControls.add(Pair.of(view.getCbUiForTouchScreen(), FPref.UI_TOUCHSCREEN_OPTIMIZE));
         lstControls.add(Pair.of(view.getCbTimedTargOverlay(), FPref.UI_TIMED_TARGETING_OVERLAY_UPDATES));
         lstControls.add(Pair.of(view.getCbCompactMainMenu(), FPref.UI_COMPACT_MAIN_MENU));
         lstControls.add(Pair.of(view.getCbUseSentry(), FPref.USE_SENTRY));
-        lstControls.add(Pair.of(view.getCbPromptFreeBlocks(), FPref.MATCHPREF_PROMPT_FREE_BLOCKS));
+        lstControls.add(Pair.of(view.getCbCheckSnapshot(), FPref.CHECK_SNAPSHOT_AT_STARTUP));
         lstControls.add(Pair.of(view.getCbPauseWhileMinimized(), FPref.UI_PAUSE_WHILE_MINIMIZED));
         lstControls.add(Pair.of(view.getCbWorkshopSyntax(), FPref.DEV_WORKSHOP_SYNTAX));
 
@@ -159,12 +151,11 @@ public enum CSubmenuPreferences implements ICDoc {
         lstControls.add(Pair.of(view.getCbCardTextHideReminder(), FPref.UI_CARD_IMAGE_RENDER_HIDE_REMINDER_TEXT));
         lstControls.add(Pair.of(view.getCbOpenPacksIndiv(), FPref.UI_OPEN_PACKS_INDIV));
         lstControls.add(Pair.of(view.getCbTokensInSeparateRow(), FPref.UI_TOKENS_IN_SEPARATE_ROW));
-        lstControls.add(Pair.of(view.getCbStackCreatures(), FPref.UI_STACK_CREATURES));
+        lstControls.add(Pair.of(view.getCbSeparateCombatStacks(), FPref.UI_SEPARATE_COMBAT_STACKS));
         lstControls.add(Pair.of(view.getCbManaLostPrompt(), FPref.UI_MANA_LOST_PROMPT));
         lstControls.add(Pair.of(view.getCbEscapeEndsTurn(), FPref.UI_ALLOW_ESC_TO_END_TURN));
         lstControls.add(Pair.of(view.getCbDetailedPaymentDesc(), FPref.UI_DETAILED_SPELLDESC_IN_PROMPT));
         lstControls.add(Pair.of(view.getCbGrayText(), FPref.UI_GRAY_INACTIVE_TEXT));
-        lstControls.add(Pair.of(view.getCbPreselectPrevAbOrder(), FPref.UI_PRESELECT_PREVIOUS_ABILITY_ORDER));
         lstControls.add(Pair.of(view.getCbShowStormCount(), FPref.UI_SHOW_STORM_COUNT_IN_PROMPT));
         lstControls.add(Pair.of(view.getCbRemindOnPriority(), FPref.UI_REMIND_ON_PRIORITY));
 
@@ -173,92 +164,41 @@ public enum CSubmenuPreferences implements ICDoc {
         lstControls.add(Pair.of(view.getCbLoadArchivedFormats(), FPref.LOAD_ARCHIVED_FORMATS));
         lstControls.add(Pair.of(view.getCbSmartCardArtSelectionOpt(), FPref.UI_SMART_CARD_ART));
         lstControls.add(Pair.of(view.getCbShowDraftRanking(), FPref.UI_OVERLAY_DRAFT_RANKING));
+        lstControls.add(Pair.of(view.getCbAiPicker(), FPref.UI_ENABLE_AI_PICKER));
 
+        for (final Pair<JCheckBox, FPref> kv : lstControls) {
+          kv.getKey().addItemListener(arg0 -> {
+              if (updating) { return; }
 
-        for(final Pair<JCheckBox, FPref> kv : lstControls) {
-          kv.getKey().addItemListener(new ItemListener() {
-                @Override
-                public void itemStateChanged(final ItemEvent arg0) {
-                    if (updating) { return; }
-
-                    prefs.setPref(kv.getValue(), String.valueOf(kv.getKey().isSelected()));
-                    prefs.save();
-                }
-            });
+              prefs.setPref(kv.getValue(), String.valueOf(kv.getKey().isSelected()));
+              prefs.save();
+          });
         }
 
-        view.getCbSmartCardArtSelectionOpt().addItemListener(new ItemListener() {
-            @Override
-            public void itemStateChanged(final ItemEvent e) {
-                if (updating) { return; }
-                boolean isEnabled = e.getStateChange() == ItemEvent.SELECTED;
-                FModel.getMagicDb().setEnableSmartCardArtSelection(isEnabled);
-            }
+        view.getCbSmartCardArtSelectionOpt().addItemListener(e -> {
+            if (updating) { return; }
+            boolean isEnabled = e.getStateChange() == ItemEvent.SELECTED;
+            FModel.getMagicDb().setEnableSmartCardArtSelection(isEnabled);
         });
 
-        view.getBtnReset().setCommand(new UiCommand() {
-            @Override
-            public void run() {
-                CSubmenuPreferences.this.resetForgeSettingsToDefault();
-            }
-        });
+        view.getBtnReset().setCommand((UiCommand) CSubmenuPreferences.this::resetForgeSettingsToDefault);
 
-        view.getBtnDeleteEditorUI().setCommand(new UiCommand() {
-            @Override
-            public void run() {
-                CSubmenuPreferences.this.resetDeckEditorLayout();
-            }
-        });
+        view.getBtnDeleteEditorUI().setCommand((UiCommand) CSubmenuPreferences.this::resetDeckEditorLayout);
 
-        view.getBtnDeleteWorkshopUI().setCommand(new UiCommand() {
-            @Override
-            public void run() {
-                CSubmenuPreferences.this.resetWorkshopLayout();
-            }
-        });
+        view.getBtnDeleteWorkshopUI().setCommand((UiCommand) CSubmenuPreferences.this::resetWorkshopLayout);
 
-        view.getBtnDeleteMatchUI().setCommand(new UiCommand() {
-            @Override
-            public void run() {
-                CSubmenuPreferences.this.resetMatchScreenLayout();
-            }
-        });
+        view.getBtnDeleteMatchUI().setCommand((UiCommand) CSubmenuPreferences.this::resetMatchScreenLayout);
 
-        view.getBtnUserProfileUI().setCommand(new UiCommand() {
-            @Override
-            public void run() {
-                CSubmenuPreferences.this.openUserProfileDirectory();
-            }
-        });
+        view.getBtnUserProfileUI().setCommand((UiCommand) CSubmenuPreferences.this::openUserProfileDirectory);
 
-        view.getBtnClearImageCache().setCommand(new UiCommand() {
-            @Override
-            public void run() {
-                CSubmenuPreferences.this.clearImageCache();
-            }
-        });
+        view.getBtnClearImageCache().setCommand((UiCommand) CSubmenuPreferences.this::clearImageCache);
 
-        view.getBtnTokenPreviewer().setCommand(new UiCommand() {
-            @Override
-            public void run() {
-                CSubmenuPreferences.this.openTokenPreviewer();
-            }
-        });
+        view.getBtnTokenPreviewer().setCommand((UiCommand) CSubmenuPreferences.this::openTokenPreviewer);
 
-        view.getBtnResetJavaFutureCompatibilityWarnings().setCommand(new UiCommand() {
-            @Override
-            public void run() {
-                prefs.setPref(FPref.DISABLE_DISPLAY_JAVA_8_UPDATE_WARNING, false);
-                prefs.save();
-                FOptionPane.showMessageDialog(localizer.getMessage("CompatibilityWarningsReEnabled"));
-            }
-        });
-
-        view.getBtnContentDirectoryUI().setCommand(new UiCommand() {
-            @Override
-            public void run() {
-                CSubmenuPreferences.this.openContentDirectory();
-            }
+        view.getBtnContentDirectoryUI().setCommand((UiCommand) CSubmenuPreferences.this::openContentDirectory);
+        view.getCbCheckSnapshot().addItemListener(e -> {
+            Singletons.getView().getNavigationBar().setUpdaterVisibility();
+            prefs.save();
         });
 
         initializeGameLogVerbosityComboBox();
@@ -266,24 +206,63 @@ public enum CSubmenuPreferences implements ICDoc {
         initializeDefaultFontSizeComboBox();
         initializeCardArtFormatComboBox();
         initializeCardArtPreference();
+        initializeCardDownloadLanguageComboBox();
         initializeAutoUpdaterComboBox();
+        initializeServerUPnPComboBox();
         initializeMulliganRuleComboBox();
         initializeAiProfilesComboBox();
         initializeAiSideboardingModeComboBox();
+        initializeAiTimeoutComboBox();
         initializeSoundSetsComboBox();
         initializeMusicSetsComboBox();
         initializeStackAdditionsComboBox();
         initializeLandPlayedComboBox();
         initializeColorIdentityCombobox();
         initializeSwitchStatesCombobox();
-        initializeAutoYieldModeComboBox();
+        initializeAutoDecisionModeComboBox();
+        initializeStackGroupPermanentsComboBox();
+        initializeMaxStackDepthComboBox();
         initializeCounterDisplayTypeComboBox();
         initializeCounterDisplayLocationComboBox();
         initializeGraveyardOrderingComboBox();
         initializePlayerNameButton();
+        initializeServerPortButton();
+        initializeAfkTimeoutButton();
         initializeDefaultLanguageComboBox();
+        initializeActionableHighlightColorField();
 
         disableLazyLoading();
+    }
+
+    private void initializeActionableHighlightColorField() {
+        final forge.toolbox.FTextField field = view.getTxtActionableHighlightColor();
+        field.setText(prefs.getPref(FPref.UI_ACTIONABLE_HIGHLIGHT_COLOR));
+        field.addFocusListener(new java.awt.event.FocusAdapter() {
+            @Override public void focusLost(java.awt.event.FocusEvent e) { saveActionableHighlightColor(field); }
+        });
+        field.addActionListener(e -> saveActionableHighlightColor(field));
+    }
+
+    private void saveActionableHighlightColor(forge.toolbox.FTextField field) {
+        if (updating) return;
+        String normalized = normalizeHexColor(field.getText());
+        if (normalized == null) {
+            // Invalid input: revert the field to the persisted value rather than silently keeping garbage.
+            field.setText(prefs.getPref(FPref.UI_ACTIONABLE_HIGHLIGHT_COLOR));
+            return;
+        }
+        field.setText(normalized);
+        prefs.setPref(FPref.UI_ACTIONABLE_HIGHLIGHT_COLOR, normalized);
+        prefs.save();
+    }
+
+    /** Accepts a case-insensitive 6-char RGB hex; returns it uppercased, or
+     *  null when input isn't 6 hex characters. */
+    private static String normalizeHexColor(String raw) {
+        if (raw == null) return null;
+        String s = raw.trim();
+        if (s.length() != 6 || !s.matches("[0-9A-Fa-f]{6}")) return null;
+        return s.toUpperCase();
     }
 
     /* (non-Javadoc)
@@ -299,16 +278,14 @@ public enum CSubmenuPreferences implements ICDoc {
         setPlayerNameButtonText();
         view.getCbDevMode().setSelected(ForgePreferences.DEV_MODE);
         view.getCbEnableMusic().setSelected(prefs.getPrefBoolean(FPref.UI_ENABLE_MUSIC));
-        view.getCbUseExperimentalNetworkStream().setSelected(prefs.getPrefBoolean(FPref.UI_NETPLAY_COMPAT));
 
         for(final Pair<JCheckBox, FPref> kv: lstControls) {
             kv.getKey().setSelected(prefs.getPrefBoolean(kv.getValue()));
         }
+        view.getTxtActionableHighlightColor().setText(prefs.getPref(FPref.UI_ACTIONABLE_HIGHLIGHT_COLOR));
         view.reloadShortcuts();
 
-        SwingUtilities.invokeLater(new Runnable() {
-            @Override public void run() { view.getCbRemoveSmall().requestFocusInWindow(); }
-        });
+        SwingUtilities.invokeLater(() -> view.getCbRemoveSmall().requestFocusInWindow());
 
         updating = false;
     }
@@ -318,7 +295,9 @@ public enum CSubmenuPreferences implements ICDoc {
         if (FOptionPane.showConfirmDialog(userPrompt, localizer.getMessage("TresetForgeSettingsToDefault"))) {
             final ForgePreferences prefs = FModel.getPreferences();
             prefs.reset();
+            netPrefs.reset();
             prefs.save();
+            netPrefs.save();
             update();
             Singletons.getControl().restartForge();
         }
@@ -387,20 +366,24 @@ public enum CSubmenuPreferences implements ICDoc {
 
     private void initializeGameLogVerbosityComboBox() {
         final FPref userSetting = FPref.DEV_LOG_ENTRY_TYPE;
-        final FComboBoxPanel<GameLogEntryType> panel = this.view.getGameLogVerbosityComboBoxPanel();
-        final FComboBox<GameLogEntryType> comboBox = createComboBox(GameLogEntryType.values(), userSetting);
-        final GameLogEntryType selectedItem = GameLogEntryType.valueOf(this.prefs.getPref(userSetting));
+        final FComboBoxPanel<GameLogVerbosity> panel = this.view.getGameLogVerbosityComboBoxPanel();
+        final FComboBox<GameLogVerbosity> comboBox = createComboBox(GameLogVerbosity.values(), userSetting);
+        final GameLogVerbosity selectedItem = GameLogVerbosity.fromString(this.prefs.getPref(userSetting));
         panel.setComboBox(comboBox, selectedItem);
+
+        view.getBtnCustomLogSettings().setCommand(
+                (UiCommand) LayoutMenu::showCustomLogCategoriesDialog);
+        view.getBtnCustomLogSettings().setEnabled(selectedItem == GameLogVerbosity.CUSTOM);
+        comboBox.addItemListener(e -> {
+            view.getBtnCustomLogSettings().setEnabled(
+                    comboBox.getSelectedItem() == GameLogVerbosity.CUSTOM);
+        });
     }
 
     private void initializeCloseActionComboBox() {
         final FComboBoxPanel<CloseAction> panel = this.view.getCloseActionComboBoxPanel();
         final FComboBox<CloseAction> comboBox = new FComboBox<>(CloseAction.values());
-        comboBox.addItemListener(new ItemListener() {
-            @Override public void itemStateChanged(final ItemEvent e) {
-                Singletons.getControl().setCloseAction(comboBox.getSelectedItem());
-            }
-        });
+        comboBox.addItemListener(e -> Singletons.getControl().setCloseAction(comboBox.getSelectedItem()));
         panel.setComboBox(comboBox, Singletons.getControl().getCloseAction());
     }
 
@@ -437,17 +420,78 @@ public enum CSubmenuPreferences implements ICDoc {
         panel.setComboBox(comboBox, selectedItem);
     }
 
+    private void initializeCardDownloadLanguageComboBox() {
+        final Map<String, String> cardLangMapping = ForgeConstants.getScryfallCardLanguageMapping();
+        final String[] localizedOptions = cardLangMapping.keySet().toArray(new String[0]);
+
+        final FPref cardLangPreference = FPref.UI_CARD_DOWNLOAD_LANG;
+
+        final FComboBoxPanel<String> panel = this.view.getCbpCardDownloadLangComboBoxPanel();
+        final FComboBox<String> comboBox = createLocalizedComboBox(localizedOptions, cardLangPreference, cardLangMapping);
+        comboBox.addItemListener(e -> applyPreferredLanguageAvailability());
+
+        final String savedCode = this.prefs.getPref(cardLangPreference);
+        final String selectedDisplayName = cardLangMapping.entrySet().stream()
+                .filter(entry -> entry.getValue().equals(savedCode))
+                .map(Map.Entry::getKey)
+                .findFirst()
+                .orElse("English");
+
+        panel.setComboBox(comboBox, selectedDisplayName);
+
+        final JCheckBox cbPreferLang = this.view.getCbPreferLangForUniqueCards();
+        cbPreferLang.setSelected(this.prefs.getPrefBoolean(FPref.UI_PREFER_LANG_FOR_UNIQUE_CARDS));
+        cbPreferLang.addItemListener(e -> {
+            this.prefs.setPref(FPref.UI_PREFER_LANG_FOR_UNIQUE_CARDS, String.valueOf(cbPreferLang.isSelected()));
+            this.prefs.save();
+            applyPreferredLanguageAvailability();
+        });
+
+        applyPreferredLanguageAvailability();
+    }
+
+    private void applyPreferredLanguageAvailability() {
+        String langCode = this.prefs.getPref(FPref.UI_CARD_DOWNLOAD_LANG);
+        boolean preferForUnique = this.prefs.getPrefBoolean(FPref.UI_PREFER_LANG_FOR_UNIQUE_CARDS);
+        if (!preferForUnique || langCode == null || langCode.isEmpty() || "en".equalsIgnoreCase(langCode)) {
+            FModel.getMagicDb().setPreferredLanguageAvailability(null);
+        } else {
+            FModel.getMagicDb().setPreferredLanguageAvailability((setCode, cn) -> CdnUuidCache.isAvailableInLanguage(setCode, cn, langCode));
+        }
+    }
+
+    private void initializeServerUPnPComboBox() {
+        // Step 1: Define the localized strings and mappings
+        final Map<String, String> upnpPreferenceMapping = ForgeConstants.getUPnPPreferenceMapping();
+        final String[] localizedOptions = upnpPreferenceMapping.keySet().toArray(new String[0]); // Localized strings
+
+        // Step 2: Get the preference key
+        final ForgeNetPreferences.FNetPref uPnPPreference = ForgeNetPreferences.FNetPref.UPnP;
+
+        // Step 3: Create the combo box with localized strings
+        final FComboBoxPanel<String> panel = this.view.getCbpServerUPnPOption();
+        final FComboBox<String> comboBox = createLocalizedComboBox(localizedOptions, uPnPPreference, upnpPreferenceMapping);
+
+        // Step 4: Pre-select the localized value based on the saved internal value
+        final String savedInternalValue = this.netPrefs.getPref(uPnPPreference);
+        final String selectedLocalizedValue = upnpPreferenceMapping.entrySet()
+                .stream()
+                .filter(entry -> entry.getValue().equals(savedInternalValue))
+                .map(Map.Entry::getKey)
+                .findFirst()
+                .orElse(localizer.getMessage("lblAsk")); // Default value
+
+        panel.setComboBox(comboBox, selectedLocalizedValue);
+    }
+
+
     private void initializeMulliganRuleComboBox() {
         final String [] choices = MulliganDefs.getMulliganRuleNames();
         final FPref userSetting = FPref.MULLIGAN_RULE;
         final FComboBoxPanel<String> panel = this.view.getCbpMulliganRule();
         final FComboBox<String> comboBox = createComboBox(choices, userSetting);
         final String selectedItem = this.prefs.getPref(userSetting);
-        comboBox.addItemListener(new ItemListener() {
-            @Override public void itemStateChanged(final ItemEvent e) {
-                StaticData.instance().setMulliganRule(MulliganDefs.GetRuleByName(prefs.getPref(FPref.MULLIGAN_RULE)));
-            }
-        });
+        comboBox.addItemListener(e -> StaticData.instance().setMulliganRule(MulliganDefs.GetRuleByName(prefs.getPref(FPref.MULLIGAN_RULE))));
         panel.setComboBox(comboBox, selectedItem);
     }
 
@@ -483,13 +527,15 @@ public enum CSubmenuPreferences implements ICDoc {
         final FComboBox<String> comboBox = createComboBox(new String[] {"Off", "AI", "Human For AI"}, userSetting);
         final String selectedItem = this.prefs.getPref(userSetting);
         panel.setComboBox(comboBox, selectedItem);
-        comboBox.addActionListener(new ActionListener() {
-            @Override
-            public void actionPerformed(ActionEvent actionEvent) {
-                AiProfileUtil.setAiSideboardingMode(AiProfileUtil.AISideboardingMode.normalizedValueOf(comboBox.getSelectedItem()));
-                System.out.println(AiProfileUtil.getAISideboardingMode());
-            }
-        });
+        comboBox.addActionListener(actionEvent -> AiProfileUtil.setAiSideboardingMode(AiProfileUtil.AISideboardingMode.normalizedValueOf(comboBox.getSelectedItem())));
+    }
+
+    private void initializeAiTimeoutComboBox() {
+        final FPref userSetting = FPref.MATCH_AI_TIMEOUT;
+        final FComboBoxPanel<String> panel = this.view.getAiTimeoutComboBox();
+        final FComboBox<String> comboBox = createComboBox(new String[] {"5", "10", "60", "120", "240", "300", "600"}, userSetting);
+        final String selectedItem = this.prefs.getPref(userSetting);
+        panel.setComboBox(comboBox, selectedItem);
     }
 
     private void initializeSoundSetsComboBox() {
@@ -498,26 +544,18 @@ public enum CSubmenuPreferences implements ICDoc {
         final FComboBox<String> comboBox = createComboBox(SoundSystem.instance.getAvailableSoundSets(), userSetting);
         final String selectedItem = this.prefs.getPref(userSetting);
         panel.setComboBox(comboBox, selectedItem);
-        comboBox.addActionListener(new ActionListener() {
-            @Override
-            public void actionPerformed(ActionEvent actionEvent) {
-                SoundSystem.instance.invalidateSoundCache();
-            }
-        });
+        comboBox.addActionListener(actionEvent -> SoundSystem.instance.invalidateSoundCache());
     }
 
     private void initializeMusicSetsComboBox() {
         final FPref userSetting = FPref.UI_CURRENT_MUSIC_SET;
         final FComboBoxPanel<String> panel = this.view.getMusicSetsComboBoxPanel();
-        final FComboBox<String> comboBox = createComboBox(SoundSystem.instance.getAvailableMusicSets(), userSetting);
+        final FComboBox<String> comboBox = createComboBox(SoundSystem.getAvailableMusicSets(), userSetting);
         final String selectedItem = this.prefs.getPref(userSetting);
         panel.setComboBox(comboBox, selectedItem);
-        comboBox.addActionListener(new ActionListener() {
-            @Override
-            public void actionPerformed(ActionEvent actionEvent) {
-                MusicPlaylist.invalidateMusicPlaylist();
-                SoundSystem.instance.changeBackgroundTrack();
-            }
+        comboBox.addActionListener(actionEvent -> {
+            MusicPlaylist.invalidateMusicPlaylist();
+            SoundSystem.instance.changeBackgroundTrack();
         });
     }
 
@@ -529,18 +567,16 @@ public enum CSubmenuPreferences implements ICDoc {
 
         final FComboBoxPanel<String> panel = this.view.getCbpCardArtPreference();
         final FComboBox<String> comboBox = new FComboBox<>(choices);
-        comboBox.addItemListener(new ItemListener() {
-            @Override public void itemStateChanged(final ItemEvent e) {
-                String artPreference = comboBox.getSelectedItem();
-                if (artPreference == null)
-                    artPreference = latestOpt;  // default, just in case
-                boolean latestArt = artPreference.equalsIgnoreCase(latestOpt);
-                boolean coreExpFilter = FModel.getMagicDb().isCoreExpansionOnlyFilterSet();
-                FModel.getMagicDb().setCardArtPreference(latestArt, coreExpFilter);
-                String preferenceOpt = FModel.getMagicDb().getCardArtPreferenceName();
-                CSubmenuPreferences.this.prefs.setPref(uiPreferredArt, preferenceOpt);
-                CSubmenuPreferences.this.prefs.save();
-            }
+        comboBox.addItemListener(e -> {
+            String artPreference = comboBox.getSelectedItem();
+            if (artPreference == null)
+                artPreference = latestOpt;  // default, just in case
+            boolean latestArt = artPreference.equalsIgnoreCase(latestOpt);
+            boolean coreExpFilter = FModel.getMagicDb().isCoreExpansionOnlyFilterSet();
+            FModel.getMagicDb().setCardArtPreference(latestArt, coreExpFilter);
+            String preferenceOpt = FModel.getMagicDb().getCardArtPreferenceName();
+            CSubmenuPreferences.this.prefs.setPref(uiPreferredArt, preferenceOpt);
+            CSubmenuPreferences.this.prefs.save();
         });
         final String selectedItem = FModel.getMagicDb().cardArtPreferenceIsLatest() ? latestOpt : originalOpt;
         panel.setComboBox(comboBox, selectedItem);
@@ -548,16 +584,13 @@ public enum CSubmenuPreferences implements ICDoc {
         final JCheckBox coreExpFilter = this.view.getCbCardArtCoreExpansionsOnlyOpt();
         boolean selected = FModel.getMagicDb().isCoreExpansionOnlyFilterSet();
         coreExpFilter.setSelected(selected);
-        coreExpFilter.addItemListener(new ItemListener() {
-            @Override
-            public void itemStateChanged(ItemEvent e) {
-                boolean latestArt = FModel.getMagicDb().cardArtPreferenceIsLatest();
-                boolean coreExpFilter = e.getStateChange() == ItemEvent.SELECTED;
-                FModel.getMagicDb().setCardArtPreference(latestArt, coreExpFilter);
-                String preferenceOpt = FModel.getMagicDb().getCardArtPreferenceName();
-                CSubmenuPreferences.this.prefs.setPref(uiPreferredArt, preferenceOpt);
-                CSubmenuPreferences.this.prefs.save();
-            }
+        coreExpFilter.addItemListener(e -> {
+            boolean latestArt = FModel.getMagicDb().cardArtPreferenceIsLatest();
+            boolean coreExpFilter1 = e.getStateChange() == ItemEvent.SELECTED;
+            FModel.getMagicDb().setCardArtPreference(latestArt, coreExpFilter1);
+            String preferenceOpt = FModel.getMagicDb().getCardArtPreferenceName();
+            CSubmenuPreferences.this.prefs.setPref(uiPreferredArt, preferenceOpt);
+            CSubmenuPreferences.this.prefs.save();
         });
     }
 
@@ -602,10 +635,15 @@ public enum CSubmenuPreferences implements ICDoc {
         panel.setComboBox(comboBox, selectedItem);
     }
 
-    private void initializeAutoYieldModeComboBox() {
-        final String[] elems = {ForgeConstants.AUTO_YIELD_PER_ABILITY, ForgeConstants.AUTO_YIELD_PER_CARD};
-        final FPref userSetting = FPref.UI_AUTO_YIELD_MODE;
-        final FComboBoxPanel<String> panel = this.view.getAutoYieldModeComboBoxPanel();
+    private void initializeAutoDecisionModeComboBox() {
+        final String[] elems = {
+            ForgeConstants.AUTO_DECISION_PER_CARD,
+            ForgeConstants.AUTO_DECISION_PER_ABILITY,
+            ForgeConstants.AUTO_DECISION_PER_ABILITY_SESSION,
+            ForgeConstants.AUTO_DECISION_PER_ABILITY_INSTALL,
+        };
+        final FPref userSetting = FPref.UI_AUTO_DECISION_MODE;
+        final FComboBoxPanel<String> panel = this.view.getAutoDecisionModeComboBoxPanel();
         final FComboBox<String> comboBox = createComboBox(elems, userSetting);
         final String selectedItem = this.prefs.getPref(userSetting);
         panel.setComboBox(comboBox, selectedItem);
@@ -618,6 +656,45 @@ public enum CSubmenuPreferences implements ICDoc {
         final FComboBoxPanel<String> panel = this.view.getCbpGraveyardOrdering();
         final FComboBox<String> comboBox = createComboBox(elems, userSetting);
         final String selectedItem = this.prefs.getPref(userSetting);
+        panel.setComboBox(comboBox, selectedItem);
+    }
+
+    private void initializeStackGroupPermanentsComboBox() {
+        final Localizer localizer = Localizer.getInstance();
+        final String[] keys = {"default", "stack", "group_creatures", "group_all"};
+        final String[] labelKeys = {"lblGroupDefault", "lblGroupStack", "lblGroupCreatures", "lblGroupAll"};
+        final Map<String, String> mapping = new LinkedHashMap<>();
+        final String[] labels = new String[keys.length];
+        for (int i = 0; i < keys.length; i++) {
+            labels[i] = localizer.getMessage(labelKeys[i]);
+            mapping.put(labels[i], keys[i]);
+        }
+        final FComboBoxPanel<String> panel = this.view.getCbpStackGroupPermanents();
+        final FComboBox<String> comboBox = createLocalizedComboBox(labels, FPref.UI_GROUP_PERMANENTS, mapping);
+        final String savedValue = this.prefs.getPref(FPref.UI_GROUP_PERMANENTS);
+        final String selectedLabel = mapping.entrySet().stream()
+                .filter(e -> e.getValue().equals(savedValue))
+                .map(Map.Entry::getKey)
+                .findFirst()
+                .orElse(labels[0]);
+        panel.setComboBox(comboBox, selectedLabel);
+    }
+
+    private void initializeMaxStackDepthComboBox() {
+        final Integer[] elems = new Integer[PlayArea.MAX_STACK_DEPTH - PlayArea.MIN_STACK_DEPTH + 1];
+        for (int i = 0; i < elems.length; i++) {
+            elems[i] = PlayArea.MIN_STACK_DEPTH + i;
+        }
+        final FPref userSetting = FPref.UI_MAX_STACK_DEPTH;
+        final FComboBoxPanel<Integer> panel = this.view.getCbpMaxStackDepth();
+        final FComboBox<Integer> comboBox = createComboBox(elems, userSetting);
+        comboBox.setMaximumRowCount(elems.length);
+        Integer selectedItem;
+        try {
+            selectedItem = Integer.valueOf(this.prefs.getPref(userSetting));
+        } catch (NumberFormatException e) {
+            selectedItem = 4;
+        }
         panel.setComboBox(comboBox, selectedItem);
     }
 
@@ -659,20 +736,72 @@ public enum CSubmenuPreferences implements ICDoc {
 
     }
 
-    private <E> FComboBox<E> createComboBox(final E[] items, final ForgePreferences.FPref setting) {
+    private <E> FComboBox<E> createComboBox(final E[] items, final IPreferences.IPref setting) {
         final FComboBox<E> comboBox = new FComboBox<>(items);
         addComboBoxListener(comboBox, setting);
         return comboBox;
     }
 
-    private <E> void addComboBoxListener(final FComboBox<E> comboBox, final ForgePreferences.FPref setting) {
-        comboBox.addItemListener(new ItemListener() {
-            @Override public void itemStateChanged(final ItemEvent e) {
-                final E selectedType = comboBox.getSelectedItem();
-                CSubmenuPreferences.this.prefs.setPref(setting, selectedType.toString());
-                CSubmenuPreferences.this.prefs.save();
+    private <E> FComboBox<E> createLocalizedComboBox(
+            final E[] localizedItems,
+            final IPreferences.IPref setting,
+            final Map<E, String> mapping) {
+
+        //Step 1: Create the combo box
+        final FComboBox<E> comboBox = new FComboBox<>(localizedItems);
+
+        //Step 2: Add a listener using the localized to internal mappings to save internal values based on localized selection
+        addLocalizedComboBoxListener(comboBox, setting, mapping);
+
+        return comboBox;
+    }
+
+
+    private <E> void addComboBoxListener(final FComboBox<E> comboBox, final IPreferences.IPref setting) {
+        comboBox.addItemListener(e -> {
+            final E selectedType = comboBox.getSelectedItem();
+            if (setting instanceof ForgePreferences.FPref) {
+                // Cast setting to ForgePreferences.FPref
+                CSubmenuPreferences.this.prefs.setPref((ForgePreferences.FPref) setting, selectedType.toString());
+            } else if (setting instanceof ForgeNetPreferences.FNetPref) {
+                // Cast setting to ForgeNetPreferences.FNetPref
+                CSubmenuPreferences.this.netPrefs.setPref((ForgeNetPreferences.FNetPref) setting, selectedType.toString());
+            }
+            CSubmenuPreferences.this.prefs.save();
+        });
+    }
+
+    private <E> void addLocalizedComboBoxListener(
+            final FComboBox<E> comboBox,
+            final IPreferences.IPref setting,
+            final Map<E, String> mapping) {
+
+        comboBox.addItemListener(e -> {
+            if (e.getStateChange() == ItemEvent.SELECTED) {
+                final E selectedLocalized = comboBox.getSelectedItem(); // Localized string
+                final String internalValue = mapping.get(selectedLocalized); // Map localized string to internal value
+
+                // Save the mapped internal value to the correct preferences
+                if (setting instanceof ForgePreferences.FPref) {
+                    CSubmenuPreferences.this.prefs.setPref((ForgePreferences.FPref) setting, internalValue);
+                    CSubmenuPreferences.this.prefs.save();
+                } else if (setting instanceof ForgeNetPreferences.FNetPref) {
+                    CSubmenuPreferences.this.netPrefs.setPref((ForgeNetPreferences.FNetPref) setting, internalValue);
+                    CSubmenuPreferences.this.netPrefs.save();
+                }
             }
         });
+    }
+
+    private void initializeServerPortButton() {
+        final FLabel btn = view.getBtnServerPort();
+        setServerPortButtonText();
+        btn.setCommand(getServerPortButtonCommand());
+    }
+    private void setServerPortButtonText() {
+        final FLabel btn = view.getBtnServerPort();
+        final int port = netPrefs.getPrefInt(ForgeNetPreferences.FNetPref.NET_PORT);
+        btn.setText(Integer.toString(port));
     }
 
     private void initializePlayerNameButton() {
@@ -695,11 +824,37 @@ public enum CSubmenuPreferences implements ICDoc {
 
     @SuppressWarnings("serial")
     private UiCommand getPlayerNameButtonCommand() {
-        return new UiCommand() {
-            @Override public void run() {
-                GamePlayerUtil.setPlayerName();
-                setPlayerNameButtonText();
-            }
+        return () -> {
+            GamePlayerUtil.setPlayerName();
+            setPlayerNameButtonText();
+        };
+    }
+
+    private UiCommand getServerPortButtonCommand() {
+        return () -> {
+            GamePlayerUtil.setServerPort();
+            setServerPortButtonText();
+        };
+    }
+
+    private void initializeAfkTimeoutButton() {
+        final FLabel btn = view.getBtnAfkTimeout();
+        setAfkTimeoutButtonText();
+        btn.setCommand(getAfkTimeoutButtonCommand());
+    }
+    private void setAfkTimeoutButtonText() {
+        final FLabel btn = view.getBtnAfkTimeout();
+        final int minutes = netPrefs.getPrefInt(ForgeNetPreferences.FNetPref.NET_AFK_TIMEOUT);
+        if (minutes <= 0) {
+            btn.setText(localizer.getMessage("lblAfkTimeoutDisabled"));
+        } else {
+            btn.setText(minutes + ":00");
+        }
+    }
+    private UiCommand getAfkTimeoutButtonCommand() {
+        return () -> {
+            GamePlayerUtil.setAfkTimeout();
+            setAfkTimeoutButtonText();
         };
     }
 }

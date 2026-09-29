@@ -48,7 +48,7 @@ public final class SResizingUtil {
     /** Minimum cell width. */
     public static final int W_MIN = 100;
     /** Minimum cell height. */
-    public static final int H_MIN = 75;
+    public static final int H_MIN = 50;
 
     private static final MouseListener MAD_RESIZE_X = new MouseAdapter() {
         @Override
@@ -147,9 +147,8 @@ public final class SResizingUtil {
 
         double roughVal = 0;
         int smoothVal = 0;
-        
-        Set<Component> existingComponents = new HashSet<>();
-        existingComponents.addAll(Arrays.asList(pnlContent.getComponents()));
+
+        Set<Component> existingComponents = new HashSet<>(Arrays.asList(pnlContent.getComponents()));
 
         // This is the core of the pixel-perfect layout. To avoid ±1 px errors on borders
         // from rounding individual panels, the intermediate values (exactly accurate, in %)

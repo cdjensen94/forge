@@ -3,12 +3,14 @@ package forge.game.ability.effects;
 import java.util.Map;
 
 import forge.game.card.*;
+import forge.game.replacement.ReplacementType;
 import org.apache.commons.lang3.tuple.Pair;
 
-import com.google.common.base.Functions;
+import com.google.common.collect.HashMultiset;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
+import com.google.common.collect.Multiset;
 
 import forge.game.Game;
 import forge.game.GameEntity;
@@ -19,7 +21,6 @@ import forge.game.player.PlayerController;
 import forge.game.spellability.SpellAbility;
 import forge.game.zone.Zone;
 import forge.game.zone.ZoneType;
-import forge.util.Aggregates;
 import forge.util.Lang;
 import forge.util.Localizer;
 
@@ -67,8 +68,8 @@ public class CountersRemoveEffect extends SpellAbilityEffect {
 
     @Override
     public void resolve(SpellAbility sa) {
-        final Card card = sa.getHostCard();
-        final Game game = card.getGame();
+        final Card source = sa.getHostCard();
+        final Game game = source.getGame();
         final Player activator = sa.getActivatingPlayer();
 
         PlayerController pc = activator.getController();
@@ -77,7 +78,7 @@ public class CountersRemoveEffect extends SpellAbilityEffect {
 
         int cntToRemove = 0;
         if (!num.equals("All") && !num.equals("Any")) {
-            cntToRemove = AbilityUtils.calculateAmount(card, num, sa);
+            cntToRemove = AbilityUtils.calculateAmount(source, num, sa);
         }
 
         if (sa.hasParam("Optional")) {
@@ -102,59 +103,58 @@ public class CountersRemoveEffect extends SpellAbilityEffect {
         boolean rememberAmount = sa.hasParam("RememberAmount");
 
         int totalRemoved = 0;
-
-        for (final Player tgtPlayer : getTargetPlayers(sa)) {
-            if (!tgtPlayer.isInGame()) {
-                continue;
-            }
-            // Removing energy
-            if (type.equals("All")) {
-                for (Map.Entry<CounterType, Integer> e : Lists.newArrayList(tgtPlayer.getCounters().entrySet())) {
-                    tgtPlayer.subtractCounter(e.getKey(), e.getValue(), activator);
-                    totalRemoved += e.getValue();
-                }
-            } else {
-                if (num.equals("All")) {
-                    cntToRemove = tgtPlayer.getCounters(counterType);
-                }
-                if (type.equals("Any")) {
-                    totalRemoved += removeAnyType(tgtPlayer, cntToRemove, sa);
-                } else {
-                    tgtPlayer.subtractCounter(counterType, cntToRemove, activator);
-                    totalRemoved += cntToRemove;
-                }
-            }
-        }
-
-        CardCollectionView srcCards = null;
-
-        String typeforPrompt = counterType == null ? "" : counterType.getName();
-        String title = Localizer.getInstance().getMessage("lblChooseCardsToTakeTargetCounters", typeforPrompt);
-        title = title.replace("  ", " ");
-        if (sa.hasParam("ValidSource")) {
-            srcCards = game.getCardsIn(ZoneType.Battlefield);
-            srcCards = CardLists.getValidCards(srcCards, sa.getParam("ValidSource"), activator, card, sa);
-            if (num.equals("Any")) {
-                Map<String, Object> params = Maps.newHashMap();
-                params.put("CounterType", counterType);
-                srcCards = pc.chooseCardsForEffect(srcCards, sa, title, 0, srcCards.size(), true, params);
-            }
-        } else if (sa.hasParam("Choices") && counterType != null) {
+        CardCollectionView srcCards;
+        if (sa.hasParam("Choices")) {
             ZoneType choiceZone = sa.hasParam("ChoiceZone") ? ZoneType.smartValueOf(sa.getParam("ChoiceZone"))
                     : ZoneType.Battlefield;
+            srcCards = CardLists.getValidCards(game.getCardsIn(choiceZone), sa.getParam("Choices"), activator, source, sa);
+        } else {
+            srcCards = getTargetCards(sa);
+        }
+        if (sa.isReplacementAbility() && sa.getReplacementEffect().getMode() == ReplacementType.Moved) {
+            srcCards = new CardCollection(srcCards).filter(c -> !c.isInPlay() || sa.getLastStateBattlefield().contains(c));
+        }
 
-            CardCollection choices = CardLists.getValidCards(game.getCardsIn(choiceZone), sa.getParam("Choices"),
-                    activator, card, sa);
-
+        if (sa.hasParam("Choices")) {
             int min = 1;
             int max = 1;
             if (sa.hasParam("ChoiceOptional")) {
                 min = 0;
-                max = choices.size();
+                max = srcCards.size();
             }
-            srcCards = pc.chooseCardsForEffect(choices, sa, title, min, max, min == 0, null);
+            if (sa.hasParam("ChoiceNum")) {
+                min = max = AbilityUtils.calculateAmount(source, sa.getParam("ChoiceNum"), sa);
+            }
+            if (srcCards.size() < min) {
+                return;
+            }
+
+            String typeforPrompt = counterType == null ? "" : counterType.getName();
+            String title = Localizer.getInstance().getMessage("lblChooseCardsToTakeTargetCounters", typeforPrompt);
+            title = title.replace("  ", " ");
+            Map<String, Object> params = Maps.newHashMap();
+            params.put("CounterType", counterType);
+            srcCards = pc.chooseCardsForEffect(srcCards, sa, title, min, max, min == 0, params);
         } else {
-            srcCards = getTargetCards(sa);
+            for (final Player tgtPlayer : getTargetPlayers(sa)) {
+                if (!tgtPlayer.isInGame()) {
+                    continue;
+                }
+                if (type.equals("All")) {
+                    for (Multiset.Entry<CounterType> e : Lists.newArrayList(tgtPlayer.getCounters().entrySet())) {
+                        totalRemoved += tgtPlayer.subtractCounter(e.getElement(), e.getCount(), activator);
+                    }
+                } else {
+                    if (num.equals("All")) {
+                        cntToRemove = tgtPlayer.getCounters(counterType);
+                    }
+                    if (type.equals("Any")) {
+                        totalRemoved += removeAnyType(tgtPlayer, cntToRemove, sa);
+                    } else {
+                        totalRemoved += tgtPlayer.subtractCounter(counterType, cntToRemove, activator);
+                    }
+                }
+            }
         }
 
         for (final Card tgtCard : srcCards) {
@@ -165,77 +165,94 @@ public class CountersRemoveEffect extends SpellAbilityEffect {
             if (gameCard == null || !tgtCard.equalsWithGameTimestamp(gameCard)) {
                 continue;
             }
+
             final Zone zone = game.getZoneOf(gameCard);
             if (type.equals("All")) {
-                for (Map.Entry<CounterType, Integer> e : Lists.newArrayList(gameCard.getCounters().entrySet())) {
-                    gameCard.subtractCounter(e.getKey(), e.getValue(), activator);
-                    totalRemoved += e.getValue();
+                for (Multiset.Entry<CounterType> e : Lists.newArrayList(gameCard.getCounters().entrySet())) {
+                    totalRemoved += gameCard.subtractCounter(e.getElement(), e.getCount(), activator);
                 }
                 game.updateLastStateForCard(gameCard);
-                continue;
-            } else if (num.equals("All") || num.equals("Any")) {
-                cntToRemove = gameCard.getCounters(counterType);
-            }
-
-            if (type.equals("Any")) {
+            } else if (type.equals("Any")) {
                 totalRemoved += removeAnyType(gameCard, cntToRemove, sa);
             } else {
-                cntToRemove = Math.min(cntToRemove, gameCard.getCounters(counterType));
-
-                if (zone.is(ZoneType.Battlefield) || zone.is(ZoneType.Exile)) {
-                    if (sa.hasParam("UpTo") || num.equals("Any")) {
-                        Map<String, Object> params = Maps.newHashMap();
-                        params.put("Target", gameCard);
-                        params.put("CounterType", counterType);
-                        title = Localizer.getInstance().getMessage("lblSelectRemoveCountersNumberOfTarget", type);
-                        cntToRemove = pc.chooseNumber(sa, title, 0, cntToRemove, params);
-                    }
+                if (!gameCard.canRemoveCounters(counterType)) {
+                    continue;
                 }
-                if (cntToRemove > 0) {
-                    gameCard.subtractCounter(counterType, cntToRemove, activator);
+
+                int removeFromCard = cntToRemove;
+                if (num.equals("All") || num.equals("Any")) {
+                    removeFromCard = gameCard.getCounters(counterType);
+                } else {
+                    if (sa.hasParam("CounterNumShared")) {
+                        removeFromCard -= totalRemoved;
+                        if (removeFromCard < 1) {
+                            break;
+                        }
+                    }
+                    removeFromCard = Math.min(removeFromCard, gameCard.getCounters(counterType));
+                }
+
+                if ((zone.is(ZoneType.Battlefield) || zone.is(ZoneType.Exile)) &&
+                        (sa.hasParam("UpTo") || num.equals("Any"))) {
+                    Map<String, Object> params = Maps.newHashMap();
+                    params.put("Target", gameCard);
+                    params.put("CounterType", counterType);
+                    removeFromCard = pc.chooseNumber(sa, Localizer.getInstance().getMessage("lblSelectRemoveCountersNumberOfTarget", type), 0, removeFromCard, params);
+                }
+                if (removeFromCard > 0) {
+                    gameCard.subtractCounter(counterType, removeFromCard, activator);
                     if (rememberRemoved) {
-                        for (int i = 0; i < cntToRemove; i++) {
+                        for (int i = 0; i < removeFromCard; i++) {
                             // TODO might need to be more specific
-                            card.addRemembered(Pair.of(counterType, i));
+                            source.addRemembered(Pair.of(counterType, i));
                         }
                     }
                     game.updateLastStateForCard(gameCard);
 
-                    totalRemoved += cntToRemove;
+                    totalRemoved += removeFromCard;
                 }
             }
         }
 
         if (totalRemoved > 0 && rememberAmount) {
             // TODO use SpellAbility Remember later
-            card.addRemembered(Integer.valueOf(totalRemoved));
+            source.addRemembered(totalRemoved);
         }
     }
 
     protected int removeAnyType(GameEntity entity, int cntToRemove, SpellAbility sa) {
         boolean rememberRemoved = sa.hasParam("RememberRemoved");
         int removed = 0;
+        boolean upTo = sa.hasParam("UpTo");
+        if ("Any".equals(sa.getParam("CounterNum"))) {
+            cntToRemove = Integer.MAX_VALUE;
+            upTo = true;
+        }
 
-        final Card card = sa.getHostCard();
-        final Game game = card.getGame();
+        final Card source = sa.getHostCard();
+        final Game game = source.getGame();
         final Player activator = sa.getActivatingPlayer();
         final PlayerController pc = activator.getController();
-        final Map<CounterType, Integer> tgtCounters = Maps.newHashMap(entity.getCounters());
+        final Multiset<CounterType> tgtCounters = HashMultiset.create(entity.getCounters());
+        for (CounterType ct : ImmutableList.copyOf(tgtCounters.elementSet())) {
+            if (!entity.canRemoveCounters(ct)) {
+                tgtCounters.remove(ct);
+            }
+        }
 
         while (cntToRemove > 0 && !tgtCounters.isEmpty()) {
             Map<String, Object> params = Maps.newHashMap();
             params.put("Target", entity);
 
             String prompt = Localizer.getInstance().getMessage("lblSelectCountersTypeToRemove");
-            CounterType chosenType = pc.chooseCounterType(
-                    ImmutableList.copyOf(tgtCounters.keySet()), sa, prompt, params);
+            CounterType chosenType = pc.chooseCounterType(ImmutableList.copyOf(tgtCounters.elementSet()), sa, prompt, params);
 
-            int max = Math.min(cntToRemove, tgtCounters.get(chosenType));
+            int max = Math.min(cntToRemove, tgtCounters.count(chosenType));
             // remove selection so player can't cheat additional trigger by choosing the same type multiple times
             tgtCounters.remove(chosenType);
-            int remaining = Aggregates.sum(tgtCounters.values(), Functions.identity());
+            int remaining = tgtCounters.size();
             // player must choose enough so he can still reach the amount with other types
-            int min = sa.hasParam("UpTo") ? 0 : Math.max(1, max - remaining);
+            int min = upTo ? 0 : Math.max(1, max - remaining);
             prompt = Localizer.getInstance().getMessage("lblSelectRemoveCountersNumberOfTarget", chosenType.getName());
             params = Maps.newHashMap();
             params.put("Target", entity);
@@ -245,18 +262,17 @@ public class CountersRemoveEffect extends SpellAbilityEffect {
             if (chosenAmount > 0) {
                 removed += chosenAmount;
                 entity.subtractCounter(chosenType, chosenAmount, activator);
-                if (entity instanceof Card) {
-                    Card gameCard = (Card) entity;
+                if (entity instanceof Card gameCard) {
                     game.updateLastStateForCard(gameCard);
                 }
 
                 if (rememberRemoved) {
                     for (int i = 0; i < chosenAmount; i++) {
-                        card.addRemembered(Pair.of(chosenType, i));
+                        source.addRemembered(Pair.of(chosenType, i));
                     }
                 }
                 cntToRemove -= chosenAmount;
-            } else if (sa.hasParam("UpTo")) {
+            } else if (upTo) {
                 break;
             }
         }

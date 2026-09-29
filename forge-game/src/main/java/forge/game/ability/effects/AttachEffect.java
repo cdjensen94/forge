@@ -1,9 +1,9 @@
 package forge.game.ability.effects;
 
-
 import java.util.List;
 import java.util.Map;
 
+import com.google.common.collect.Iterables;
 import forge.game.Game;
 import forge.game.GameActionUtil;
 import forge.game.GameEntity;
@@ -20,12 +20,10 @@ import forge.game.card.CardPredicates;
 import forge.game.player.Player;
 import forge.game.spellability.SpellAbility;
 import forge.game.zone.ZoneType;
-import forge.util.CardTranslation;
 import forge.util.Lang;
 import forge.util.Localizer;
 import forge.util.collect.FCollection;
 
-import com.google.common.collect.Iterables;
 import com.google.common.collect.Maps;
 
 public class AttachEffect extends SpellAbilityEffect {
@@ -124,8 +122,8 @@ public class AttachEffect extends SpellAbilityEffect {
             return;
         }
         String attachToName;
-        if (attachTo instanceof Card) {
-            attachToName = CardTranslation.getTranslatedName(((Card)attachTo).getName());
+        if (attachTo instanceof Card c) {
+            attachToName = c.getTranslatedName();
         } else {
             attachToName = attachTo.toString();
         }
@@ -142,8 +140,8 @@ public class AttachEffect extends SpellAbilityEffect {
                 continue;
             }
 
-            String message = Localizer.getInstance().getMessage("lblDoYouWantAttachSourceToTarget", CardTranslation.getTranslatedName(attachment.getName()), attachToName);
-            if (sa.hasParam("Optional") && !activator.getController().confirmAction(sa, null, message, null))
+            String message = Localizer.getInstance().getMessage("lblDoYouWantAttachSourceToTarget", attachment.getTranslatedName(), attachToName);
+            if (sa.hasParam("Optional") && !chooser.getController().confirmAction(sa, null, message, null))
             // TODO add params for message
                 continue;
 

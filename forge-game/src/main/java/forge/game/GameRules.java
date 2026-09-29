@@ -6,14 +6,18 @@ import java.util.Set;
 public class GameRules {
     private final GameType gameType;
     private boolean manaBurn;
+    private boolean orderCombatants;
     private int poisonCountersToLose = 10; // is commonly 10, but turns into 15 for 2HG
     private int gamesPerMatch = 3;
     private int gamesToWinMatch = 2;
     private boolean playForAnte = false;
     private boolean matchAnteRarity = false;
+    private boolean anteIncludeBasicLands = false;
     private boolean AISideboardingEnabled = false;
     private boolean sideboardForAI = false;
+    private boolean allowCheatShuffle = false;
     private final Set<GameType> appliedVariants = EnumSet.noneOf(GameType.class);
+    private int simTimeout = 120;
 
     // it's a preference, not rule... but I could hardly find a better place for it
     private boolean useGrayText;
@@ -32,15 +36,20 @@ public class GameRules {
     public boolean hasManaBurn() {
         return manaBurn;
     }
-
     public void setManaBurn(final boolean manaBurn) {
         this.manaBurn = manaBurn;
+    }
+
+    public boolean hasOrderCombatants() {
+        return orderCombatants;
+    }
+    public void setOrderCombatants(final boolean ordered) {
+        this.orderCombatants = ordered;
     }
 
     public int getPoisonCountersToLose() {
         return poisonCountersToLose;
     }
-
     public void setPoisonCountersToLose(final int amount) {
         this.poisonCountersToLose = amount;
     }
@@ -48,7 +57,6 @@ public class GameRules {
     public int getGamesPerMatch() {
         return gamesPerMatch;
     }
-
     public void setGamesPerMatch(final int gamesPerMatch) {
         this.gamesPerMatch = gamesPerMatch;
         this.gamesToWinMatch = gamesPerMatch / 2 + 1;
@@ -57,7 +65,6 @@ public class GameRules {
     public boolean useAnte() {
         return playForAnte;
     }
-
     public void setPlayForAnte(final boolean useAnte) {
         this.playForAnte = useAnte;
     }
@@ -65,15 +72,20 @@ public class GameRules {
     public boolean getMatchAnteRarity() {
         return matchAnteRarity;
     }
-
     public void setMatchAnteRarity(final boolean matchRarity) {
         matchAnteRarity = matchRarity;
+    }
+
+    public boolean getAnteIncludeBasicLands() {
+        return anteIncludeBasicLands;
+    }
+    public void setAnteIncludeBasicLands(final boolean includeBasicLands) {
+        anteIncludeBasicLands = includeBasicLands;
     }
 
     public boolean getSideboardForAI() {
         return sideboardForAI;
     }
-
     public void setSideboardForAI(final boolean sideboard) {
         sideboardForAI = sideboard;
     }
@@ -81,9 +93,15 @@ public class GameRules {
     public boolean getAISideboardingEnabled() {
         return AISideboardingEnabled;
     }
-
     public void setAISideboardingEnabled(final boolean aiSideboarding) {
         AISideboardingEnabled = aiSideboarding;
+    }
+
+    public boolean isAllowCheatShuffle() {
+        return allowCheatShuffle;
+    }
+    public void setAllowCheatShuffle(boolean allowCheatShuffle) {
+        this.allowCheatShuffle = allowCheatShuffle;
     }
 
     public int getGamesToWinMatch() {
@@ -93,6 +111,10 @@ public class GameRules {
     public void setAppliedVariants(final Set<GameType> appliedVariants) {
         if (appliedVariants != null && !appliedVariants.isEmpty())
             this.appliedVariants.addAll(appliedVariants);
+    }
+
+    public void addAppliedVariant(final GameType variant) {
+        this.appliedVariants.add(variant);
     }
 
     public boolean hasAppliedVariant(final GameType variant) {
@@ -118,5 +140,13 @@ public class GameRules {
     }
     public void setWarnAboutAICards(final boolean warnAboutAICards) {
         this.warnAboutAICards = warnAboutAICards;
+    }
+
+    public int getSimTimeout() {
+        return this.simTimeout;
+    }
+
+    public void setSimTimeout(final int duration) {
+        this.simTimeout = duration;
     }
 }

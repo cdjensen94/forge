@@ -22,8 +22,6 @@ import java.awt.Rectangle;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.awt.event.MouseMotionListener;
-import java.awt.event.MouseWheelEvent;
-import java.awt.event.MouseWheelListener;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -101,13 +99,10 @@ public abstract class CardPanelContainer extends SkinnedPanel {
     }
 
     private void setupMouseWheelListener() {
-        this.addMouseWheelListener(new MouseWheelListener() {
-            @Override
-            public void mouseWheelMoved(final MouseWheelEvent e) {
-                final CardPanel hitPanel = getCardPanel(e.getX(), e.getY());
-                if (hitPanel != null && e.getWheelRotation() < 0) {
-                    mouseWheelZoom(hitPanel.getCard());
-                }
+        this.addMouseWheelListener(e -> {
+            final CardPanel hitPanel = getCardPanel(e.getX(), e.getY());
+            if (hitPanel != null && e.getWheelRotation() < 0) {
+                mouseWheelZoom(hitPanel.getCard());
             }
         });
     }
@@ -164,6 +159,7 @@ public abstract class CardPanelContainer extends SkinnedPanel {
 
                 final CardPanel panel = getCardPanel(evt.getX(), evt.getY());
                 if (panel != null && mouseDownPanel == panel) {
+                    getMatchUI().setLastClickedCardPanel(panel);
                     if (SwingUtilities.isLeftMouseButton(evt)) {
                         mouseLeftClicked(panel, evt);
                     } else if (SwingUtilities.isRightMouseButton(evt)) {
@@ -283,7 +279,7 @@ public abstract class CardPanelContainer extends SkinnedPanel {
 
     public final CardPanel getCardPanel(final int gameCardID) {
         for (final CardPanel panel : this.getCardPanels()) {
-            if (panel.getCard().getId() == gameCardID) {
+            if (panel.getCard() != null && panel.getCard().getId() == gameCardID) {
                 return panel;
             }
         }

@@ -17,23 +17,24 @@
  */
 package forge.gamemodes.limited;
 
-import java.util.ArrayList;
-import java.util.List;
-
-import org.apache.commons.lang3.StringUtils;
-import org.apache.commons.lang3.tuple.ImmutablePair;
-import org.apache.commons.lang3.tuple.Pair;
-
 import forge.card.CardEdition;
+import forge.deck.CardPool;
 import forge.deck.Deck;
 import forge.deck.DeckBase;
+import forge.deck.DeckSection;
 import forge.item.PaperCard;
-import forge.item.SealedProduct;
+import forge.item.SealedTemplate;
 import forge.model.FModel;
 import forge.util.FileSection;
 import forge.util.ItemPool;
 import forge.util.TextUtil;
 import forge.util.storage.IStorage;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.tuple.ImmutablePair;
+import org.apache.commons.lang3.tuple.Pair;
+
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * <p>
@@ -44,7 +45,7 @@ import forge.util.storage.IStorage;
  * @version $Id$
  */
 public class CustomLimited extends DeckBase {
-    private final SealedProduct.Template tpl;
+    private final SealedTemplate tpl;
 
     /**
      * TODO: Write javadoc for Constructor.
@@ -57,13 +58,15 @@ public class CustomLimited extends DeckBase {
         CardEdition edition = CardEdition.Predicates.getRandomSetWithAllBasicLands(FModel.getMagicDb().getEditions());
         if(edition!=null)//can be null on lazy loading, probably does not work correctly then
             landSetCode=edition.getCode();
-        tpl = new SealedProduct.Template(slots);
+        tpl = new SealedTemplate(slots);
     }
 
     private static final long serialVersionUID = 7435640939026612173L;
 
     /** The Num packs. */
     private int numPacks = 3;
+
+    private int numPlayers = 8;
 
     private transient ItemPool<PaperCard> cardPool;
 
@@ -110,15 +113,25 @@ public class CustomLimited extends DeckBase {
                 slots.add(ImmutablePair.of(kv[1], Integer.parseInt(kv[0])));
             }
         } else
-            slots = SealedProduct.Template.genericDraftBooster.getSlots();
+            slots = SealedTemplate.genericDraftBooster.getSlots();
 
         final CustomLimited cd = new CustomLimited(data.get("Name"), slots);
         cd.landSetCode = data.get("LandSetCode");
         cd.numPacks = data.getInt("NumPacks");
         cd.singleton = data.getBoolean("Singleton");
+        cd.numPlayers = data.getInt("NumPlayers");
         cd.customRankingsFile = data.get("CustomRankings", "rankings_cubecobra.txt");
         final Deck deckCube = cubes.get(data.get("DeckFile"));
-        cd.cardPool = deckCube == null ? ItemPool.createFrom(FModel.getMagicDb().getCommonCards().getUniqueCards(), PaperCard.class) : deckCube.getMain();
+        if (deckCube == null) {
+            cd.cardPool = ItemPool.createFrom(FModel.getMagicDb().getCommonCards().getUniqueCards(), PaperCard.class);
+        } else {
+            // Include conspiracy cards (e.g. Backup Plan) in the draft pool alongside regular cards
+            CardPool pool = new CardPool(deckCube.getMain());
+            if (deckCube.has(DeckSection.Conspiracy)) {
+                pool.addAll(deckCube.get(DeckSection.Conspiracy));
+            }
+            cd.cardPool = pool;
+        }
 
         return cd;
     }
@@ -143,6 +156,25 @@ public class CustomLimited extends DeckBase {
     }
 
     /**
+     * Gets the num players.
+     * 
+     * @return the numPlayers
+     */
+    public int getNumPlayers() {
+        return this.numPlayers;
+    }
+
+    /**
+     * Sets the num players.
+     * 
+     * @param numPlayersIn
+     *            the numPlayers to set
+     */
+    public void setNumPlayers(final int numPlayersIn) {
+        this.numPlayers = numPlayersIn;
+    }
+
+    /**
      * Gets the land set code.
      * 
      * @return the landSetCode
@@ -160,6 +192,14 @@ public class CustomLimited extends DeckBase {
         return this.cardPool;
     }
 
+    /**
+     * Sets the card pool.
+     *
+     * @param cardPoolIn
+     *            the cardPool to set
+     */
+    public void setCardPool(CardPool cardPoolIn) { this.cardPool = cardPoolIn; }
+
     /*
      * (non-Javadoc)
      * 
@@ -172,9 +212,9 @@ public class CustomLimited extends DeckBase {
 
     /**
      * TODO: Write javadoc for this method.
-     * @return SealedProduct.Template
+     * @return SealedTemplate
      */
-    public SealedProduct.Template getSealedProductTemplate() {
+    public SealedTemplate getSealedProductTemplate() {
         return tpl;
     }
 
@@ -182,8 +222,18 @@ public class CustomLimited extends DeckBase {
         return singleton;
     }
 
+    public void setSingleton(boolean bIn) { this.singleton = bIn; }
+
     public String getCustomRankingsFileName() {
         return customRankingsFile;
+    }
+
+    public void setCustomRankingsFile(String fileName) {
+        if (fileName == null) {
+            // Default to a known fileName if none is specified
+            fileName = "rankings_cubecobra.txt";
+        }
+        this.customRankingsFile = fileName;
     }
 
     @Override

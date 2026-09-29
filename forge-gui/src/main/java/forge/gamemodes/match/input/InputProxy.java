@@ -17,12 +17,6 @@
  */
 package forge.gamemodes.match.input;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Observable;
-import java.util.Observer;
-import java.util.concurrent.atomic.AtomicReference;
-
 import forge.game.card.Card;
 import forge.game.card.CardView;
 import forge.game.player.Player;
@@ -31,6 +25,12 @@ import forge.game.spellability.SpellAbility;
 import forge.gui.FThreads;
 import forge.player.PlayerControllerHuman;
 import forge.util.ITriggerEvent;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Observable;
+import java.util.Observer;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * <p>
@@ -64,14 +64,11 @@ public class InputProxy implements Observer {
         if (!(nextInput instanceof InputLockUI)) {
             controller.getGui().setCurrentPlayer(nextInput.getOwner());
         }
-        final Runnable showMessage = new Runnable() {
-            @Override
-            public void run() {
-                Input current = getInput(); 
-                controller.getInputQueue().syncPoint();
-                //System.out.printf("\t%s > showMessage @ %s/%s during %s%n", FThreads.debugGetCurrThreadId(), nextInput.getClass().getSimpleName(), current.getClass().getSimpleName(), game.getPhaseHandler().debugPrintState());
-                current.showMessageInitial(); 
-            }
+        final Runnable showMessage = () -> {
+            Input current = getInput();
+            controller.getInputQueue().syncPoint();
+            //System.out.printf("\t%s > showMessage @ %s/%s during %s%n", FThreads.debugGetCurrThreadId(), nextInput.getClass().getSimpleName(), current.getClass().getSimpleName(), game.getPhaseHandler().debugPrintState());
+            current.showMessageInitial();
         };
         FThreads.invokeInEdtLater(showMessage);
     }
@@ -147,13 +144,14 @@ public class InputProxy implements Observer {
         return false;
     }
 
-    public final void selectAbility(final SpellAbility sa) {
+    public final boolean selectAbility(final SpellAbility sa) {
         final Input inp = getInput();
         if (inp != null) {
             if (sa != null) {
-                inp.selectAbility(sa);
+                return inp.selectAbility(sa);
             }
         }
+        return false;
     }
 
     public final void alphaStrike() {

@@ -2,7 +2,6 @@
 Code=C16
 Date=2016-11-11
 Name=Commander 2016
-Code2=C16
 Type=Commander
 ScryfallCode=C16
 
@@ -96,7 +95,7 @@ ScryfallCode=C16
 87 R Devastation Tide @Raymond Swanland
 88 C Disdainful Stroke @Svetlin Velinov
 89 C Etherium Sculptor @Steven Belledin
-90 M Ethersworn Adjudicator @Dan Scott
+90 M Ethersworn Adjudicator @Dan Murayama Scott
 91 R Evacuation @Franz Vohwinkel
 92 R Master of Etherium @Matt Cavotta
 93 R Minds Aglow @Yeong-Hao Han
@@ -129,7 +128,7 @@ ScryfallCode=C16
 120 R Blasphemous Act @Daarken
 121 R Breath of Fury @Kev Walker
 122 R Chaos Warp @Trevor Claxton
-123 M Daretti, Scrap Savant @Dan Scott
+123 M Daretti, Scrap Savant @Dan Murayama Scott
 124 R Dragon Mage @Matthew D. Wilson
 125 R Godo, Bandit Warlord @Paolo Parente
 126 U Grab the Reins @Michael Sutfin
@@ -159,7 +158,7 @@ ScryfallCode=C16
 150 R Forgotten Ancient @Mark Tedin
 151 U Gamekeeper @Scott Hampton
 152 R Hardened Scales @Mark Winters
-153 U Inspiring Call @Dan Scott
+153 U Inspiring Call @Dan Murayama Scott
 154 M Kalonian Hydra @Chris Rahn
 155 C Kodama's Reach @Heather Hudson
 156 R Lurking Predators @Mike Bierek
@@ -279,7 +278,7 @@ ScryfallCode=C16
 270 C Simic Signet @Mike Sass
 271 U Skullclamp @Daniel Ljunggren
 272 U Sol Ring @Mike Bierek
-273 R Solemn Simulacrum @Dan Scott
+273 R Solemn Simulacrum @Dan Murayama Scott
 274 M Soul of New Phyrexia @Daarken
 275 R Sunforger @Darrell Riche
 276 U Swiftfoot Boots @Svetlin Velinov
@@ -338,7 +337,7 @@ ScryfallCode=C16
 329 R Sunpetal Grove @Jason Chan
 330 C Swiftwater Cliffs @Eytan Zana
 331 U Temple of the False God @James Zapata
-332 C Terramorphic Expanse @Dan Scott
+332 C Terramorphic Expanse @Dan Murayama Scott
 333 C Thornwood Falls @Eytan Zana
 334 C Transguild Promenade @Noah Bradley
 335 R Underground River @Andrew Goldhawk
@@ -360,23 +359,26 @@ ScryfallCode=C16
 351 L Forest @Kev Walker
 
 [tokens]
-c_1_1_spirit
-w_1_1_bird_flying
-w_4_4_elemental_flying
-w_0_1_goat
-w_1_1_soldier
-w_1_1_spirit_flying
-u_2_2_bird_flying
-u_1_1_squid_islandwalk
-u_1_1_a_thopter_flying
-b_0_0_phyrexian_germ
-b_2_2_zombie
-r_1_1_goblin_all_attack
-r_3_3_ogre
-g_3_3_beast
-g_1_1_elf_warrior
-g_1_1_saproling
-g_1_1_saproling
-bg_1_1_worm
-c_x_x_a_phyrexian_horror
-c_1_1_a_myr
+1 c_1_1_spirit @Daniel Ljunggren
+2 w_1_1_bird_flying @Winona Nelson
+3 w_4_4_elemental_flying @Anthony S. Waters
+4 w_0_1_goat @Adam Paquette
+5 w_1_1_soldier @Seb McKinnon
+6 w_1_1_spirit_flying @Mike Sass
+7 u_2_2_bird_flying @Peter Mohrbacher
+8 u_1_1_squid_islandwalk @Jack Wang
+9 u_1_1_a_thopter_flying @Andrew Murray
+10 b_0_0_germ @Igor Kieryluk
+11 b_2_2_zombie @Lucas Graciano
+12 r_1_1_goblin_all_attack @Wayne Reynolds
+13 r_3_3_ogre @Paul Bonner
+14 g_3_3_beast @Jesper Ejsing
+15 g_1_1_elf_warrior @William O'Connor
+16 g_1_1_saproling @Brad Rigney
+16 g_1_1_saproling @Brad Rigney
+18 bg_1_1_worm @Chuck Lukacs
+19 c_x_x_a_phyrexian_horror @Scott Chou
+20 c_1_1_a_myr @Ryan Pancoast
+
+[other]
+21 emblem_daretti_scrap_savant @Dan Murayama Scott

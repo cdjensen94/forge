@@ -3,19 +3,23 @@ package forge.game.keyword;
 import java.util.Collection;
 import java.util.Iterator;
 import java.util.List;
+import java.util.stream.Collectors;
 
 import com.google.common.collect.Lists;
 import com.google.common.collect.Multimap;
 import com.google.common.collect.MultimapBuilder;
 
 import forge.game.card.Card;
+import forge.game.card.ICardTraitChanges;
+import forge.game.replacement.ReplacementEffect;
+import forge.game.spellability.SpellAbility;
+import forge.game.staticability.StaticAbility;
+import forge.game.trigger.Trigger;
 
-public class KeywordCollection implements Iterable<KeywordInterface> {
-
-    private transient KeywordCollectionView view;
+public class KeywordCollection implements ICardTraitChanges, Iterable<KeywordInterface> {
     // don't use enumKeys it causes a slow down
     private final Multimap<Keyword, KeywordInterface> map = MultimapBuilder.hashKeys()
-            .arrayListValues().build();
+            .linkedHashSetValues().build();
 
     public KeywordCollection() {
         super();
@@ -56,7 +60,6 @@ public class KeywordCollection implements Iterable<KeywordInterface> {
             return true;
         }
         return false;
-
     }
 
     public void addAll(Iterable<String> keywords) {
@@ -157,6 +160,10 @@ public class KeywordCollection implements Iterable<KeywordInterface> {
         return result;
     }
 
+    public KeywordCollectionView getView() {
+        return new KeywordCollectionView(getValues().stream().map(KeywordInterface::getView).collect(Collectors.toList()));
+    }
+
     public void setHostCard(final Card host) {
         for (KeywordInterface k : map.values()) {
             k.setHostCard(host);
@@ -174,61 +181,60 @@ public class KeywordCollection implements Iterable<KeywordInterface> {
         return sb.toString();
     }
 
-    public KeywordCollectionView getView() {
-        if (view == null) {
-            view = new KeywordCollectionView();
+    @Override
+    public List<SpellAbility> applySpellAbility(List<SpellAbility> list) {
+        if (map.isEmpty()) {
+            return list;
         }
-        return view;
+        for (KeywordInterface k : getValues()) {
+            k.applySpellAbility(list);
+        }
+        return list;
+    }
+    @Override
+    public List<Trigger> applyTrigger(List<Trigger> list) {
+        if (map.isEmpty()) {
+            return list;
+        }
+        for (KeywordInterface k : getValues()) {
+            k.applyTrigger(list);
+        }
+        return list;
+    }
+    @Override
+    public List<ReplacementEffect> applyReplacementEffect(List<ReplacementEffect> list) {
+        if (map.isEmpty()) {
+            return list;
+        }
+        for (KeywordInterface k : getValues()) {
+            k.applyReplacementEffect(list);
+        }
+        return list;
+    }
+    @Override
+    public List<StaticAbility> applyStaticAbility(List<StaticAbility> list) {
+        // most cards carry no keywords, and building the multimap's iterator to discover that
+        // is the bulk of this call's cost
+        if (map.isEmpty()) {
+            return list;
+        }
+        for (KeywordInterface k : getValues()) {
+            k.applyStaticAbility(list);
+        }
+        return list;
+    }
+    @Override
+    public KeywordCollection copy(Card host, boolean lki) {
+        KeywordCollection result = new KeywordCollection();
+        for (KeywordInterface ki : getValues()) {
+            result.insert(ki.copy(host, lki));
+        }
+        return result;
     }
 
-    public void applyChanges(Iterable<KeywordsChange> changes) {
-        for (final KeywordsChange ck : changes) {
-            if (ck.isRemoveAllKeywords()) {
-                clear();
-            }
-            else if (ck.getRemoveKeywords() != null) {
-                removeAll(ck.getRemoveKeywords());
-            }
-
-            removeInstances(ck.getRemovedKeywordInstances());
-
-            if (ck.getKeywords() != null) {
-                insertAll(ck.getKeywords());
-            }
-        }
-    }
-
-    public class KeywordCollectionView implements Iterable<KeywordInterface> {
-
-        protected KeywordCollectionView() {
-        }
-
-        public boolean isEmpty() {
-            return KeywordCollection.this.isEmpty();
-        }
-
-        public int size() {
-            return KeywordCollection.this.size();
-        }
-
-        public int getAmount(String keyword) {
-            return KeywordCollection.this.getAmount(keyword);
-        }
-
-        public boolean contains(Keyword keyword) {
-            return KeywordCollection.this.contains(keyword);
-        }
-        public boolean contains(String keyword) {
-            return KeywordCollection.this.contains(keyword);
-        }
-
-        public List<String> asStringList() {
-            return KeywordCollection.this.asStringList();
-        }
-
-        @Override
-        public Iterator<KeywordInterface> iterator() {
-            return KeywordCollection.this.iterator();
+    public void applyChanges(Iterable<? extends IKeywordsChange> changes) {
+        for (final IKeywordsChange ck : changes) {
+            ck.applyKeywords(this);
         }
     }
 

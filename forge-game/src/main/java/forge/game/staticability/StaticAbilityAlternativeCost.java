@@ -1,6 +1,7 @@
 package forge.game.staticability;
 
 import java.util.List;
+import java.util.Set;
 
 import com.google.common.collect.Lists;
 
@@ -15,8 +16,6 @@ import forge.game.zone.ZoneType;
 
 public class StaticAbilityAlternativeCost {
 
-    static String MODE = "AlternativeCost";
-
     public static List<SpellAbility> alternativeCosts(final SpellAbility sa, final Card source, final Player pl) {
         List<SpellAbility> result = Lists.newArrayList();
         // add source first in case it's LKI (alternate host)
@@ -24,11 +23,16 @@ public class StaticAbilityAlternativeCost {
         list.addAll(source.getGame().getCardsIn(ZoneType.STATIC_ABILITIES_SOURCE_ZONES));
         for (final Card ca : list) {
             for (final StaticAbility stAb : ca.getStaticAbilities()) {
-                if (!stAb.checkConditions(MODE)) {
+                if (!stAb.checkMode(StaticAbilityMode.AlternativeCost)) {
                     continue;
                 }
 
+                // apply() is cheap, checkConditions() may scan the battlefield
                 if (!apply(stAb, sa, source, pl)) {
+                    continue;
+                }
+
+                if (!stAb.checkConditions()) {
                     continue;
                 }
 
@@ -53,10 +57,11 @@ public class StaticAbilityAlternativeCost {
                     newSA.putParam("ManaRestriction", stAb.getParam("ManaRestriction"));
                 }
 
-                if (stAb.hasParam("AffectedZone")) {
-                    newSA.getRestrictions().setZone(ZoneType.smartValueOf(stAb.getParam("AffectedZone")));
-                } else if (!stAb.getHostCard().isImmutable() && stAb.hasParam("EffectZone") && !"All".equals(stAb.getParam("EffectZone"))) {
-                    newSA.getRestrictions().setZone(ZoneType.smartValueOf(stAb.getParam("EffectZone")));
+                if (!stAb.getHostCard().isImmutable()) {
+                    Set<ZoneType> zones = stAb.getActiveZone();
+                    if (zones != null && zones.size() == 1) {
+                        newSA.getRestrictions().setZone(zones.stream().findFirst().get());
+                    }
                 }
 
                 if (stAb.hasParam("StackDescription")) {
@@ -84,6 +89,11 @@ public class StaticAbilityAlternativeCost {
                     }
                 }
                 newSA.setDescription(sb.toString());
+
+                // Support for custom cards alternative costs targeting
+                if (stAb.hasParam("Named")) {
+                    newSA.setName(stAb.getParam("Named"));
+                }
 
                 result.add(newSA);
             }

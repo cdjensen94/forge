@@ -1,7 +1,6 @@
 package forge.screens.planarconquest;
 
 import com.google.common.collect.Iterables;
-
 import forge.Forge;
 import forge.assets.FImage;
 import forge.card.CardImage;
@@ -37,7 +36,7 @@ public class NewConquestScreen extends MultiStepWizardScreen<NewConquestScreenMo
     @Override
     protected void finish() {
         //create new quest in game thread so option panes can wait for input
-        ThreadUtil.invokeInGameThread(() -> newConquest());
+        ThreadUtil.invokeInGameThread(this::newConquest);
     }
 
     private void newConquest() {
@@ -154,7 +153,7 @@ public class NewConquestScreen extends MultiStepWizardScreen<NewConquestScreenMo
     }
 
     private static class SelectStartingPlaneswalkerStep extends WizardStep<NewConquestScreenModel> {
-        private final FChoiceList<PaperCard> lstPlaneswalkers = add(new FChoiceList<PaperCard>(FModel.getPlanes().iterator().next().getCommanders()) { //just use commanders as temporary list
+        private final FChoiceList<PaperCard> lstPlaneswalkers = add(new FChoiceList<PaperCard>(FModel.getPlanes().iterator().next().getCommanders()) { // Just use commanders as temporary list
             @Override
             protected void onItemActivate(Integer index, PaperCard value) {
                 advance();

@@ -2,17 +2,17 @@ package forge.itemmanager.filters;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.Predicate;
 
 import javax.swing.JPanel;
 
-import com.google.common.base.Predicate;
-import com.google.common.base.Predicates;
-
 import forge.card.CardRules;
 import forge.item.PaperCard;
+import forge.item.PaperCardPredicates;
 import forge.itemmanager.ItemManager;
 import forge.itemmanager.SItemManagerUtil.StatTypes;
 import forge.itemmanager.SpellShopManager;
+import forge.util.IterableUtil;
 
 
 public class CardTypeFilter extends StatTypeFilter<PaperCard> {
@@ -51,13 +51,9 @@ public class CardTypeFilter extends StatTypeFilter<PaperCard> {
         }
 
         if (types.size() == buttonMap.size()) {
-            return new Predicate<PaperCard>() { //use custom return true delegate to validate the item is a card
-                @Override
-                public boolean apply(PaperCard card) {
-                    return true;
-                }
-            };
+            //use custom return true delegate to validate the item is a card
+            return card -> true;
         }
-        return Predicates.compose(Predicates.or(types), PaperCard.FN_GET_RULES);
+        return PaperCardPredicates.fromRules(IterableUtil.or(types));
     }
 }

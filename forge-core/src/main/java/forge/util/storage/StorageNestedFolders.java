@@ -2,8 +2,7 @@ package forge.util.storage;
 
 import java.io.File;
 import java.util.HashMap;
-
-import com.google.common.base.Function;
+import java.util.function.Function;
 
 public class StorageNestedFolders<T> extends StorageBase<IStorage<T>> {
     private final File thisFolder;
@@ -24,7 +23,7 @@ public class StorageNestedFolders<T> extends StorageBase<IStorage<T>> {
         File subdir = new File(thisFolder, item.getName());
         subdir.mkdir();
 
-        // TODO: save recursivelly the passed IStorage
+        // TODO: save recursively the passed IStorage
         throw new UnsupportedOperationException("method is not implemented");
     }
 

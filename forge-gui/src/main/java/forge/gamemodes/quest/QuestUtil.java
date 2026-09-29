@@ -156,7 +156,7 @@ public class QuestUtil {
         script.add("Types:" + properties[5].replace(';', ' '));
         script.add("Oracle:"); // tokens don't have texts yet
         final String fileName = PaperToken.makeTokenFileName(properties[1], properties[2], properties[3], properties[4]);
-        return new PaperToken(CardRules.fromScript(script), CardEdition.UNKNOWN, fileName);
+        return new PaperToken(CardRules.fromScript(script), CardEdition.UNKNOWN, fileName, "", IPaperCard.NO_ARTIST_NAME);
     }
 
     /**
@@ -525,13 +525,10 @@ public class QuestUtil {
     public static void finishStartingGame() {
         final QuestController qData = FModel.getQuest();
 
-        FThreads.invokeInBackgroundThread(new Runnable() {
-            @Override
-            public void run() {
-                qData.getDuelsManager().randomizeOpponents();
-                qData.setCurrentEvent(event);
-                qData.save();
-            }
+        FThreads.invokeInBackgroundThread(() -> {
+            qData.getDuelsManager().randomizeOpponents();
+            qData.setCurrentEvent(event);
+            qData.save();
         });
 
         int extraLifeHuman = 0;
@@ -573,9 +570,9 @@ public class QuestUtil {
         }
 
         if (useBazaar) {
-            humanStart.setCardsOnBattlefield(QuestUtil.getHumanStartingCards(qData, event));
+            humanStart.addExtraCardsOnBattlefield(QuestUtil.getHumanStartingCards(qData, event));
             aiStart.setStartingLife(lifeAI);
-            aiStart.setCardsOnBattlefield(QuestUtil.getComputerStartingCards(event));
+            aiStart.addExtraCardsOnBattlefield(QuestUtil.getComputerStartingCards(event));
         }
 
         final List<RegisteredPlayer> starter = new ArrayList<>();
@@ -597,7 +594,7 @@ public class QuestUtil {
         rules.setPlayForAnte(useAnte);
         rules.setMatchAnteRarity(matchAnteRarity);
         rules.setGamesPerMatch(qData.getMatchLength());
-        rules.setManaBurn(FModel.getPreferences().getPrefBoolean(FPref.UI_MANABURN));
+        rules.setOrderCombatants(FModel.getPreferences().getPrefBoolean(FPref.LEGACY_ORDER_COMBATANTS));
         rules.setUseGrayText(FModel.getPreferences().getPrefBoolean(FPref.UI_GRAY_INACTIVE_TEXT));
 
         final TreeSet<GameType> variant = new TreeSet<>();
@@ -608,12 +605,7 @@ public class QuestUtil {
         final HostedMatch hostedMatch = GuiBase.getInterface().hostMatch();
         final IGuiGame gui = GuiBase.getInterface().getNewGuiGame();
         gui.setPlayerAvatar(aiPlayer, event);
-        FThreads.invokeInEdtNowOrLater(new Runnable(){
-            @Override
-            public void run() {
-                hostedMatch.startMatch(rules, variant, starter, ImmutableMap.of(humanStart, gui), null);
-            }
-        });
+        FThreads.invokeInEdtNowOrLater(() -> hostedMatch.startMatch(rules, variant, starter, ImmutableMap.of(humanStart, gui), null));
     }
 
     /**

@@ -17,16 +17,7 @@
  */
 package forge.gui.download;
 
-import java.io.File;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Map;
-import java.util.TreeMap;
-
-import org.apache.commons.lang3.StringUtils;
-
 import com.google.common.collect.Iterables;
-
 import forge.StaticData;
 import forge.card.CardEdition;
 import forge.item.PaperCard;
@@ -34,6 +25,13 @@ import forge.localinstance.properties.ForgeConstants;
 import forge.model.FModel;
 import forge.util.ImageUtil;
 import forge.util.TextUtil;
+import org.apache.commons.lang3.StringUtils;
+
+import java.io.File;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.TreeMap;
 
 public class GuiDownloadSetPicturesLQ extends GuiDownloadService {
     @Override
@@ -57,7 +55,7 @@ public class GuiDownloadSetPicturesLQ extends GuiDownloadService {
             }
             final String setCode2 = setMapping.get(setCode3);
 
-            if (StringUtils.isBlank(setCode3) || CardEdition.UNKNOWN.getCode().equals(setCode3)) {
+            if (StringUtils.isBlank(setCode3) || CardEdition.UNKNOWN_CODE.equals(setCode3)) {
                 // we don't want cards from unknown sets
                 continue;
             }

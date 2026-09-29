@@ -21,52 +21,41 @@ import forge.card.CardStateName;
 import forge.card.mana.ManaCost;
 import forge.game.card.Card;
 import forge.game.card.CardCopyService;
-import forge.game.card.CardPlayOption;
-import forge.game.cost.Cost;
+import forge.game.card.CardState;
 import forge.game.player.Player;
 import forge.game.staticability.StaticAbility;
+import forge.game.zone.ZoneType;
 import forge.util.CardTranslation;
 import forge.util.Localizer;
-import org.apache.commons.lang3.ObjectUtils;
 import org.apache.commons.lang3.StringUtils;
 
-public class LandAbility extends Ability {
+import java.util.Objects;
 
-    public LandAbility(Card sourceCard, Player p, CardPlayOption mayPlay) {
-        super(sourceCard, new Cost(ManaCost.NO_COST, false));
-        setActivatingPlayer(p);
-        setMayPlay(mayPlay);
-    }
-    public LandAbility(Card sourceCard) {
-        this(sourceCard, sourceCard.getController(), null);
+public class LandAbility extends AbilityStatic {
+
+    public LandAbility(Card sourceCard, CardState state) {
+        super(sourceCard, ManaCost.NO_COST, state);
+
+        getRestrictions().setZone(ZoneType.Hand);
     }
 
-    public boolean canPlay(Card newHost) {
-        final Player p = getActivatingPlayer();
-        return p.canPlayLand(newHost, false, this);
+    @Override
+    public boolean isLandAbility() { return true; }
+
+    @Override
+    public boolean isSecondary() {
+        return true;
     }
 
     @Override
     public boolean canPlay() {
         Card land = this.getHostCard();
         final Player p = this.getActivatingPlayer();
-
-        if (this.getCardState() != null && land.getCurrentStateName() != this.getCardStateName()) {
-            if (!land.isLKI()) {
-                land = CardCopyService.getLKICopy(land);
-            }
-            CardStateName stateName = getCardStateName();
-            if (!land.hasState(stateName)) {
-                land.addAlternateState(stateName, false);
-                land.getState(stateName).copyFrom(getHostCard().getState(stateName), true);
-            }
-
-            land.setState(stateName, false);
-
-            // need to reset CMC
-            land.setLKICMC(-1);
-            land.setLKICMC(land.getCMC());
+        if (p == null || land.isInZone(ZoneType.Battlefield)) {
+            return false;
         }
+ 
+        land = Objects.requireNonNullElse(getAlternateHost(land), land);
 
         return p.canPlayLand(land, false, this);
     }
@@ -74,7 +63,7 @@ public class LandAbility extends Ability {
     @Override
     public void resolve() {
         getHostCard().setSplitStateToPlayAbility(this);
-        final Card result = getActivatingPlayer().playLandNoCheck(getHostCard(), this);
+        final Card result = getActivatingPlayer().playLand(getHostCard(), this);
 
         // increase mayplay used
         if (getMayPlay() != null) {
@@ -92,7 +81,7 @@ public class LandAbility extends Ability {
         StringBuilder sb = new StringBuilder(StringUtils.capitalize(localizer.getMessage("lblPlayLand")));
 
         if (getHostCard().isModal()) {
-            sb.append(" (").append(CardTranslation.getTranslatedName(getHostCard().getName(ObjectUtils.firstNonNull(getCardStateName(), CardStateName.Original)))).append(")");
+            sb.append(" (").append(CardTranslation.getTranslatedName(getCardState().getName())).append(")");
         }
 
         StaticAbility sta = getMayPlay();
@@ -113,4 +102,40 @@ public class LandAbility extends Ability {
         return sb.toString();
     }
 
+    @Override
+    public Card getAlternateHost(Card source) {
+        boolean lkicheck = false;
+
+        if (source.isFaceDown() && source.isInZone(ZoneType.Exile)) {
+            if (!source.isLKI()) {
+                source = CardCopyService.getLKICopy(source);
+            }
+
+            source.forceTurnFaceUp();
+            lkicheck = true;
+        }
+
+        if (getCardState() != null && source.getCurrentStateName() != getCardStateName()) {
+            if (!source.isLKI()) {
+                source = CardCopyService.getLKICopy(source);
+            }
+            CardStateName stateName = getCardState().getStateName();
+            if (!source.hasState(stateName)) {
+                source.addAlternateState(stateName, false);
+                source.getState(stateName).copyFrom(getHostCard().getState(stateName), true);
+            }
+
+            source.setState(stateName, false);
+            if (getHostCard().isDoubleFaced()) {
+                source.setBackSide(getHostCard().getRules().getSplitType().getChangedStateName().equals(stateName));
+            }
+
+            // need to reset CMC
+            source.setLKICMC(-1);
+            source.setLKICMC(source.getCMC());
+            lkicheck = true;
+        }
+
+        return lkicheck ? source : null;
+    }
 }

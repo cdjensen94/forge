@@ -1,27 +1,29 @@
 package forge.screens.home;
 
+import forge.ai.AiProfileUtil;
 import forge.deckchooser.FDeckChooser;
-import java.awt.Graphics;
+
+import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.event.FocusAdapter;
 import java.awt.event.FocusEvent;
 import java.awt.event.MouseEvent;
+import java.awt.image.BufferedImage;
 import java.util.Collections;
 import java.util.List;
 import java.util.Set;
+import java.util.function.Predicate;
 
-import javax.swing.ButtonGroup;
-import javax.swing.JCheckBoxMenuItem;
-import javax.swing.JPopupMenu;
+import javax.swing.*;
 
 import org.apache.commons.lang3.StringUtils;
 
-import com.google.common.base.Predicate;
-import com.google.common.collect.ImmutableSet;
-
+import forge.ImageCache;
 import forge.Singletons;
 import forge.ai.AIOption;
+import forge.deck.Deck;
+import forge.deck.DeckProxy;
 import forge.deck.DeckSection;
 import forge.game.GameType;
 import forge.gamemodes.match.LobbySlot;
@@ -69,13 +71,20 @@ public class PlayerPanel extends FPanel {
     private final FLabel avatarLabel = new FLabel.Builder().opaque(true).hoverable(true).iconScaleFactor(0.99f).iconInBackground(true).build();
     private final FLabel sleeveLabel = new FLabel.Builder().opaque(true).hoverable(true).iconScaleFactor(0.99f).iconInBackground(true).build();
     private int avatarIndex, sleeveIndex;
+    private String sleeveArtKey = "";
+    private int sleeveArtOffset = Deck.DEFAULT_SLEEVE_OFFSET;
 
     private final FTextField txtPlayerName = new FTextField.Builder().build();
     private FRadioButton radioHuman;
     private FRadioButton radioAi;
-    private JCheckBoxMenuItem radioAiUseSimulation;
+    private JPopupMenu radioAiUseSimulation;
     private FRadioButton radioOpen;
     private FCheckBox chkReady;
+
+    // AI picker
+    private String aiProfile;
+    private final FLabel aiPickerLabel = new FLabel.Builder().text(localizer.getMessage("lblAiPickerPanel") + ":").build();
+    private FComboBoxWrapper<Object> aiPickerComboBox = new FComboBoxWrapper<>();
 
     private final FComboBoxWrapper<Object> teamComboBox = new FComboBoxWrapper<>();
     private final FComboBoxWrapper<Object> aeTeamComboBox = new FComboBoxWrapper<>();
@@ -107,20 +116,18 @@ public class PlayerPanel extends FPanel {
     private FDeckChooser deckChooser;
 
     private final VLobby lobby;
-    public PlayerPanel(final VLobby lobby, final boolean allowNetworking, final int index, final LobbySlot slot, final boolean mayEdit, final boolean mayControl) {
-        super();
-
+    public PlayerPanel(final VLobby lobby, final int index, final LobbySlot slot, final boolean mayEdit, final boolean mayControl) {
         this.lobby = lobby;
         this.index = index;
         this.mayEdit = mayEdit;
         this.mayControl = mayControl;
-        this.allowNetworking = allowNetworking;
+        this.allowNetworking = lobby.getLobby().isAllowNetworking();
 
         this.deckLabel = lobby.newLabel(localizer.getMessage("lblDeck") + ":");
         this.scmLabel = lobby.newLabel(localizer.getMessage("lblSchemeDeck") + ":");
         this.cmdLabel = lobby.newLabel(localizer.getMessage("lblCommanderDeck") + ":");
-        this.pchLabel =  lobby.newLabel(localizer.getMessage("lblPlanarDeck") + ":");
-        this.vgdLabel =  lobby.newLabel(localizer.getMessage("lblVanguard") + ":");
+        this.pchLabel = lobby.newLabel(localizer.getMessage("lblPlanarDeck") + ":");
+        this.vgdLabel = lobby.newLabel(localizer.getMessage("lblVanguard") + ":");
 
         setLayout(new MigLayout("insets 10px, gap 5px"));
 
@@ -129,11 +136,10 @@ public class PlayerPanel extends FPanel {
         this.add(closeBtn, "w 20, h 20, pos (container.w-20) 0");
 
         createAvatar();
-        this.add(avatarLabel, "spany 2, width 80px, height 80px");
+        this.add(avatarLabel, "cell 0 0, spany 2, split 2, width 80px, height 80px");
 
-        /*TODO Layout and Override for PC*/
-        //createSleeve();
-        //this.add(sleeveLabel, "spany 2, width 60px, height 80px");
+        createSleeve();
+        this.add(sleeveLabel, "width 58px, height 80px, gapleft 5px");
 
         createNameEditor();
         this.add(lobby.newLabel(localizer.getMessage("lblName") +":"), "w 40px, h 30px, gaptop 5px");
@@ -146,7 +152,17 @@ public class PlayerPanel extends FPanel {
         this.add(radioHuman, "gapright 5px");
         this.add(radioAi, "wrap");
 
-        this.add(lobby.newLabel(localizer.getMessage("lblTeam") + ":"), "w 40px, h 30px");
+        int cellY = 1;
+        if (prefs.getPrefBoolean(FPref.UI_ENABLE_AI_PICKER)) {
+            this.add(aiPickerLabel, "w 40px, h 30px");
+            populateAiPickerComboBox();
+            aiPickerComboBox.addTo(this, "h 30px, pushx, growx, wrap");
+            aiPickerComboBox.addActionListener(aiPickerListener);
+            cellY += 1;
+        }
+        this.setAiProfile(slot.getAiProfile());
+
+        this.add(lobby.newLabel(localizer.getMessage("lblTeam") + ":"), "cell 0 " + cellY +", sx 2, ax right, w 40px, h 30px");
         populateTeamsComboBoxes();
 
         // Set these before action listeners are added
@@ -155,17 +171,17 @@ public class PlayerPanel extends FPanel {
 
         teamComboBox.addActionListener(teamListener);
         aeTeamComboBox.addActionListener(teamListener);
-        teamComboBox.addTo(this, variantBtnConstraints + ", pushx, growx, gaptop 5px");
-        aeTeamComboBox.addTo(this, variantBtnConstraints + ", pushx, growx, gaptop 5px");
+        teamComboBox.addTo(this, variantBtnConstraints + ", cell 2 " + cellY + ", growx, gaptop 5px, wrap");
+        aeTeamComboBox.addTo(this, variantBtnConstraints + ", cell 2 " + cellY + ", growx, gaptop 5px, wrap");
 
         createReadyButton();
         if (allowNetworking) {
-            this.add(radioOpen, "cell 4 1, ax left, sx 2");
-            this.add(chkReady, "cell 5 1, ax left, sx 2, wrap");
+            this.add(radioOpen, "cell 4 4, ax left, sx 2");
+            this.add(chkReady, "cell 5 4, ax left, sx 2, wrap");
         }
 
-        this.add(deckLabel, variantBtnConstraints + ", cell 0 2, sx 2, ax right");
-        this.add(deckBtn, variantBtnConstraints + ", cell 2 2, pushx, growx, wmax 100%-153px, h 30px, spanx 4, wrap");
+        this.add(deckLabel, variantBtnConstraints + ", cell 0 3, sx 2, ax right");
+        this.add(deckBtn, variantBtnConstraints + ", cell 2 3, pushx, growx, wmax 100%-153px, h 30px, spanx 4, wrap");
 
         addHandlersDeckSelector();
 
@@ -186,7 +202,7 @@ public class PlayerPanel extends FPanel {
         addHandlersToVariantsControls();
 
         this.addMouseListener(new FMouseAdapter() {
-            @Override public final void onLeftMouseDown(final MouseEvent e) {
+            @Override public void onLeftMouseDown(final MouseEvent e) {
                 avatarLabel.requestFocusInWindow();
             }
         });
@@ -209,16 +225,26 @@ public class PlayerPanel extends FPanel {
 
     void update() {
         avatarLabel.setEnabled(mayEdit);
-        avatarLabel.setIcon(FSkin.getAvatars().get(Integer.valueOf(type == LobbySlotType.OPEN ? -1 : avatarIndex)));
+        avatarLabel.setIcon(FSkin.getAvatars().get(type == LobbySlotType.OPEN ? -1 : avatarIndex));
         avatarLabel.repaintSelf();
 
         sleeveLabel.setEnabled(mayEdit);
-        sleeveLabel.setIcon(FSkin.getSleeves().get(Integer.valueOf(type == LobbySlotType.OPEN ? -1 : sleeveIndex)));
-        sleeveLabel.repaintSelf();
+        if (type != LobbySlotType.OPEN && sleeveArtKey != null && !sleeveArtKey.isEmpty()) {
+            showCardArtOnSleeveLabel(sleeveArtKey);
+        } else {
+            sleeveLabel.setIcon(FSkin.getSleeves().get(type == LobbySlotType.OPEN ? -1 : sleeveIndex));
+            sleeveLabel.repaintSelf();
+        }
 
         txtPlayerName.setEnabled(mayEdit);
         txtPlayerName.setText(type == LobbySlotType.OPEN ? StringUtils.EMPTY : playerName);
         nameRandomiser.setEnabled(mayEdit);
+
+        boolean enableAiPicker = mayEdit && type == LobbySlotType.AI && prefs.getPrefBoolean(FPref.UI_ENABLE_AI_PICKER);
+        aiPickerLabel.setVisible(enableAiPicker);
+        aiPickerComboBox.setVisible(enableAiPicker);
+        aiPickerComboBox.setEnabled(enableAiPicker);
+
         teamComboBox.setEnabled(mayEdit);
         deckLabel.setVisible(mayEdit);
         deckBtn.setVisible(mayEdit);
@@ -248,13 +274,17 @@ public class PlayerPanel extends FPanel {
         updateVariantControlsVisibility();
     }
 
-    private final FMouseAdapter radioMouseAdapter(final FRadioButton source, final LobbySlotType type) {
+    private FMouseAdapter radioMouseAdapter(final FRadioButton source, final LobbySlotType type) {
         return new FMouseAdapter() {
-            @Override public final void onLeftClick(final MouseEvent e) {
+            @Override public void onLeftClick(final MouseEvent e) {
                 if (!source.isEnabled()) {
                     return;
                 }
                 setType(type);
+                if (type != LobbySlotType.OPEN && getPlayerName().isEmpty()) {
+                    final String newName = NameGenerator.getRandomName("Any", "Any", lobby.getPlayerNames());
+                    setPlayerName(newName);
+                }
                 lobby.firePlayerChangeListener(index);
                 avatarLabel.requestFocusInWindow();
                 lobby.updateVanguardList(index);
@@ -296,54 +326,6 @@ public class PlayerPanel extends FPanel {
         }
     };
 
-    private final FMouseAdapter avatarMouseListener = new FMouseAdapter() {
-        @Override public final void onLeftClick(final MouseEvent e) {
-            if (!avatarLabel.isEnabled()) {
-                return;
-            }
-
-            final FLabel avatar = (FLabel)e.getSource();
-
-            lobby.changePlayerFocus(index);
-            avatar.requestFocusInWindow();
-
-            final AvatarSelector aSel = new AvatarSelector(playerName, avatarIndex, lobby.getUsedAvatars());
-            for (final FLabel lbl : aSel.getSelectables()) {
-                lbl.setCommand(new UiCommand() {
-                    @Override
-                    public void run() {
-                        setAvatarIndex(Integer.valueOf(lbl.getName().substring(11)));
-                        aSel.setVisible(false);
-                    }
-                });
-            }
-
-            aSel.setVisible(true);
-            aSel.dispose();
-
-            if (index < 2) {
-                lobby.updateAvatarPrefs();
-            }
-
-            lobby.firePlayerChangeListener(index);
-        }
-
-        @Override public final void onRightClick(final MouseEvent e) {
-            if (!avatarLabel.isEnabled()) {
-                return;
-            }
-
-            lobby.changePlayerFocus(index);
-            avatarLabel.requestFocusInWindow();
-
-            setRandomAvatar();
-
-            if (index < 2) {
-                lobby.updateAvatarPrefs();
-            }
-        }
-    };
-
     /** Listens to sleeve buttons and gives the appropriate player focus. */
     private final FocusAdapter sleeveFocusListener = new FocusAdapter() {
         @Override
@@ -352,66 +334,28 @@ public class PlayerPanel extends FPanel {
         }
     };
 
-    private final FMouseAdapter sleeveMouseListener = new FMouseAdapter() {
-        @Override public final void onLeftClick(final MouseEvent e) {
-            if (!sleeveLabel.isEnabled()) {
-                return;
-            }
-
-            final FLabel sleeve = (FLabel)e.getSource();
-
-            lobby.changePlayerFocus(index);
-            sleeve.requestFocusInWindow();
-
-            final SleeveSelector sSel = new SleeveSelector(playerName, sleeveIndex, lobby.getUsedSleeves());
-            for (final FLabel lbl : sSel.getSelectables()) {
-                lbl.setCommand(new UiCommand() {
-                    @Override
-                    public void run() {
-                        setSleeveIndex(Integer.valueOf(lbl.getName().substring(11)));
-                        sSel.setVisible(false);
-                    }
-                });
-            }
-
-            sSel.setVisible(true);
-            sSel.dispose();
-
-            if (index < 2) {
-                lobby.updateSleevePrefs();
-            }
-
-            lobby.firePlayerChangeListener(index);
-        }
-
-        @Override public final void onRightClick(final MouseEvent e) {
-            if (!sleeveLabel.isEnabled()) {
-                return;
-            }
-
-            lobby.changePlayerFocus(index);
-            sleeveLabel.requestFocusInWindow();
-
-            setRandomSleeve();
-
-            if (index < 2) {
-                lobby.updateSleevePrefs();
-            }
-        }
-    };
+    /** The selected game format puts the deck's leader in the command zone. */
+    private boolean formatUsesCommandZone() {
+        return lobby.hasVariant(GameType.Commander) || lobby.hasVariant(GameType.Oathbreaker)
+                || lobby.hasVariant(GameType.TinyLeaders) || lobby.hasVariant(GameType.Brawl);
+    }
 
     private void updateVariantControlsVisibility() {
-        final boolean isOathbreaker = lobby.hasVariant(GameType.Oathbreaker);
-        final boolean isTinyLeaders = lobby.hasVariant(GameType.TinyLeaders);
-        final boolean isBrawl = lobby.hasVariant(GameType.Brawl);
-        final boolean isCommanderApplied = mayEdit && (lobby.hasVariant(GameType.Commander) || isOathbreaker || isTinyLeaders || isBrawl);
+        // The game format decides where the deck comes from: chosen normally, chosen as a
+        // commander deck, or generated outright by Momir Basic and MoJhoSto.
+        final boolean isCommanderApplied = mayEdit && formatUsesCommandZone();
+        final boolean isDeckGeneratedByFormat = lobby.hasAutoGeneratedVariant();
+
+        // Variants layered on top of the format, each with its own per-player selection.
         final boolean isPlanechaseApplied = mayEdit && lobby.hasVariant(GameType.Planechase);
         final boolean isVanguardApplied = mayEdit && lobby.hasVariant(GameType.Vanguard);
         final boolean isArchenemyApplied = mayEdit && lobby.hasVariant(GameType.Archenemy);
         final boolean archenemyVisiblity = mayEdit && lobby.hasVariant(GameType.ArchenemyRumble) || (isArchenemyApplied && isArchenemy());
-        // Commander deck building replaces normal one, so hide it
-        final boolean isDeckBuildingAllowed = mayEdit && !isCommanderApplied && !lobby.hasVariant(GameType.MomirBasic)
-                && !lobby.hasVariant(GameType.MoJhoSto);
+
+        // In Limited mode there's nothing to pick until a pool exists (draft/sealed done or past event loaded)
+        final CLobby controller = lobby.getController();
+        final boolean isDeckBuildingAllowed = mayEdit && !isCommanderApplied && !isDeckGeneratedByFormat
+                && (!controller.isLimitedMode() || controller.getActiveEventId() != null);
 
         deckLabel.setVisible(isDeckBuildingAllowed);
         deckBtn.setVisible(isDeckBuildingAllowed);
@@ -455,15 +399,26 @@ public class PlayerPanel extends FPanel {
     }
 
     public Set<AIOption> getAiOptions() {
-        return isSimulatedAi()
-                ? ImmutableSet.of(AIOption.USE_SIMULATION)
-                : Collections.emptySet();
+        if (radioAi.isSelected()) {
+            for (int i = 0; i < radioAiUseSimulation.getComponentCount(); i++) {
+                if (((JRadioButtonMenuItem) radioAiUseSimulation.getComponent(i)).isSelected()) {
+                    if (i == 0) {
+                        break;
+                    }
+                    if (i == 1) {
+                        return Set.of(AIOption.USE_HYBRID_SIMULATION);
+                    }
+                    if (i == 2) {
+                        return Set.of(AIOption.USE_FULL_SIMULATION);
+                    }
+                }
+            }
+        }
+        return Collections.emptySet();
     }
-    private boolean isSimulatedAi() {
-        return radioAi.isSelected() && radioAiUseSimulation.isSelected();
-    }
-    public void setUseAiSimulation(final boolean useSimulation) {
-        radioAiUseSimulation.setSelected(useSimulation);
+    public void setUseAiSimulation(Set<AIOption> options) {
+        ((JRadioButtonMenuItem) radioAiUseSimulation.getComponent(options.contains(AIOption.USE_FULL_SIMULATION) ? 2 : options.contains(AIOption.USE_HYBRID_SIMULATION) ? 1 : 0))
+                .setSelected(true);
     }
 
     public boolean isArchenemy() {
@@ -515,6 +470,20 @@ public class PlayerPanel extends FPanel {
         avatarLabel.requestFocusInWindow();
     }
 
+    /**
+     * Setup the AI Picker combo box with the known AI profiles.
+     * Default the combo box selection to the default value of FPref.UI_CURRENT_AI_PROFILE.
+     */
+    private void populateAiPickerComboBox() {
+        aiPickerComboBox.removeAllItems();
+        final List<String> aiProfiles = AiProfileUtil.getAvailableProfiles();
+        for (final String profile : aiProfiles) {
+            aiPickerComboBox.addItem(profile);
+        }
+        aiPickerComboBox.setSelectedItem(FPref.UI_CURRENT_AI_PROFILE.getDefault());
+        aiPickerComboBox.setEnabled(true);
+    }
+
     private void populateTeamsComboBoxes() {
         aeTeamComboBox.addItem(localizer.getMessage("lblArchenemy"));
         aeTeamComboBox.addItem(localizer.getMessage("lblHeroes"));
@@ -527,7 +496,7 @@ public class PlayerPanel extends FPanel {
 
     private final ActionListener teamListener = new ActionListener() {
         @SuppressWarnings("unchecked")
-        @Override public final void actionPerformed(final ActionEvent e) {
+        @Override public void actionPerformed(final ActionEvent e) {
             final FComboBox<Object> cb = (FComboBox<Object>) e.getSource();
             cb.requestFocusInWindow();
             final Object selection = cb.getSelectedItem();
@@ -539,81 +508,70 @@ public class PlayerPanel extends FPanel {
         }
     };
 
+    private final ActionListener aiPickerListener = new ActionListener() {
+        @Override
+        public void actionPerformed(ActionEvent e) {
+            final FComboBox<Object> comboBox = (FComboBox<Object>) e.getSource();
+            closeBtn.requestFocusInWindow();
+            final Object selection = comboBox.getSelectedItem();
+
+            if (selection != null) {
+                setAiProfile(selection.toString());
+                lobby.changePlayerFocus(index);
+                lobby.firePlayerChangeListener(index);
+            }
+        }
+    };
+
     private void addHandlersToVariantsControls() {
         // Archenemy buttons
-        scmDeckSelectorBtn.setCommand(new Runnable() {
-            @Override public final void run() {
-                lobby.setCurrentGameMode(lobby.hasVariant(GameType.Archenemy) ? GameType.Archenemy : GameType.ArchenemyRumble);
-                scmDeckSelectorBtn.requestFocusInWindow();
-                lobby.changePlayerFocus(index);
-            }
+        scmDeckSelectorBtn.setCommand((Runnable) () -> {
+            lobby.setCurrentGameMode(lobby.hasVariant(GameType.Archenemy) ? GameType.Archenemy : GameType.ArchenemyRumble);
+            scmDeckSelectorBtn.requestFocusInWindow();
+            lobby.changePlayerFocus(index);
         });
 
-        scmDeckEditor.setCommand(new UiCommand() {
-            @Override
-            public void run() {
-                lobby.setCurrentGameMode(lobby.hasVariant(GameType.Archenemy) ? GameType.Archenemy : GameType.ArchenemyRumble);
-                final Predicate<PaperCard> predSchemes = new Predicate<PaperCard>() {
-                    @Override public final boolean apply(final PaperCard arg0) {
-                        return arg0.getRules().getType().isScheme();
-                    }
-                };
+        scmDeckEditor.setCommand((UiCommand) () -> {
+            lobby.setCurrentGameMode(lobby.hasVariant(GameType.Archenemy) ? GameType.Archenemy : GameType.ArchenemyRumble);
+            final Predicate<PaperCard> predSchemes = arg0 -> arg0.getRules().getType().isScheme();
 
-                Singletons.getControl().setCurrentScreen(FScreen.DECK_EDITOR_ARCHENEMY);
-                CDeckEditorUI.SINGLETON_INSTANCE.setEditorController(
-                        new CEditorVariant(FModel.getDecks().getScheme(), predSchemes, DeckSection.Schemes, FScreen.DECK_EDITOR_ARCHENEMY, CDeckEditorUI.SINGLETON_INSTANCE.getCDetailPicture()));
-            }
+            Singletons.getControl().setCurrentScreen(FScreen.DECK_EDITOR_ARCHENEMY);
+            CDeckEditorUI.SINGLETON_INSTANCE.setEditorController(
+                    new CEditorVariant(FModel.getDecks().getScheme(), predSchemes, DeckSection.Schemes, FScreen.DECK_EDITOR_ARCHENEMY, CDeckEditorUI.SINGLETON_INSTANCE.getCDetailPicture()));
         });
 
         // Commander buttons
-        cmdDeckSelectorBtn.setCommand(new Runnable() {
-            @Override
-            public void run() {
-                lobby.setCurrentGameMode(
-                        lobby.hasVariant(GameType.Oathbreaker) ? GameType.Oathbreaker :
-                        lobby.hasVariant(GameType.TinyLeaders) ? GameType.TinyLeaders :
-                        lobby.hasVariant(GameType.Brawl) ? GameType.Brawl :
-                        GameType.Commander);
-                cmdDeckSelectorBtn.requestFocusInWindow();
-                lobby.changePlayerFocus(index);
-            }
+        cmdDeckSelectorBtn.setCommand((Runnable) () -> {
+            lobby.setCurrentGameMode(
+                    lobby.hasVariant(GameType.Oathbreaker) ? GameType.Oathbreaker :
+                    lobby.hasVariant(GameType.TinyLeaders) ? GameType.TinyLeaders :
+                    lobby.hasVariant(GameType.Brawl) ? GameType.Brawl :
+                    GameType.Commander);
+            cmdDeckSelectorBtn.requestFocusInWindow();
+            lobby.changePlayerFocus(index);
         });
 
         // Planechase buttons
-        pchDeckSelectorBtn.setCommand(new Runnable() {
-            @Override
-            public void run() {
-                lobby.setCurrentGameMode(GameType.Planechase);
-                pchDeckSelectorBtn.requestFocusInWindow();
-                lobby.changePlayerFocus(index, GameType.Planechase);
-            }
+        pchDeckSelectorBtn.setCommand((Runnable) () -> {
+            lobby.setCurrentGameMode(GameType.Planechase);
+            pchDeckSelectorBtn.requestFocusInWindow();
+            lobby.changePlayerFocus(index, GameType.Planechase);
         });
 
-        pchDeckEditor.setCommand(new UiCommand() {
-            @Override
-            public void run() {
-                lobby.setCurrentGameMode(GameType.Planechase);
-                final Predicate<PaperCard> predPlanes = new Predicate<PaperCard>() {
-                    @Override
-                    public boolean apply(final PaperCard arg0) {
-                        return arg0.getRules().getType().isPlane() || arg0.getRules().getType().isPhenomenon();
-                    }
-                };
+        pchDeckEditor.setCommand((UiCommand) () -> {
+            lobby.setCurrentGameMode(GameType.Planechase);
+            final Predicate<PaperCard> predPlanes = arg0 -> arg0.getRules().getType().isPlane() || arg0.getRules().getType().isPhenomenon();
 
-                Singletons.getControl().setCurrentScreen(FScreen.DECK_EDITOR_PLANECHASE);
-                CDeckEditorUI.SINGLETON_INSTANCE.setEditorController(
-                        new CEditorVariant(FModel.getDecks().getPlane(), predPlanes, DeckSection.Planes, FScreen.DECK_EDITOR_PLANECHASE, CDeckEditorUI.SINGLETON_INSTANCE.getCDetailPicture()));
-            }
+            Singletons.getControl().setCurrentScreen(FScreen.DECK_EDITOR_PLANECHASE);
+            CDeckEditorUI.SINGLETON_INSTANCE.setEditorController(
+                    new CEditorVariant(FModel.getDecks().getPlane(), predPlanes, DeckSection.Planes, FScreen.DECK_EDITOR_PLANECHASE, CDeckEditorUI.SINGLETON_INSTANCE.getCDetailPicture()));
         });
 
         // Vanguard buttons
-        vgdSelectorBtn.setCommand(new Runnable() {
-            @Override
-            public void run() {
-                lobby.setCurrentGameMode(GameType.Vanguard);
-                vgdSelectorBtn.requestFocusInWindow();
-                lobby.changePlayerFocus(index, GameType.Vanguard);
-            }
+        vgdSelectorBtn.setCommand((Runnable) () -> {
+            lobby.setCurrentGameMode(GameType.Vanguard);
+            vgdSelectorBtn.requestFocusInWindow();
+            lobby.changePlayerFocus(index, GameType.Vanguard);
         });
     }
 
@@ -622,14 +580,21 @@ public class PlayerPanel extends FPanel {
         radioAi = new FRadioButton(localizer.getMessage("lblAI"));
         radioOpen = new FRadioButton(localizer.getMessage("lblOpen"));
 
-        final JPopupMenu menu = new  JPopupMenu();
-        radioAiUseSimulation = new JCheckBoxMenuItem(localizer.getMessage("lblUseSimulation"));
-        menu.add(radioAiUseSimulation);
-        radioAiUseSimulation.addActionListener(new ActionListener() {
-            @Override public final void actionPerformed(final ActionEvent e) {
-                lobby.firePlayerChangeListener(index);
-            } });
-        radioAi.setComponentPopupMenu(menu);
+        final ButtonGroup group = new ButtonGroup();
+        radioAiUseSimulation = new JPopupMenu();
+        JRadioButtonMenuItem item = new JRadioButtonMenuItem("Heuristics");
+        item.addActionListener(e -> lobby.firePlayerChangeListener(index));
+        group.add(item);
+        radioAiUseSimulation.add(item);
+        item = new JRadioButtonMenuItem(localizer.getMessage("lblUseSimulation") + " (Hybrid)");
+        item.addActionListener(e -> lobby.firePlayerChangeListener(index));
+        group.add(item);
+        radioAiUseSimulation.add(item);
+        item = new JRadioButtonMenuItem(localizer.getMessage("lblUseSimulation"));
+        item.addActionListener(e -> lobby.firePlayerChangeListener(index));
+        group.add(item);
+        radioAiUseSimulation.add(item);
+        radioAi.setComponentPopupMenu(radioAiUseSimulation);
 
         radioHuman.addMouseListener(radioMouseAdapter(radioHuman, LobbySlotType.LOCAL));
         radioAi.addMouseListener   (radioMouseAdapter(radioAi,    LobbySlotType.AI));
@@ -643,38 +608,29 @@ public class PlayerPanel extends FPanel {
 
     private void createReadyButton() {
         chkReady = new FCheckBox(localizer.getMessage("lblReady"));
-        chkReady.addActionListener(new ActionListener() {
-            @Override public final void actionPerformed(final ActionEvent e) {
-                lobby.setReady(index, chkReady.isSelected());
-            }
-        });
+        chkReady.addActionListener(e -> lobby.setReady(index, chkReady.isSelected()));
     }
 
     private void createDevModeButton() {
         chkDevMode = new FCheckBox(localizer.getMessage("cbDevMode"));
 
-        chkDevMode.addActionListener(new ActionListener() {
-            @Override public final void actionPerformed(final ActionEvent e) {
-                final boolean toggle = chkDevMode.isSelected();
-                prefs.setPref(FPref.DEV_MODE_ENABLED, String.valueOf(toggle));
-                ForgePreferences.DEV_MODE = toggle;
+        chkDevMode.addActionListener(e -> {
+            final boolean toggle = chkDevMode.isSelected();
+            prefs.setPref(FPref.DEV_MODE_ENABLED, String.valueOf(toggle));
+            ForgePreferences.DEV_MODE = toggle;
 
-                // ensure that preferences panel reflects the change
-                prefs.save();
+            // ensure that preferences panel reflects the change
+            prefs.save();
 
-                lobby.setDevMode(index);
-            }
+            lobby.setDevMode(index);
         });
     }
 
     private void addHandlersDeckSelector() {
-        deckBtn.setCommand(new Runnable() {
-            @Override
-            public void run() {
-                lobby.setCurrentGameMode(GameType.Constructed);
-                deckBtn.requestFocusInWindow();
-                lobby.changePlayerFocus(index, GameType.Constructed);
-            }
+        deckBtn.setCommand((Runnable) () -> {
+            lobby.setCurrentGameMode(GameType.Constructed);
+            deckBtn.requestFocusInWindow();
+            lobby.changePlayerFocus(index, GameType.Constructed);
         });
     }
 
@@ -682,22 +638,19 @@ public class PlayerPanel extends FPanel {
         final FLabel newNameBtn = new FLabel.Builder().tooltip(localizer.getMessage("lblGetaNewRandomName")).iconInBackground(false)
                 .icon(FSkin.getIcon(FSkinProp.ICO_EDIT)).hoverable(true).opaque(false)
                 .unhoveredAlpha(0.9f).build();
-        newNameBtn.setCommand(new UiCommand() {
-            @Override
-            public void run() {
-                final String newName = lobby.getNewName();
-                if (null == newName) {
-                    return;
-                }
-                txtPlayerName.setText(newName);
-
-                if (index == 0) {
-                    prefs.setPref(FPref.PLAYER_NAME, newName);
-                    prefs.save();
-                }
-                txtPlayerName.requestFocus();
-                lobby.changePlayerFocus(index);
+        newNameBtn.setCommand((UiCommand) () -> {
+            final String newName = lobby.getNewName();
+            if (null == newName) {
+                return;
             }
+            txtPlayerName.setText(newName);
+
+            if (index == 0) {
+                prefs.setPref(FPref.PLAYER_NAME, newName);
+                prefs.save();
+            }
+            txtPlayerName.requestFocus();
+            lobby.changePlayerFocus(index);
         });
         newNameBtn.addFocusListener(nameFocusListener);
         return newNameBtn;
@@ -725,13 +678,11 @@ public class PlayerPanel extends FPanel {
     private FLabel createCloseButton() {
         final FLabel closeBtn = new FLabel.Builder().tooltip(localizer.getMessage("lblRemove")).iconInBackground(false)
                 .icon(FSkin.getIcon(FSkinProp.ICO_CLOSE)).hoverable(true).build();
-        closeBtn.setCommand(new Runnable() {
-            @Override public final void run() {
-                if (type == LobbySlotType.REMOTE && !SOptionPane.showConfirmDialog(String.format(localizer.getMessage("lblReallyKick"), playerName), localizer.getMessage("lblKick"), false)) {
-                    return;
-                }
-                lobby.removePlayer(index);
+        closeBtn.setCommand((Runnable) () -> {
+            if (type == LobbySlotType.REMOTE && !SOptionPane.showConfirmDialog(String.format(localizer.getMessage("lblReallyKick"), playerName), localizer.getMessage("lblKick"), false)) {
+                return;
             }
+            lobby.removePlayer(index);
         });
         return closeBtn;
     }
@@ -747,21 +698,134 @@ public class PlayerPanel extends FPanel {
 
         avatarLabel.setToolTipText(localizer.getMessage("ttlblAvatar"));
         avatarLabel.addFocusListener(avatarFocusListener);
-        avatarLabel.addMouseListener(avatarMouseListener);
+        avatarLabel.setCommand((UiCommand) () -> {
+            lobby.changePlayerFocus(index);
+            avatarLabel.requestFocusInWindow();
+
+            final AvatarSelector aSel = new AvatarSelector(playerName, avatarIndex, lobby.getUsedAvatars());
+            for (final FLabel lbl : aSel.getSelectables()) {
+                lbl.setCommand((UiCommand) () -> {
+                    setAvatarIndex(Integer.parseInt(lbl.getName().substring(11)));
+                    aSel.setVisible(false);
+                });
+            }
+
+            aSel.setVisible(true);
+            aSel.dispose();
+
+            if (index < 2) {
+                lobby.updateAvatarPrefs();
+            }
+
+            lobby.firePlayerChangeListener(index);
+        });
+        avatarLabel.setRightClickCommand((UiCommand) () -> {
+            lobby.changePlayerFocus(index);
+            avatarLabel.requestFocusInWindow();
+
+            setRandomAvatar();
+
+            if (index < 2) {
+                lobby.updateAvatarPrefs();
+            }
+        });
     }
 
     private void createSleeve() {
         final String[] currentPrefs = FModel.getPreferences().getPref(FPref.UI_SLEEVES).split(",");
         if (index < currentPrefs.length) {
-            sleeveIndex = Integer.parseInt(currentPrefs[index]);
-            sleeveLabel.setIcon(FSkin.getSleeves().get(sleeveIndex));
+            // card-art sleeve, if any, arrives via refreshSleeveFromDeck once a deck is selected
+            setSleeve(Integer.parseInt(currentPrefs[index]), "", Deck.DEFAULT_SLEEVE_OFFSET);
         } else {
             setRandomSleeve(false);
         }
 
         sleeveLabel.setToolTipText("L-click: Select sleeve. R-click: Randomize sleeve.");
         sleeveLabel.addFocusListener(sleeveFocusListener);
-        sleeveLabel.addMouseListener(sleeveMouseListener);
+        sleeveLabel.setCommand((UiCommand) () -> {
+            lobby.changePlayerFocus(index);
+            sleeveLabel.requestFocusInWindow();
+
+            final SleeveSelector sSel = new SleeveSelector(playerName, sleeveIndex, sleeveArtKey, lobby.getUsedSleeves());
+            sSel.setVisible(true);
+            sSel.dispose();
+
+            if (sSel.getResultArtKey() != null) {
+                applyCardArtSleeve(sSel.getResultArtKey(), sSel.getResultOffset());
+                persistSleeveToDeck(sSel.getResultArtKey(), sSel.getResultOffset());
+            } else if (sSel.getResultIndex() >= 0) {
+                setSleeveIndex(sSel.getResultIndex());
+                persistSleeveToDeck("", Deck.DEFAULT_SLEEVE_OFFSET);
+            }
+
+            if (index < 2) {
+                lobby.updateSleevePrefs();
+            }
+
+            lobby.firePlayerChangeListener(index);
+        });
+        sleeveLabel.setRightClickCommand((UiCommand) () -> {
+            lobby.changePlayerFocus(index);
+            sleeveLabel.requestFocusInWindow();
+
+            setRandomSleeve();
+            persistSleeveToDeck("", Deck.DEFAULT_SLEEVE_OFFSET);
+
+            if (index < 2) {
+                lobby.updateSleevePrefs();
+            }
+        });
+    }
+
+    private void applyCardArtSleeve(final String key, final int offset) {
+        setSleeveArtKey(key);
+        sleeveArtOffset = offset;
+        showCardArtOnSleeveLabel(key);
+    }
+
+    /** Updates the sleeve display from a deck's stored card-art sleeve, or the built-in sleeve if it has none. */
+    public void refreshSleeveFromDeck(final Deck deck) {
+        final String artKey = deck == null ? "" : deck.getSleeveArtKey();
+        if (artKey != null && !artKey.isEmpty()) {
+            sleeveArtKey = artKey;
+            sleeveArtOffset = deck.getSleeveArtOffset();
+            showCardArtOnSleeveLabel(artKey);
+        } else {
+            sleeveArtKey = "";
+            sleeveArtOffset = Deck.DEFAULT_SLEEVE_OFFSET;
+            sleeveLabel.setIcon(FSkin.getSleeves().get(sleeveIndex));
+            sleeveLabel.repaintSelf();
+        }
+    }
+
+    // Writes the chosen sleeve onto the currently selected deck and saves it (no-op for read-only decks)
+    private void persistSleeveToDeck(final String key, final int offset) {
+        final FDeckChooser chooser = getDeckChooser();
+        if (chooser == null) {
+            return;
+        }
+        final DeckProxy proxy = chooser.getLstDecks().getSelectedItem();
+        if (proxy == null) {
+            return;
+        }
+        final Deck deck = proxy.getDeck();
+        if (deck == null) {
+            return;
+        }
+        deck.setSleeveArtKey(key);
+        deck.setSleeveArtOffset(offset);
+        proxy.saveDeck();
+        lobby.fireDeckSleeveChange(index, deck);
+    }
+
+    private void showCardArtOnSleeveLabel(final String key) {
+        final BufferedImage art = ImageCache.getSleeveArtCropped(key, sleeveArtOffset);
+        if (art != null) {
+            sleeveLabel.setIcon(new FSkin.UnskinnedIcon(art));
+            sleeveLabel.repaintSelf();
+        } else {
+            ImageCache.fetchSleeveArt(key, () -> showCardArtOnSleeveLabel(key));
+        }
     }
 
     /** Applies a random avatar, avoiding avatars already used. */
@@ -830,13 +894,31 @@ public class PlayerPanel extends FPanel {
     }
     public void setSleeveIndex(final int sleeveIndex0) {
         sleeveIndex = sleeveIndex0;
+        sleeveArtKey = ""; // picking a built-in sleeve clears any card-art sleeve
+        sleeveArtOffset = Deck.DEFAULT_SLEEVE_OFFSET;
         final SkinImage icon = FSkin.getSleeves().get(sleeveIndex);
         sleeveLabel.setIcon(icon);
         sleeveLabel.repaintSelf();
     }
 
+    public void setSleeveArtKey(final String key) {
+        sleeveArtKey = key == null ? "" : key;
+    }
+
+    /** Applies a sleeve from slot data: built-in index, then card-art key (with its icon) if present. */
+    public void setSleeve(final int index, final String artKey, final int artOffset) {
+        setSleeveIndex(index);
+        if (artKey != null && !artKey.isEmpty()) {
+            setSleeveArtKey(artKey);
+            sleeveArtOffset = artOffset;
+            showCardArtOnSleeveLabel(artKey);
+        }
+    }
+
     public int getTeam() {
-        return teamComboBox.getSelectedIndex();
+        return lobby.hasVariant(GameType.Archenemy)
+                ? aeTeamComboBox.getSelectedIndex()
+                : teamComboBox.getSelectedIndex();
     }
     public void setTeam(final int team) {
         teamComboBox.suppressActionListeners();
@@ -887,5 +969,20 @@ public class PlayerPanel extends FPanel {
 
     void setDeckChooser(final FDeckChooser deckChooser) {
         this.deckChooser = deckChooser;
+    }
+
+    public void setAiProfile(String aiProfile) {
+        this.aiProfile = aiProfile;
+        if (aiProfile != null) {
+            aiPickerComboBox.setSelectedItem(aiProfile);
+        }
+    }
+
+    public String getAiProfile() {
+        final Object selection = aiPickerComboBox.getSelectedItem();
+        if (selection != null) {
+            return selection.toString();
+        }
+        return aiProfile;
     }
 }

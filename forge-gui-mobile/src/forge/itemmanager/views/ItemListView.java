@@ -22,6 +22,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.stream.IntStream;
 
 import com.badlogic.gdx.math.Rectangle;
 
@@ -60,7 +61,7 @@ public final class ItemListView<T extends InventoryItem> extends ItemView<T> {
 
     private final ItemList list = new ItemList();
     private final ItemListModel listModel;
-    private List<Integer> selectedIndices = new ArrayList<>();
+    private final List<Integer> selectedIndices = new ArrayList<>();
 
     public ItemListModel getListModel() {
         return listModel;
@@ -154,9 +155,7 @@ public final class ItemListView<T extends InventoryItem> extends ItemView<T> {
     @Override
     public void selectAll() {
         selectedIndices.clear();
-        for (Integer i = 0; i < getCount(); i++) {
-            selectedIndices.add(i);
-        }
+        IntStream.range(0, getCount()).forEach(selectedIndices::add);
         onSelectionChange();
     }
 
@@ -193,7 +192,7 @@ public final class ItemListView<T extends InventoryItem> extends ItemView<T> {
 
     @Override
     protected void onRefresh() {
-        list.setListData(model.getOrderedList());
+        list.setListData(new ArrayList<>(model.getOrderedList()));
     }
 
     @Override
@@ -250,6 +249,7 @@ public final class ItemListView<T extends InventoryItem> extends ItemView<T> {
                             }
                             else if (count == 2 && index == prevTapIndex) {
                                 itemManager.activateSelectedItems();
+                                itemManager.closeMenu();
                             }
                         }
                     }
@@ -277,6 +277,10 @@ public final class ItemListView<T extends InventoryItem> extends ItemView<T> {
                         w -= padding;
                     }
                     renderer.drawValue(g, value, font, foreColor, backColor, pressed, x + 1, y, w - 2, h); //x + 1 and w - 2 to account for left and right borders
+                    if(itemManager.itemIsFavorite(value)) {
+                        float starSize = h * 0.35f;
+                        g.drawImage(FSkinImage.HDSTAR_FILLED, x + 1, y, starSize, starSize);
+                    }
                 }
             });
             setFont(FSkinFont.get(14));

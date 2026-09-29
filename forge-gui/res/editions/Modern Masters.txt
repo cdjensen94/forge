@@ -1,7 +1,7 @@
 [metadata]
-Name=Modern Masters
 Code=MMA
 Date=2013-06-07
+Name=Modern Masters
 Type=Reprint
 BoosterCovers=3
 Booster=11 Common, 3 Uncommon, 1 RareMythic
@@ -25,7 +25,7 @@ ScryfallCode=MMA
 12 C Dispeller's Capsule @Franz Vohwinkel
 13 M Elspeth, Knight-Errant @Volkan Baǵa
 14 R Ethersworn Canonist @Izzy
-15 U Feudkiller's Verdict @Dan Scott
+15 U Feudkiller's Verdict @Dan Murayama Scott
 16 U Flickerwisp @Jeremy Enecio
 17 C Gleam of Resistance @Matt Stewart
 18 C Hillcomber Giant @Ralph Horsley
@@ -79,7 +79,7 @@ ScryfallCode=MMA
 66 U Take Possession @Michael Phillippi
 67 U Thirst for Knowledge @Anthony Francisco
 68 C Traumatic Visions @Cyril Van Der Haegen
-69 C Vedalken Dismisser @Dan Scott
+69 C Vedalken Dismisser @Dan Murayama Scott
 70 M Vendilion Clique @Michael Sutfin
 71 C Absorb Vis @Brandon Kitkouski
 72 U Auntie's Snitch @Warren Mahy
@@ -111,7 +111,7 @@ ScryfallCode=MMA
 98 C Stinkweed Imp @Nils Hamm
 99 C Street Wraith @Cyril Van Der Haegen
 100 C Syphon Life @Dan Seagrave
-101 C Thieving Sprite @Dan Scott
+101 C Thieving Sprite @Dan Murayama Scott
 102 R Tombstalker @Aleksi Briclot
 103 C Warren Pilferers @Wayne Reynolds
 104 C Warren Weirding @Matt Cavotta
@@ -234,7 +234,7 @@ ScryfallCode=MMA
 221 R City of Brass @Jung Park
 222 U Dakmor Salvage @John Avon
 223 R Glimmervoid @Lars Grant-West
-224 C Terramorphic Expanse @Dan Scott
+224 C Terramorphic Expanse @Dan Murayama Scott
 225 U Vivid Crag @Martina Pilcerova
 226 U Vivid Creek @Fred Fields
 227 U Vivid Grove @Howard Lyon
@@ -242,18 +242,21 @@ ScryfallCode=MMA
 229 U Vivid Meadow @Rob Alexander
 
 [tokens]
-w_5_5_giant_warrior
-w_1_1_kithkin_soldier
-w_1_1_soldier
-u_1_1_illusion_flying
-b_1_1_bat_flying
-b_1_1_goblin_rogue
-b_2_4_spider_reach
-b_2_2_zombie
-r_4_4_dragon_flying
-r_1_1_goblin
-g_4_4_elemental
-g_1_1_saproling
-g_2_5_treefolk_shaman
-ub_1_1_faerie_rogue_flying
-bg_1_1_worm
+1 w_5_5_giant_warrior @Svetlin Velinov
+2 w_1_1_kithkin_soldier @Randy Gallegos
+3 w_1_1_soldier @Goran Josic
+4 u_1_1_illusion_flying @Véronique Meignaud
+5 b_1_1_bat_flying @Wayne Reynolds
+6 b_1_1_goblin_rogue @Dave Kendall
+7 b_2_4_spider_reach @Lars Grant-West
+8 b_2_2_zombie @Bud Cook
+9 r_4_4_dragon_flying @Vance Kovacs
+10 r_1_1_goblin @Dave Kendall
+11 g_4_4_elemental @Brandon Kitkouski
+12 g_1_1_saproling @Warren Mahy
+13 g_2_5_treefolk_shaman @Zack Stella
+14 ub_1_1_faerie_rogue_flying @E. M. Gist
+15 bg_1_1_worm @Chuck Lukacs
+
+[other]
+16 emblem_elspeth_knight_errant @Volkan Baǵa

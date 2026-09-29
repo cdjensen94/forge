@@ -1,7 +1,7 @@
 Name:Herald of Vengeance
 ManaCost:3 W W
 Types:Creature Angel
-PT:4/3
+PT:4/5
 K:Flying
 T:Mode$ ChangesZone | Origin$ Any | Destination$ Battlefield | ValidCard$ Card.Self | Execute$ TrigDestroyAll | TriggerDescription$ When CARDNAME enters the battlefield, destroy each permanent you don't control that has the same name as a permanent that dealt damage to you last turn.
 SVar:TrigDestroyAll:DB$ DestroyAll | ValidCards$ Permanent.YouDontCtrl+sharesNameWith Remembered

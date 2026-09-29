@@ -1,7 +1,6 @@
 package forge.gamemodes.net;
 
-import org.apache.commons.lang3.StringUtils;
-
+import forge.gamemodes.match.AbstractGuiGame;
 import forge.gamemodes.match.GameLobby.GameLobbyData;
 import forge.gamemodes.match.LobbySlotType;
 import forge.gamemodes.net.client.ClientGameLobby;
@@ -9,74 +8,85 @@ import forge.gamemodes.net.client.FGameClient;
 import forge.gamemodes.net.event.IdentifiableNetEvent;
 import forge.gamemodes.net.event.MessageEvent;
 import forge.gamemodes.net.event.NetEvent;
-import forge.gamemodes.net.event.UpdateLobbyPlayerEvent;
 import forge.gamemodes.net.server.FServerManager;
 import forge.gamemodes.net.server.ServerGameLobby;
+import forge.localinstance.properties.ForgeNetPreferences;
 import forge.gui.GuiBase;
 import forge.gui.interfaces.IGuiGame;
 import forge.gui.interfaces.ILobbyView;
 import forge.gui.util.SOptionPane;
 import forge.interfaces.ILobbyListener;
-import forge.interfaces.IPlayerChangeListener;
 import forge.interfaces.IUpdateable;
 import forge.localinstance.properties.ForgeConstants;
 import forge.localinstance.properties.ForgePreferences.FPref;
-import forge.localinstance.properties.ForgeProfileProperties;
 import forge.model.FModel;
 import forge.player.GamePlayerUtil;
 import forge.util.Localizer;
+import forge.util.URLValidator;
+import org.apache.commons.lang3.StringUtils;
+
+import java.util.ArrayList;
+import java.util.List;
 
 public class NetConnectUtil {
     private NetConnectUtil() { }
 
-    public static String getServerUrl() {
-        final String url = SOptionPane.showInputDialog(Localizer.getInstance().getMessage("lblOnlineMultiplayerDest"), Localizer.getInstance().getMessage("lblConnectToServer"));
-        if (url == null) { return null; }
+    /**
+     * Prompt for the server address to join. Returns null if cancelled, or the address string.
+     */
+    public static String getJoinServerUrl() {
+        final String url = SOptionPane.showInputDialog(
+                Localizer.getInstance().getMessage("lblEnterServerAddress"),
+                Localizer.getInstance().getMessage("lblJoinGame"));
+        if (url == null || url.isEmpty()) { return null; }
 
-        //prompt user for player one name if needed
-        if (StringUtils.isBlank(FModel.getPreferences().getPref(FPref.PLAYER_NAME))) {
-            GamePlayerUtil.setPlayerName();
-        }
+        ensurePlayerName();
         return url;
     }
 
+    /**
+     * Ensure the player name is set before connecting.
+     */
+    public static void ensurePlayerName() {
+        if (StringUtils.isBlank(FModel.getPreferences().getPref(FPref.PLAYER_NAME))) {
+            GamePlayerUtil.setPlayerName();
+        }
+    }
+
     public static ChatMessage host(final IOnlineLobby onlineLobby, final IOnlineChatInterface chatInterface) {
-        final int port = ForgeProfileProperties.getServerPort();
+        final int port = FModel.getNetPreferences().getPrefInt(ForgeNetPreferences.FNetPref.NET_PORT);
         final FServerManager server = FServerManager.getInstance();
         final ServerGameLobby lobby = new ServerGameLobby();
         final ILobbyView view = onlineLobby.setLobby(lobby);
 
+        NetworkLogConfig.activateNetworkLogging();
         server.startServer(port);
         server.setLobby(lobby);
 
         lobby.setListener(new IUpdateable() {
             @Override
-            public final void update(final boolean fullUpdate) {
+            public void update(final boolean fullUpdate) {
                 view.update(fullUpdate);
                 server.updateLobbyState();
             }
             @Override
-            public final void update(final int slot, final LobbySlotType type) {return;}
+            public void update(final int slot, final LobbySlotType type) {}
         });
-        view.setPlayerChangeListener(new IPlayerChangeListener() {
-            @Override
-            public final void update(final int index, final UpdateLobbyPlayerEvent event) {
-                server.updateSlot(index, event);
-                server.updateLobbyState();
-            }
-        });
+        // updateSlot already routes through the IUpdateable listener above, which calls
+        // updateLobbyState; calling it again here would broadcast a duplicate LobbyUpdateEvent.
+        view.setPlayerChangeListener(server::updateSlot);
 
         server.setLobbyListener(new ILobbyListener() {
             @Override
-            public final void update(final GameLobbyData state, final int slot) {
+            public void update(final GameLobbyData state, final int slot) {
                 // NO-OP, lobby connected directly
             }
             @Override
-            public final void message(final String source, final String message) {
-                chatInterface.addMessage(new ChatMessage(source, message));
+            public void message(final String source, final String message, final ChatMessage.MessageType type) {
+                chatInterface.addMessage(new ChatMessage(source, message, type));
             }
             @Override
-            public final void close() {
+            public void close() {
                 // NO-OP, server can't receive close message
             }
             @Override
@@ -84,17 +94,19 @@ public class NetConnectUtil {
                 return null;
             }
         });
+        server.setDraftHandler(view.getDraftHandler());
         chatInterface.setGameClient(new IRemote() {
             @Override
-            public final void send(final NetEvent event) {
-                if (event instanceof MessageEvent) {
-                    final MessageEvent message = (MessageEvent) event;
-                    chatInterface.addMessage(new ChatMessage(message.getSource(), message.getMessage()));
+            public void send(final NetEvent event) {
+                if (event instanceof MessageEvent message) {
+                    if (server.handleCommand(message.getMessage())) {
+                        return;
+                    }
                     server.broadcast(event);
                 }
             }
             @Override
-            public final Object sendAndWait(final IdentifiableNetEvent event) {
+            public Object sendAndWait(final IdentifiableNetEvent event) {
                 send(event);
                 return null;
             }
@@ -102,51 +114,93 @@ public class NetConnectUtil {
 
         view.update(true);
 
+        server.broadcast(new MessageEvent(server.formatAfkTimeoutMessage()));
+
         return new ChatMessage(null, Localizer.getInstance().getMessage("lblHostingPortOnN", String.valueOf(port)));
     }
 
-    public static void copyHostedServerUrl() {
-        String internalAddress = FServerManager.getInstance().getLocalAddress();
-        String externalAddress = FServerManager.getInstance().getExternalAddress();
-        String internalUrl = internalAddress + ":" + ForgeProfileProperties.getServerPort();
-        String externalUrl = null;
+    /**
+     * Snapshot of the hosted server's reachable addresses, used by the desktop and mobile
+     * server-URL dialogs. {@code starIndex} is the row to auto-copy and visually mark — either
+     * the previously remembered URL (if still present) or the first row as a fallback.
+     */
+    public static final class ServerAddressList {
+        public final List<String> labels;
+        public final List<String> urls;
+        public final int starIndex;
+
+        ServerAddressList(final List<String> labels, final List<String> urls, final int starIndex) {
+            this.labels = labels;
+            this.urls = urls;
+            this.starIndex = starIndex;
+        }
+    }
+
+    public static ServerAddressList collectHostedServerAddresses() {
+        final ForgeNetPreferences netPrefs = FModel.getNetPreferences();
+        final int port = netPrefs.getPrefInt(ForgeNetPreferences.FNetPref.NET_PORT);
+        final String externalAddress = FServerManager.getExternalAddress();
+
+        final List<String> labels = new ArrayList<>();
+        final List<String> urls = new ArrayList<>();
         if (externalAddress != null) {
-            externalUrl = externalAddress + ":" + ForgeProfileProperties.getServerPort();
-            GuiBase.getInterface().copyToClipboard(externalUrl);
-        } else {
-            GuiBase.getInterface().copyToClipboard(internalAddress);
+            labels.add("External (WAN)");
+            urls.add(externalAddress + ":" + port);
+        }
+        for (final java.util.Map.Entry<String, String> entry : FServerManager.getAllLocalAddresses().entrySet()) {
+            labels.add(entry.getKey());
+            urls.add(entry.getValue() + ":" + port);
         }
 
-        String message = "";
-        if (externalUrl != null) {
-            message = Localizer.getInstance().getMessage("lblShareURLToMakePlayerJoinServer", externalUrl, internalUrl);
-        } else {
-            message = Localizer.getInstance().getMessage("lblForgeUnableDetermineYourExternalIP", message + internalUrl);
+        final String rememberedUrl = netPrefs.getPref(ForgeNetPreferences.FNetPref.NET_LAST_COPIED_URL);
+        int starIndex = urls.indexOf(rememberedUrl);
+        if (starIndex < 0) {
+            starIndex = urls.isEmpty() ? -1 : 0;
         }
-        SOptionPane.showMessageDialog(message, Localizer.getInstance().getMessage("lblServerURL"), SOptionPane.INFORMATION_ICON);
+        return new ServerAddressList(labels, urls, starIndex);
+    }
+
+    public static void rememberCopiedServerUrl(final String url) {
+        final ForgeNetPreferences netPrefs = FModel.getNetPreferences();
+        netPrefs.setPref(ForgeNetPreferences.FNetPref.NET_LAST_COPIED_URL, url);
+        netPrefs.save();
     }
 
     public static ChatMessage join(final String url, final IOnlineLobby onlineLobby, final IOnlineChatInterface chatInterface) {
         final IGuiGame gui = GuiBase.getInterface().getNewGuiGame();
-        final FGameClient client = new FGameClient(FModel.getPreferences().getPref(FPref.PLAYER_NAME), "0", gui);
+        String hostname;
+        int port;
+
+        URLValidator.HostPort hostPort = URLValidator.parseURL(url);
+        if (hostPort == null) {
+            return new ChatMessage(null, ForgeConstants.INVALID_HOST_COMMAND);
+        }
+
+        hostname = hostPort.host();
+        port = hostPort.port();
+        if (port == -1) port = Integer.valueOf(ForgeNetPreferences.FNetPref.NET_PORT.getDefault());
+
+        final FGameClient client = new FGameClient(FModel.getPreferences().getPref(FPref.PLAYER_NAME), gui, hostname, port);
         onlineLobby.setClient(client);
         chatInterface.setGameClient(client);
         final ClientGameLobby lobby = new ClientGameLobby();
         final ILobbyView view =  onlineLobby.setLobby(lobby);
         lobby.setListener(view);
+        if (gui instanceof AbstractGuiGame agg) {
+            agg.setClientLobby(lobby);
+        }
         client.addLobbyListener(new ILobbyListener() {
             @Override
-            public final void message(final String source, final String message) {
-                chatInterface.addMessage(new ChatMessage(source, message));
+            public void message(final String source, final String message, final ChatMessage.MessageType type) {
+                chatInterface.addMessage(new ChatMessage(source, message, type));
             }
             @Override
-            public final void update(final GameLobbyData state, final int slot) {
+            public void update(final GameLobbyData state, final int slot) {
                 lobby.setLocalPlayer(slot);
                 lobby.setData(state);
             }
             @Override
-            public final void close() {
-                GuiBase.setInterrupted(true);
+            public void close() {
                 onlineLobby.closeConn(Localizer.getInstance().getMessage("lblYourConnectionToHostWasInterrupted", url));
             }
             @Override
@@ -154,35 +208,55 @@ public class NetConnectUtil {
                 return lobby;
             }
         });
-        view.setPlayerChangeListener(new IPlayerChangeListener() {
-            @Override
-            public final void update(final int index, final UpdateLobbyPlayerEvent event) {
-                client.send(event);
-            }
-        });
+        client.setDraftHandler(view.getDraftHandler());
+        view.setPlayerChangeListener((index, event) -> client.send(event));
 
-        String hostname = url;
-        int port = ForgeProfileProperties.getServerPort();
-
-        //see if port specified in URL
-        int index = url.indexOf(':');
-        if (index >= 0) {
-            hostname = url.substring(0, index);
-            String portStr = url.substring(index + 1);
-            try {
-                port = Integer.parseInt(portStr);
-            }
-            catch (Exception ex) {}
-        }
-
+        NetworkLogConfig.activateNetworkLogging();
         try {
-            client.connect(hostname, port);
+            client.connect();
         }
         catch (Exception ex) {
-            //return a message to close the connection so we will not crash...
-            return new ChatMessage(null, ForgeConstants.CLOSE_CONN_COMMAND);
+            // Return error with details for GUI display
+            String errorDetail = getConnectionErrorMessage(ex, hostname, port);
+            return new ChatMessage(null, ForgeConstants.CONN_ERROR_PREFIX + errorDetail);
         }
 
         return new ChatMessage(null, Localizer.getInstance().getMessage("lblConnectedIPPort", hostname, String.valueOf(port)));
+    }
+
+    /**
+     * Generate a user-friendly error message for connection failures.
+     */
+    private static String getConnectionErrorMessage(Exception ex, String hostname, int port) {
+        Localizer localizer = Localizer.getInstance();
+        StringBuilder sb = new StringBuilder();
+
+        // Get the root cause for better error messages
+        Throwable cause = ex.getCause() != null ? ex.getCause() : ex;
+        String causeName = cause.getClass().getSimpleName();
+
+        sb.append(localizer.getMessage("lblConnectionFailedTo", hostname, port));
+        sb.append("\n\n");
+
+        // Provide specific messages for common error types
+        if (causeName.contains("ConnectException") || causeName.contains("ConnectionRefused")) {
+            sb.append(localizer.getMessage("lblConnectionRefused"));
+        } else if (causeName.contains("UnknownHost")) {
+            sb.append(localizer.getMessage("lblUnknownHost"));
+        } else if (causeName.contains("Timeout") || causeName.contains("TimedOut")) {
+            sb.append(localizer.getMessage("lblConnectionTimeout"));
+        } else if (causeName.contains("NoRouteToHost")) {
+            sb.append(localizer.getMessage("lblNoRouteToHost"));
+        } else {
+            // Generic error with the exception message
+            String msg = cause.getMessage();
+            if (msg != null && !msg.isEmpty()) {
+                sb.append(msg);
+            } else {
+                sb.append(causeName);
+            }
+        }
+
+        return sb.toString();
     }
 }

@@ -4,6 +4,7 @@ Date=2023-09-08
 Name=Wilds of Eldraine Commander
 Type=Commander
 ScryfallCode=WOC
+TokensFallbackCode=WOE
 
 [cards]
 1 M Tegwyll, Duke of Splendor @Ekaterina Burmak
@@ -77,7 +78,7 @@ ScryfallCode=WOC
 69 R Kor Spiritdancer @Nils Hamm
 70 R Mantle of the Ancients @Lucas Graciano
 71 M Realm-Cloaked Giant @Adam Paquette
-72 R Retether @Dan Scott
+72 R Retether @Dan Murayama Scott
 73 U Sage's Reverie @Jason Rainville
 74 R Shalai, Voice of Plenty @Victor Adame Minguez
 75 U Spectral Steel @Johannes Voss
@@ -106,7 +107,7 @@ ScryfallCode=WOC
 98 C Keep Watch @Fred Rahmqvist
 99 R Midnight Clock @Alexander Forssberg
 100 U Nightveil Sprite @Uriah Voth
-101 C Opt @Dan Scott
+101 C Opt @Dan Murayama Scott
 102 R Perplexing Test @Fariba Khamseh
 103 U Quickling @Clint Cearley
 104 U Reality Shift @Howard Lyon
@@ -124,7 +125,7 @@ ScryfallCode=WOC
 116 R Rankle, Master of Pranks @Dmitry Burmak
 117 U Reckless Spite @Karl Kopinski
 118 R Thrilling Encore @Alex Konstad
-119 C Ancestral Mask @Massimilano Frezzato
+119 C Ancestral Mask @Massimiliano Frezzato
 120 C Aura Gnarlid @Lars Grant-West
 121 R Bear Umbra @Howard Lyon
 122 C Careful Cultivation @A. M. Sartor
@@ -150,10 +151,10 @@ ScryfallCode=WOC
 142 R Oona, Queen of the Fae @Adam Rex
 143 U Pollenbright Wings @Brian Valeza
 144 U Siona, Captain of the Pyleas @Chris Rallis
-145 C Arcane Signet @Dan Scott
+145 C Arcane Signet @Dan Murayama Scott
 146 U Dimir Signet @Raoul Vitale
 147 U Fellwar Stone @John Avon
-148 C Mind Stone @Adam Rex
+148 U Mind Stone @Adam Rex
 149 U Sol Ring @Mike Bierek
 150 U Talisman of Dominance @Mike Dringenberg
 151 C Wayfarer's Bauble @Darrell Riche
@@ -181,22 +182,19 @@ ScryfallCode=WOC
 173 U Vitu-Ghazi, the City-Tree @Martina Pilcerova
 
 [tokens]
-b_1_1_faerie_rogue_flying
-g_1_1_human_monk_g
-g_1_1_saproling
-g_3_3_elephant
-r_4_2_pirate_noblock
-role_monster
-role_royal
-role_sorcerer
-role_virtuous
-role_virtuous
-role_virtuous
-u_1_1_faerie_flying
-ub_1_1_faerie_rogue_flying
-w_1_1_cat_lifelink
-w_1_1_human_soldier
-w_1_1_pegasus_flying
-w_2_2_cat
-w_2_4_ox
-wb_1_1_spirit_flying
+1 role_monster @Rovina Cai
+# Need to flip it
+1 role_virtuous @Rovina Cai
+2 role_royal @Rovina Cai
+# Need to flip it
+2 role_virtuous @Rovina Cai
+7 w_1_1_human_soldier @Kimonas Theodossiou
+9 w_2_2_pegasus_flying @Lars Grant-West
+10 u_1_1_faerie_flying @Irina Nordsol
+11 b_1_1_faerie_rogue_flying @Dave Allsop
+12 r_4_2_pirate_noblock @Igor Krstic
+15 g_1_1_saproling @Joseph Meehan
+16 ub_1_1_faerie_rogue_flying @E. M. Gist
+
+[other]
+4 copy @David Palumbo

@@ -3,6 +3,7 @@ package forge.game.ability.effects;
 import forge.game.Game;
 import forge.game.GameLogEntryType;
 import forge.game.ability.AbilityUtils;
+import forge.game.event.GameEventAddLog;
 import forge.game.ability.SpellAbilityEffect;
 import forge.game.card.Card;
 import forge.game.player.Player;
@@ -20,7 +21,7 @@ public class ChoosePlayerEffect extends SpellAbilityEffect {
 
         sb.append(Lang.joinHomogenous(getTargetPlayers(sa)));
 
-        sb.append("chooses a player.");
+        sb.append(" chooses a player.");
 
         return sb.toString();
     }
@@ -64,7 +65,7 @@ public class ChoosePlayerEffect extends SpellAbilityEffect {
                 }
                 if (!secret) {
                     //ie Shared Fate – log the chosen player
-                    if (sa.hasParam("DontNotify")) game.getGameLog().add(GameLogEntryType.INFORMATION, Localizer.getInstance().getMessage("lblPlayerPickedChosen", sa.getActivatingPlayer(), chosen));
+                    if (sa.hasParam("DontNotify")) game.fireEvent(new GameEventAddLog(GameLogEntryType.INFORMATION, Localizer.getInstance().getMessage("lblPlayerPickedChosen", sa.getActivatingPlayer(), chosen)));
                     else game.getAction().notifyOfValue(sa, p, Localizer.getInstance().getMessage("lblPlayerPickedChosen", sa.getActivatingPlayer(), chosen), null);
                 }
                 // SubAbility that only fires if a player is chosen

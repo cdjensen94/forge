@@ -35,9 +35,9 @@ import javax.swing.SwingConstants;
 import javax.swing.SwingUtilities;
 import javax.swing.UIManager;
 
-import forge.gui.GuiBase;
 import forge.localinstance.properties.ForgePreferences.FPref;
 import forge.localinstance.skin.FSkinProp;
+import forge.model.FModel;
 import forge.toolbox.FProgressBar;
 import forge.toolbox.FSkin;
 import forge.toolbox.FSkin.SkinIcon;
@@ -78,15 +78,10 @@ public class SplashFrame extends JFrame {
      */
     public SplashFrame() {
         super();
-        FSkin.loadLight(GuiBase.getForgePrefs().getPref(FPref.UI_SKIN), true);
+        FSkin.loadLight(FModel.getPreferences().getPref(FPref.UI_SKIN), true);
 
         try {
-            SwingUtilities.invokeAndWait(new Runnable() {
-                @Override
-                public void run() {
-                    SplashFrame.this.init();
-                }
-            });
+            SwingUtilities.invokeAndWait(SplashFrame.this::init);
         }
         catch (Exception e) {
         }

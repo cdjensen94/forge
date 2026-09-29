@@ -17,23 +17,32 @@
  */
 package forge.gamemodes.match.input;
 
-import java.util.ArrayList;
-import java.util.List;
-
 import forge.game.Game;
+import forge.game.GameView;
 import forge.game.card.Card;
+import forge.game.phase.PhaseType;
 import forge.game.player.Player;
-import forge.game.player.PlayerController;
+import forge.game.player.PlayerView;
 import forge.game.player.actions.PassPriorityAction;
-import forge.game.spellability.LandAbility;
 import forge.game.spellability.SpellAbility;
+import forge.game.spellability.StackItemView;
+import forge.gamemodes.match.DeclineScope;
+import forge.gamemodes.match.SuggestionType;
+import forge.gamemodes.match.YieldController;
+import forge.gamemodes.match.YieldUpdate;
+import forge.gamemodes.net.server.FServerManager;
+import forge.gamemodes.net.server.FServerManager.AfkTimeout;
 import forge.localinstance.properties.ForgePreferences.FPref;
+import forge.util.collect.FCollectionView;
 import forge.model.FModel;
 import forge.player.GamePlayerUtil;
 import forge.player.PlayerControllerHuman;
 import forge.util.ITriggerEvent;
 import forge.util.Localizer;
 import forge.util.ThreadUtil;
+
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * <p>
@@ -49,18 +58,117 @@ public class InputPassPriority extends InputSyncronizedBase {
 
     private List<SpellAbility> chosenSa;
 
+    private SuggestionType pendingSuggestion = null;
+    private String pendingSuggestionMessage = null;
+
     public InputPassPriority(final PlayerControllerHuman controller) {
         super(controller);
+    }
+
+    @Override
+    protected void onStop() {
+        getController().clearActionableCards();
+    }
+
+    @Override
+    public void showAndWait() {
+        final FServerManager server = FServerManager.getInstance();
+        final AfkTimeout timeout = server != null
+                ? server.armAfkTimeout(getController(), this)
+                : AfkTimeout.NOOP;
+        try {
+            super.showAndWait();
+        } finally {
+            timeout.cancel();
+        }
     }
 
     /** {@inheritDoc} */
     @Override
     public final void showMessage() {
+        if (!getController().isMacroActive() && !isAlreadyYielding()) {
+            // Suppress one prompt after a yield ends — avoids "yielded → ended → yield again?" loop
+            if (getController().getYieldController().getBoolPref(FPref.YIELD_SUPPRESS_AFTER_END)
+                    && getController().getYieldController().didYieldJustEnd()) {
+                showNormalPrompt();
+                return;
+            }
+
+            if (getController().getYieldController().getBoolPref(FPref.YIELD_AUTO_PASS_NO_ACTIONS)) {
+                showNormalPrompt();
+                return;
+            }
+
+            // Both scopes NEVER → skip including stack-transition tracking (no decline state to maintain)
+            DeclineScope stackScope = getController().getYieldController().getDeclineScope(FPref.YIELD_DECLINE_SCOPE_STACK_YIELD);
+            DeclineScope noActionsScope = getController().getYieldController().getDeclineScope(FPref.YIELD_DECLINE_SCOPE_NO_ACTIONS);
+            if (stackScope == DeclineScope.NEVER && noActionsScope == DeclineScope.NEVER) {
+                showNormalPrompt();
+                return;
+            }
+
+            GameView gvForStack = getGameView();
+            boolean stackNonEmpty = gvForStack != null && gvForStack.getStack() != null
+                    && !gvForStack.getStack().isEmpty();
+            getController().getYieldController().onPriorityReceived(stackNonEmpty);
+
+            Localizer loc = Localizer.getInstance();
+
+            if (!getController().getYieldController().isSuggestionDeclined(SuggestionType.STACK_YIELD)
+                    && shouldShowStackYieldPrompt()) {
+                pendingSuggestion = SuggestionType.STACK_YIELD;
+                pendingSuggestionMessage = loc.getMessage("lblCannotRespondToStackYieldPrompt");
+                showYieldSuggestionPrompt();
+                return;
+            }
+            if (!getController().getYieldController().isSuggestionDeclined(SuggestionType.NO_ACTIONS)
+                    && shouldShowNoActionsPrompt()) {
+                pendingSuggestion = SuggestionType.NO_ACTIONS;
+                pendingSuggestionMessage = loc.getMessage("lblNoActionsAvailableYieldPrompt");
+                showYieldSuggestionPrompt();
+                return;
+            }
+        }
+
+        showNormalPrompt();
+    }
+
+    private void showYieldSuggestionPrompt() {
+        // State may have flipped between the initial check and now (e.g. async multiplayer click).
+        if (isAlreadyYielding()) {
+            pendingSuggestion = null;
+            pendingSuggestionMessage = null;
+            showNormalPrompt();
+            return;
+        }
+
+        Localizer loc = Localizer.getInstance();
+        String fullMessage = pendingSuggestionMessage;
+        DeclineScope scope = getController().getYieldController().getDeclineScope(pendingSuggestion.scopePref());
+        if (scope == DeclineScope.STACK) {
+            fullMessage += "\n" + loc.getMessage("lblYieldSuggestionDeclineHintStack");
+        } else if (scope == DeclineScope.TURN) {
+            fullMessage += "\n" + loc.getMessage("lblYieldSuggestionDeclineHint");
+        }
+        showMessage(fullMessage);
+        chosenSa = null;
+        getController().getGui().updateButtons(getOwner(),
+                loc.getMessage("lblAccept"),
+                loc.getMessage("lblDecline"),
+                true, true, true);
+        getController().getGui().alertUser();
+    }
+
+    private void showNormalPrompt() {
+        pendingSuggestion = null;
+        pendingSuggestionMessage = null;
+
+        getController().pushActionableCards(false);
         showMessage(getTurnPhasePriorityMessage(getController().getGame()));
         chosenSa = null;
         Localizer localizer = Localizer.getInstance();
         if (getController().canUndoLastAction()) { //allow undoing with cancel button if can undo last action
-            getController().getGui().updateButtons(getOwner(), localizer.getMessage("lblOK"), localizer.getMessage("lblUndo"), true, true, true);
+            getController().getGui().updateButtons(getOwner(), localizer.getMessage("lblOK"), localizer.getMessage("lblUndo") + " (" + getController().getGame().getStack().getUndoStackSize() + ")", true, true, true);
         }
         else { //otherwise allow ending turn with cancel button
             getController().getGui().updateButtons(getOwner(), localizer.getMessage("lblOK"), localizer.getMessage("lblEndTurn"), true, true, true);
@@ -69,29 +177,121 @@ public class InputPassPriority extends InputSyncronizedBase {
         getController().getGui().alertUser();
     }
 
+    private boolean isAlreadyYielding() {
+        return getController().getYieldController().isYieldActive();
+    }
+
+    private GameView getGameView() {
+        return getController().getGui().getGameView();
+    }
+
+    private boolean checkHasAvailableActions() {
+        Player player = getController().getPlayer();
+        if (player == null) return false;
+        // Freshened upstream in chooseSpellAbilityToPlay; don't recompute
+        return player.getView().hasAvailableActions();
+    }
+
+    private boolean shouldShowStackYieldPrompt() {
+        GameView gv = getGameView();
+        if (gv == null) return false;
+        FCollectionView<StackItemView> stack = gv.getStack();
+        if (stack == null || stack.isEmpty()) return false;
+        return !checkHasAvailableActions();
+    }
+
+    private boolean shouldShowNoActionsPrompt() {
+        GameView gv = getGameView();
+        PlayerView pv = getOwner();
+        if (gv == null || pv == null) return false;
+        FCollectionView<StackItemView> stack = gv.getStack();
+        if (stack != null && !stack.isEmpty()) return false;
+        PlayerView currentTurn = gv.getPlayerTurn();
+        if (currentTurn != null && currentTurn.equals(pv)) {
+            // Always suppress on player's first turn (no lands/mana yet)
+            if (gv.getTurn() <= gv.getPlayers().size()) return false;
+            if (getController().getYieldController().getBoolPref(FPref.YIELD_SUPPRESS_ON_OWN_TURN)) return false;
+        }
+        return !checkHasAvailableActions();
+    }
+
     /** {@inheritDoc} */
     @Override
     protected final void onOk() {
-        passPriority(new Runnable() {
-            @Override
-            public void run() {
-                getController().macros().addRememberedAction(new PassPriorityAction());
+        if (pendingSuggestion != null) {
+            // Defensive: state may have flipped (e.g. async multiplayer click).
+            if (isAlreadyYielding()) {
+                pendingSuggestion = null;
+                pendingSuggestionMessage = null;
                 stop();
+                return;
             }
+            // APINA flipped on between display and accept — drop the now-redundant accept (host-local only)
+            if (!getController().isRemoteClient()
+                    && getController().getYieldController().getBoolPref(FPref.YIELD_AUTO_PASS_NO_ACTIONS)) {
+                pendingSuggestion = null;
+                pendingSuggestionMessage = null;
+                stop();
+                return;
+            }
+            SuggestionType accepted = pendingSuggestion;
+            pendingSuggestion = null;
+            pendingSuggestionMessage = null;
+
+            PlayerView self = getOwner();
+            YieldController yc = getController().getYieldController();
+            if (accepted == SuggestionType.STACK_YIELD) {
+                yc.setAutoPassUntilStackEmpty(true, true);
+                if (self != null) getController().getGui().applyYieldUpdate(
+                        new YieldUpdate.StackYield(self, true, true));
+            } else if (accepted == SuggestionType.NO_ACTIONS) {
+                // UPKEEP because UNTAP has no priority pass — a marker on UNTAP could never fire.
+                if (self != null) {
+                    boolean atOrPast = YieldController.isPriorityAtOrPastMarker(
+                            getGameView(), self, PhaseType.UPKEEP);
+                    yc.setMarker(self, PhaseType.UPKEEP, atOrPast);
+                    getController().getGui().applyYieldUpdate(
+                            new YieldUpdate.SetMarker(self, PhaseType.UPKEEP, atOrPast));
+                }
+            }
+            if (isAlreadyYielding()) {
+                stop();
+            } else {
+                showNormalPrompt();
+            }
+            return;
+        }
+
+        passPriority();
+    }
+
+    /** Distinct from clicking OK, which accepts a yield suggestion when one is on screen. */
+    public void passPriority() {
+        if (isFinished()) return;
+        passPriority(() -> {
+            getController().macros().addRememberedAction(new PassPriorityAction(
+                    getController().getGame().getStack().isEmpty(),
+                    getController().getGame().getPhaseHandler().getPhase()));
+            stop();
         });
     }
 
     /** {@inheritDoc} */
     @Override
     protected final void onCancel() {
+        if (pendingSuggestion != null) {
+            getController().getYieldController().declineSuggestion(pendingSuggestion);
+            pendingSuggestion = null;
+            pendingSuggestionMessage = null;
+            showNormalPrompt();
+            return;
+        }
+
         if (!getController().tryUndoLastAction()) { //undo if possible
             //otherwise end turn
-            passPriority(new Runnable() {
-                @Override
-                public void run() {
-                    getController().autoPassUntilEndOfTurn();
-                    stop();
-                }
+            passPriority(() -> {
+                getController().autoPassUntilEndOfTurn();
+                stop();
             });
         }
     }
@@ -108,17 +308,15 @@ public class InputPassPriority extends InputSyncronizedBase {
             if (game.getStack().isEmpty()) { //phase can't end right now if stack isn't empty
                 Player player = game.getPhaseHandler().getPriorityPlayer();
                 if (player != null && player.getManaPool().willManaBeLostAtEndOfPhase() && player.getLobbyPlayer() == GamePlayerUtil.getGuiPlayer()) {
-                    ThreadUtil.invokeInGameThread(new Runnable() { //must invoke in game thread so dialog can be shown on mobile game
-                        @Override
-                        public void run() {
-                            Localizer localizer = Localizer.getInstance();
-                            String message = localizer.getMessage("lblYouHaveManaFloatingInYourManaPoolCouldBeLostIfPassPriority");
-                            if (player.getManaPool().hasBurn()) {
-                                message += " " + localizer.getMessage("lblYouWillTakeManaBurnDamageEqualAmountFloatingManaLostThisWay");
-                            }
-                            if (getController().getGui().showConfirmDialog(message, localizer.getMessage("lblManaFloating"), localizer.getMessage("lblOK"), localizer.getMessage("lblCancel"))) {
-                                runnable.run();
-                            }
+                    //must invoke in game thread so dialog can be shown on mobile game
+                    ThreadUtil.invokeInGameThread(() -> {
+                        Localizer localizer = Localizer.getInstance();
+                        String message = localizer.getMessage("lblYouHaveManaFloatingInYourManaPoolCouldBeLostIfPassPriority");
+                        if (player.getManaPool().hasBurn()) {
+                            message += " " + localizer.getMessage("lblYouWillTakeManaBurnDamageEqualAmountFloatingManaLostThisWay");
+                        }
+                        if (getController().getGui().showConfirmDialog(message, localizer.getMessage("lblManaFloating"), localizer.getMessage("lblOK"), localizer.getMessage("lblCancel"))) {
+                            runnable.run();
                         }
                     });
                     return;
@@ -131,16 +329,9 @@ public class InputPassPriority extends InputSyncronizedBase {
     public List<SpellAbility> getChosenSa() { return chosenSa; }
 
     @Override
-    protected final void onPlayerSelected(Player selected, final ITriggerEvent triggerEvent) {
-        PlayerController pc = selected.getController();
-        if (pc.isGuiPlayer()) {
-           pc.setFullControl(!pc.isFullControl());
-        }
-    }
-
-    @Override
     protected boolean onCardSelected(final Card card, final List<Card> otherCardsToSelect, final ITriggerEvent triggerEvent) {
-        //remove unplayable unless triggerEvent specified, in which case unplayable may be shown as disabled options
+        // remove unplayable unless triggerEvent specified, in which case unplayable may be shown as disabled options
+        // (so shortcuts are constant regardless of game state)
         List<SpellAbility> abilities = card.getAllPossibleAbilities(getController().getPlayer(), triggerEvent == null); 
         if (abilities.isEmpty()) {
             return false;
@@ -177,7 +368,7 @@ public class InputPassPriority extends InputSyncronizedBase {
         if (sa.isSpell()) {
             return Localizer.getInstance().getMessage("lblCastSpell");
         }
-        if (sa instanceof LandAbility) {
+        if (sa.isLandAbility()) {
             return Localizer.getInstance().getMessage("lblPlayLand");
         }
         return Localizer.getInstance().getMessage("lblActivateAbility");

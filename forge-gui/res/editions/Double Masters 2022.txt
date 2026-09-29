@@ -80,9 +80,9 @@ ScryfallCode=2X2
 67 U Wash Out @Steven Belledin
 68 C Balustrade Spy @Jaime Jones
 69 M Bitterblossom @Rebecca Guay
-70 U Blood Artist @LA Draws
+70 U Blood Artist @L.A. Draws
 71 C Bloodflow Connoisseur @Slawomir Maniak
-72 U Carrier Thrall @Lius Lasahido
+72 C Carrier Thrall @Lius Lasahido
 73 R Damnation @Kev Walker
 74 C Disfigure @Justin Sweet
 75 C Eyeblight's Ending @Ron Spears
@@ -128,7 +128,7 @@ ScryfallCode=2X2
 115 U Labyrinth Champion @Chase Stone
 116 C Lava Coil @Wesley Burt
 117 U Lightning Bolt @Christopher Moeller
-118 U Living Lightning @Caio Monteiro
+118 C Living Lightning @Caio Monteiro
 119 C Monastery Swiftspear @Steve Argyle
 120 C Pirate's Pillage @Wayne Reynolds
 121 C Purphoros's Emissary @Sam Burley
@@ -239,9 +239,9 @@ ScryfallCode=2X2
 226 U Heroic Reinforcements @Scott Murphy
 227 R Hostage Taker @Wayne Reynolds
 228 R Hydroid Krasis @Jason Felix
-229 R Intet, the Dreamer @Dan Scott
+229 R Intet, the Dreamer @Dan Murayama Scott
 230 C Izzet Charm @Zoltan Boros
-231 R Jeskai Ascendancy @Dan Scott
+231 R Jeskai Ascendancy @Dan Murayama Scott
 232 U Jeskai Charm @Mathias Kollros
 233 R Jodah, Archmage Eternal @Yongjae Choi
 234 R Judith, the Scourge Diva @Wesley Burt
@@ -426,7 +426,7 @@ ScryfallCode=2X2
 411 U Selesnya Sanctuary @Ron Spears
 412 U Simic Growth Chamber @Pete Venters
 
-[showcase]
+[etched]
 413 M Emrakul, the Aeons Torn @Mark Tedin
 414 M Kozilek, Butcher of Truth @Michael Komarck
 415 M Ulamog, the Infinite Gyre @Aleksi Briclot
@@ -521,8 +521,8 @@ ScryfallCode=2X2
 504 M Hellkite Overlord @Justin Sweet
 505 R Hostage Taker @Wayne Reynolds
 506 R Hydroid Krasis @Jason Felix
-507 R Intet, the Dreamer @Dan Scott
-508 R Jeskai Ascendancy @Dan Scott
+507 R Intet, the Dreamer @Dan Murayama Scott
+508 R Jeskai Ascendancy @Dan Murayama Scott
 509 R Jodah, Archmage Eternal @Yongjae Choi
 510 R Judith, the Scourge Diva @Wesley Burt
 511 M Kaalia of the Vast @Michael Komarck
@@ -939,24 +939,28 @@ ScryfallCode=2X2
 1 Wrenn and Six+|2X2
 
 [tokens]
-c_1_1_eldrazi_scion_sac
-c_1_1_spirit
-w_4_4_angel_flying_vigilance
-w_2_2_knight_vigilance
-w_1_1_monk_prowess
-w_1_1_soldier
-w_1_1_spirit_flying
-w_1_1_vampire_lifelink
-u_2_2_drake_flying
-b_1_1_faerie_rogue_flying
-b_2_2_zombie
-r_1_1_elemental
-g_4_4_bear
-g_3_3_boar
-g_0_1_egg_defender
-g_1_1_saproling
-g_1_2_spider_reach
-brg_3_3_cat_dragon_flying
-bg_1_1_worm
-c_3_3_a_phyrexian_golem
-c_a_treasure_sac
+1 c_1_1_eldrazi_scion_sac @Izzy
+2 c_1_1_spirit @Daniel Ljunggren
+3 w_4_4_angel_flying_vigilance @Grzegorz Rutkowski
+5 w_2_2_knight_vigilance @Matt Stewart
+6 w_1_1_monk_prowess @Steven Belledin
+7 w_1_1_soldier @Magali Villeneuve
+8 w_1_1_spirit_flying @Mike Sass
+9 w_1_1_vampire_lifelink @John Severin Brassell
+10 u_2_2_drake_flying @Svetlin Velinov
+11 b_1_1_faerie_rogue_flying @Dave Allsop
+12 b_2_2_zombie @Anna Steinbauer
+13 r_1_1_elemental @Winona Nelson
+14 g_4_4_bear @Kev Walker
+15 g_3_3_boar @Jesper Ejsing
+16 g_0_1_egg_defender @Christopher Burdett
+17 g_1_1_saproling @Brad Rigney
+18 g_1_2_spider_reach @Slawomir Maniak
+19 brg_3_3_cat_dragon_flying @Cynthia Sheppard
+20 bg_1_1_worm @Chuck Lukacs
+21 c_3_3_a_phyrexian_golem @Volkan Baǵa
+22 c_a_treasure_sac @Alayna Danner
+
+[other]
+23 emblem_liliana_the_last_hope @Jaime Jones
+24 emblem_wrenn_and_six @Chase Stone

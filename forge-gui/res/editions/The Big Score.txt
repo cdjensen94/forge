@@ -23,7 +23,7 @@ ScryfallCode=BIG
 15 M Territory Forge @Mirko Failoni
 16 M Ancient Cornucopia @Bartek Fedyczak
 17 M Bristlebud Farmer @Adrián Rodríguez Pérez
-18 M Omenpath Journey @Marzena Nereida Piwowar
+18 M Omenpath Journey @Nereida
 19 M Sandstorm Salvager @Francis Tneh
 20 M Vaultborn Tyrant @Loïc Canavaggia
 21 M Loot, the Key to Everything @Rudy Siswanto
@@ -36,6 +36,8 @@ ScryfallCode=BIG
 28 M Transmutation Font @Mark Poole
 29 M Fomori Vault @Jonas De Ro
 30 M Tarnation Vista @Alayna Danner
+
+[showcase]
 31 M Collector's Cage @Ben Hill
 32 M Grand Abolisher @David Astruga
 33 M Oltec Matterweaver @Inkognit
@@ -71,6 +73,8 @@ ScryfallCode=BIG
 63 M Lotus Ring @Ben Hill
 64 M Sword of Wealth and Power @Artur Nakhodkin
 65 M Tarnation Vista @Artur Nakhodkin
+
+[extended art]
 66 M Collector's Cage @Bartek Fedyczak
 67 M Grand Abolisher @Aurore Folny
 68 M Oltec Matterweaver @Villarrte
@@ -88,7 +92,7 @@ ScryfallCode=BIG
 80 M Territory Forge @Mirko Failoni
 81 M Ancient Cornucopia @Bartek Fedyczak
 82 M Bristlebud Farmer @Adrián Rodríguez Pérez
-83 M Omenpath Journey @Marzena Nereida Piwowar
+83 M Omenpath Journey @Nereida
 84 M Sandstorm Salvager @Francis Tneh
 85 M Vaultborn Tyrant @Loïc Canavaggia
 86 M Loot, the Key to Everything @Rudy Siswanto
@@ -103,10 +107,10 @@ ScryfallCode=BIG
 95 M Tarnation Vista @Alayna Danner
 
 [tokens]
-b_2_1_bat_flying
-c_0_0_a_construct_total_artifacts
-c_1_1_a_gnome
-c_3_3_a_golem
-c_a_blood_draw
-c_a_food_sac
-c_a_map_sac_explore
+1 b_2_1_bat_flying @Inkognit
+2 c_a_blood_draw @Mark Poole
+3 c_0_0_a_construct_total_artifacts @Matteo Bassini
+4 c_a_food_sac @Patrik Hell
+5 c_1_1_a_gnome @Villarrte
+6 c_3_3_a_golem @Brian Valeza
+7 c_a_map_sac_explore @Camille Alquier

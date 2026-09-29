@@ -1,28 +1,29 @@
 package forge.player;
 
-import java.util.Set;
-
-import org.apache.commons.lang3.StringUtils;
-
 import forge.LobbyPlayer;
 import forge.ai.AIOption;
 import forge.ai.AiProfileUtil;
 import forge.ai.LobbyPlayerAi;
 import forge.gui.GuiBase;
 import forge.gui.util.SOptionPane;
+import forge.localinstance.properties.ForgeNetPreferences;
 import forge.localinstance.properties.ForgePreferences.FPref;
 import forge.model.FModel;
 import forge.util.GuiDisplayUtil;
+import forge.util.Localizer;
 import forge.util.MyRandom;
+import org.apache.commons.lang3.StringUtils;
+
+import java.util.Set;
 
 public final class GamePlayerUtil {
     private GamePlayerUtil() { }
-
+    private static Localizer localizer = Localizer.getInstance();
     private static final LobbyPlayer guiPlayer = new LobbyPlayerHuman("Human");
-    public static final LobbyPlayer getGuiPlayer() {
+    public static LobbyPlayer getGuiPlayer() {
         return guiPlayer;
     }
-    public static final LobbyPlayer getGuiPlayer(final String name, final int avatarIndex, final int sleeveIndex, final boolean writePref) {
+    public static LobbyPlayer getGuiPlayer(final String name, final int avatarIndex, final int sleeveIndex, final boolean writePref) {
         if (writePref) {
             if (!name.equals(guiPlayer.getName())) {
                 guiPlayer.setName(name);
@@ -38,39 +39,42 @@ public final class GamePlayerUtil {
         return new LobbyPlayerHuman(name, avatarIndex, sleeveIndex);
     }
 
-    public static final LobbyPlayer getQuestPlayer() {
+    public static LobbyPlayer getQuestPlayer() {
         return guiPlayer; //TODO: Make this a separate player
     }
 
-    public final static LobbyPlayer createAiPlayer() {
+    public static LobbyPlayer createAiPlayer() {
         return createAiPlayer(GuiDisplayUtil.getRandomAiName());
     }
-    public final static LobbyPlayer createAiPlayer(final String name) {
+    public static LobbyPlayer createAiPlayer(final String name) {
         final int avatarCount = GuiBase.getInterface().getAvatarCount();
         final int sleeveCount = GuiBase.getInterface().getSleevesCount();
         return createAiPlayer(name, avatarCount == 0 ? 0 : MyRandom.getRandom().nextInt(avatarCount), sleeveCount == 0 ? 0 : MyRandom.getRandom().nextInt(sleeveCount));
     }
-    public final static LobbyPlayer createAiPlayer(final String name, final String profileOverride) {
+    public static LobbyPlayer createAiPlayer(final String name, final String profileOverride) {
         final int avatarCount = GuiBase.getInterface().getAvatarCount();
         final int sleeveCount = GuiBase.getInterface().getSleevesCount();
         return createAiPlayer(name, avatarCount == 0 ? 0 : MyRandom.getRandom().nextInt(avatarCount), sleeveCount == 0 ? 0 : MyRandom.getRandom().nextInt(sleeveCount), null, profileOverride);
     }
-    public final static LobbyPlayer createAiPlayer(final String name, final int avatarIndex) {
-        final int sleeveCount = GuiBase.getInterface().getSleevesCount();
-        return createAiPlayer(name, avatarIndex, sleeveCount == 0 ? 0 : MyRandom.getRandom().nextInt(sleeveCount), null, "");
+    public static LobbyPlayer createAiPlayer(final String name, final int avatarIndex) {
+        return createAiPlayer(name, avatarIndex, "");
     }
-    public final static LobbyPlayer createAiPlayer(final String name, final int avatarIndex, final int sleeveIndex) {
+    public static LobbyPlayer createAiPlayer(final String name, final int avatarIndex, final String profileOverride) {
+        final int sleeveCount = GuiBase.getInterface().getSleevesCount();
+        return createAiPlayer(name, avatarIndex, sleeveCount == 0 ? 0 : MyRandom.getRandom().nextInt(sleeveCount), null, profileOverride);
+    }
+    public static LobbyPlayer createAiPlayer(final String name, final int avatarIndex, final int sleeveIndex) {
         return createAiPlayer(name, avatarIndex, sleeveIndex, null, "");
     }
-    public final static LobbyPlayer createAiPlayer(final String name, final int avatarIndex, final int sleeveIndex, final Set<AIOption> options) {
+    public static LobbyPlayer createAiPlayer(final String name, final int avatarIndex, final int sleeveIndex, final Set<AIOption> options) {
         return createAiPlayer(name, avatarIndex, sleeveIndex, options, "");
     }
-    public final static LobbyPlayer createAiPlayer(final String name, final int avatarIndex, final int sleeveIndex, final Set<AIOption> options, final String profileOverride) {
+    public static LobbyPlayer createAiPlayer(final String name, final int avatarIndex, final int sleeveIndex, final Set<AIOption> options, final String profileOverride) {
         final LobbyPlayerAi player = new LobbyPlayerAi(name, options);
 
         // TODO: implement specific AI profiles for quest mode.
         String profile = "";
-        if (profileOverride.isEmpty()) {
+        if (profileOverride == null || profileOverride.isEmpty()) {
             String lastProfileChosen = FModel.getPreferences().getPref(FPref.UI_CURRENT_AI_PROFILE);
             if (!AiProfileUtil.getProfilesDisplayList().contains(lastProfileChosen)) {
                 System.out.println("[AI Preferences] Unknown profile " + lastProfileChosen + " was requested, resetting to default.");
@@ -87,8 +91,8 @@ public final class GamePlayerUtil {
             profile = profileOverride;
         }
 
-        assert (!profile.isEmpty());
-        
+        assert (!profile.isEmpty()); // TODO test instead of assert
+
         player.setAiProfile(profile);
         player.setAvatarIndex(avatarIndex);
         player.setSleeveIndex(sleeveIndex);
@@ -105,7 +109,7 @@ public final class GamePlayerUtil {
             } else {
                 newPlayerName = getVerifiedPlayerName(getPlayerNameUsingStandardPrompt(oldPlayerName), oldPlayerName);
             }
-        } catch (final IllegalStateException ise){
+        } catch (final IllegalStateException ise) {
             //now is not a good time for this...
             newPlayerName = StringUtils.isBlank(oldPlayerName) ? "Human" : oldPlayerName;
         }
@@ -151,4 +155,65 @@ public final class GamePlayerUtil {
         }
         return newName;
     }
+
+    public static void setServerPort() {
+        final int oldPort = FModel.getNetPreferences().getPrefInt(ForgeNetPreferences.FNetPref.NET_PORT);
+        int newPort = getServerPortPrompt(oldPort);
+        FModel.getNetPreferences().setPref(ForgeNetPreferences.FNetPref.NET_PORT, String.valueOf(newPort));
+        FModel.getNetPreferences().save();
+    }
+    private static Integer getServerPortPrompt(final Integer serverPort) {
+        String input = SOptionPane.showInputDialog(
+                localizer.getMessage("sOPServerPromptMessage"),
+                localizer.getMessage("sOPServerPromptTitle"),
+                null,
+                serverPort.toString(),
+                null,
+                true
+        );
+        Integer port;
+        try {
+             port = Integer.parseInt(input);
+        } catch (NumberFormatException nfe) {
+            SOptionPane.showErrorDialog(localizer.getMessage("sOPServerPromptError", input));
+            return serverPort;
+        }
+        if (port < 0 || port > 65535) {
+            SOptionPane.showErrorDialog(localizer.getMessage("sOPServerPromptError", input));
+            return serverPort;
+        }
+        return port;
+    }
+
+    public static void setAfkTimeout() {
+        final int oldVal = FModel.getNetPreferences().getPrefInt(ForgeNetPreferences.FNetPref.NET_AFK_TIMEOUT);
+        int newVal = getAfkTimeoutPrompt(oldVal);
+        FModel.getNetPreferences().setPref(ForgeNetPreferences.FNetPref.NET_AFK_TIMEOUT, String.valueOf(newVal));
+        FModel.getNetPreferences().save();
+    }
+
+    private static Integer getAfkTimeoutPrompt(final Integer current) {
+        String input = SOptionPane.showInputDialog(
+                localizer.getMessage("sOPAfkTimeoutPromptMessage"),
+                localizer.getMessage("sOPAfkTimeoutPromptTitle"),
+                null,
+                current.toString(),
+                null,
+                true
+        );
+        if (input == null) { return current; }
+        int value;
+        try {
+            value = Integer.parseInt(input);
+        } catch (NumberFormatException nfe) {
+            SOptionPane.showErrorDialog(localizer.getMessage("sOPAfkTimeoutPromptError", input));
+            return current;
+        }
+        if (value < 0 || value > 60) {
+            SOptionPane.showErrorDialog(localizer.getMessage("sOPAfkTimeoutPromptError", input));
+            return current;
+        }
+        return value;
+    }
+
 }

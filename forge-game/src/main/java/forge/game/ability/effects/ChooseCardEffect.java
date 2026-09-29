@@ -6,7 +6,6 @@ import com.google.common.collect.Lists;
 import forge.game.Direction;
 import forge.game.player.DelayedReveal;
 import forge.game.player.PlayerView;
-import forge.util.CardTranslation;
 
 import forge.card.CardType;
 import forge.game.Game;
@@ -17,9 +16,9 @@ import forge.game.card.CardCollection;
 import forge.game.card.CardCollectionView;
 import forge.game.card.CardLists;
 import forge.game.card.CardPredicates;
-import forge.game.card.CardPredicates.Presets;
 import forge.game.player.Player;
 import forge.game.player.PlayerActionConfirmMode;
+import forge.game.player.PlayerCollection;
 import forge.game.spellability.SpellAbility;
 import forge.game.zone.ZoneType;
 import forge.util.Aggregates;
@@ -61,7 +60,7 @@ public class ChooseCardEffect extends SpellAbilityEffect {
         final Game game = activator.getGame();
         CardCollection allChosen = new CardCollection();
 
-        final List<Player> tgtPlayers = getDefinedPlayersOrTargeted(sa);
+        final PlayerCollection tgtPlayers = getDefinedPlayersOrTargeted(sa);
 
         List<ZoneType> choiceZone = Lists.newArrayList(ZoneType.Battlefield);
         if (sa.hasParam("ChoiceZone")) {
@@ -72,7 +71,7 @@ public class ChooseCardEffect extends SpellAbilityEffect {
             choices = CardLists.getValidCards(choices, sa.getParam("Choices"), activator, host, sa);
         }
         if (sa.hasParam("TargetControls")) {
-            choices = CardLists.filterControlledBy(choices, tgtPlayers.get(0));
+            choices = CardLists.filterControlledBy(choices, tgtPlayers);
         }
         if (sa.hasParam("DefinedCards")) {
             choices = AbilityUtils.getDefinedCards(host, sa.getParam("DefinedCards"), sa);
@@ -103,7 +102,7 @@ public class ChooseCardEffect extends SpellAbilityEffect {
             CardCollectionView pChoices = choices;
             CardCollection chosen = new CardCollection();
             if (!p.isInGame()) {
-                p = getNewChooser(sa, activator, p);
+                p = getNewChooser(sa, p);
             }
             if (sa.hasParam("ControlledByPlayer")) {
                 final String param = sa.getParam("ControlledByPlayer");
@@ -118,16 +117,9 @@ public class ChooseCardEffect extends SpellAbilityEffect {
             }
             boolean dontRevealToOwner = true;
             if (sa.hasParam("EachBasicType")) {
-                // Get all lands,
-                List<Card> land = CardLists.filter(game.getCardsIn(ZoneType.Battlefield), Presets.LANDS);
-                String eachBasic = sa.getParam("EachBasicType");
-                if (eachBasic.equals("Controlled")) {
-                    land = CardLists.filterControlledBy(land, p);
-                }
-
                 // Choose one of each BasicLand given special place
                 for (final String type : CardType.getBasicTypes()) {
-                    final CardCollectionView cl = CardLists.getType(land, type);
+                    final CardCollectionView cl = CardLists.getType(pChoices, type);
                     if (!cl.isEmpty()) {
                         final String prompt = Localizer.getInstance().getMessage("lblChoose") + " " + Lang.nounWithAmount(1, type);
                         Card c = p.getController().chooseSingleEntityForEffect(cl, sa, prompt, false, null);
@@ -138,8 +130,7 @@ public class ChooseCardEffect extends SpellAbilityEffect {
                 }
             } else if (sa.hasParam("ChooseEach")) {
                 final String s = sa.getParam("ChooseEach");
-                final String[] types = s.equals("Party") ? new String[]{"Cleric","Thief","Warrior","Wizard"}
-                     : s.split(" & ");
+                final Collection<String> types = s.equals("Party") ? CardType.Constant.PARTY_TYPES : Arrays.asList(s.split(" & "));
                 for (final String type : types) {
                     CardCollection valids = CardLists.filter(pChoices, CardPredicates.isType(type));
                     if (!valids.isEmpty()) {
@@ -155,7 +146,7 @@ public class ChooseCardEffect extends SpellAbilityEffect {
             } else if (sa.hasParam("WithTotalPower")) {
                 final int totP = AbilityUtils.calculateAmount(host, sa.getParam("WithTotalPower"), sa);
                 CardCollection negativeCreats = CardLists.filterLEPower(p.getCreaturesInPlay(), -1);
-                int negativeNum = Aggregates.sum(negativeCreats, CardPredicates.Accessors.fnGetNetPower);
+                int negativeNum = Aggregates.sum(negativeCreats, Card::getNetPower);
                 CardCollection creature = CardLists.filterLEPower(p.getCreaturesInPlay(), totP - negativeNum);
                 CardCollection chosenPool = new CardCollection();
                 int chosenP = 0;
@@ -171,7 +162,7 @@ public class ChooseCardEffect extends SpellAbilityEffect {
                         chosenP += c.getNetPower();
                         chosenPool.add(c);
                         negativeCreats.remove(c);
-                        negativeNum = Aggregates.sum(negativeCreats, CardPredicates.Accessors.fnGetNetPower);
+                        negativeNum = Aggregates.sum(negativeCreats, Card::getNetPower);
                         creature = CardLists.filterLEPower(p.getCreaturesInPlay(), totP - chosenP - negativeNum);
                         creature.removeAll(chosenPool);
                     }
@@ -245,7 +236,7 @@ public class ChooseCardEffect extends SpellAbilityEffect {
                     } else if (value.equals("ChosenType")) {
                         tag = host.getChosenType();
                     }
-                    if (!tag.equals("")) {
+                    if (!tag.isEmpty()) {
                         title = title + " (" + tag +")";
                     }
                 }
@@ -264,7 +255,7 @@ public class ChooseCardEffect extends SpellAbilityEffect {
                     CardCollectionView shown = !p.hasKeyword("LimitSearchLibrary")
                             ? searched.getCardsIn(ZoneType.Library) : searched.getCardsIn(ZoneType.Library, fetchNum);
                     DelayedReveal delayedReveal = new DelayedReveal(shown, ZoneType.Library, PlayerView.get(searched),
-                            CardTranslation.getTranslatedName(host.getName()) + " - " +
+                            host.getTranslatedName() + " - " +
                                     Localizer.getInstance().getMessage("lblLookingCardIn") + " ");
                     Card choice = p.getController().chooseSingleEntityForEffect(pChoices, delayedReveal, sa, title,
                             !sa.hasParam("Mandatory"), p, null);
@@ -291,11 +282,9 @@ public class ChooseCardEffect extends SpellAbilityEffect {
             allChosen.addAll(chosen);
         }
         if (sa.hasParam("Reveal") && sa.hasParam("Secretly")) {
-            for (final Player p : tgtPlayers) {
-                game.getAction().reveal(allChosen, p, true, revealTitle ?
-                        sa.getParam("RevealTitle") : Localizer.getInstance().getMessage("lblChosenCards") + " ", 
-                        !revealTitle);
-            }
+            game.getAction().revealTo(allChosen, game.getPlayers(), revealTitle ?
+                    sa.getParam("RevealTitle") : Localizer.getInstance().getMessage("lblChosenCards") + " ", 
+                    !revealTitle);
         }
         host.setChosenCards(allChosen);
         if (sa.hasParam("ForgetOtherRemembered")) {

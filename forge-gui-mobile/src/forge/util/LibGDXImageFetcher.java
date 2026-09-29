@@ -1,19 +1,38 @@
 package forge.util;
 
-import java.io.FileOutputStream;
+import com.badlogic.gdx.files.FileHandle;
+import forge.Forge;
+import forge.adventure.data.ConfigData;
+import forge.adventure.util.Config;
+import forge.gui.GuiBase;
+import forge.item.PaperCard;
+import forge.localinstance.properties.ForgeConstants;
+import io.sentry.Sentry;
+
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
-
-import com.badlogic.gdx.files.FileHandle;
-
-import forge.Forge;
-import forge.gui.GuiBase;
-import forge.localinstance.properties.ForgeConstants;
+import java.nio.file.Files;
+import java.util.Arrays;
+import java.util.concurrent.TimeUnit;
 
 public class LibGDXImageFetcher extends ImageFetcher {
+    @Override
+    protected boolean shouldTryScryfallSetLookupCandidate(PaperCard requestedCard, PaperCard candidate) {
+        if (!Forge.isMobileAdventureMode) {
+            return true;
+        }
+
+        ConfigData configData = Config.instance().getConfigData();
+        if (configData == null || configData.allowedEditions == null || configData.allowedEditions.length == 0) {
+            return true;
+        }
+
+        return Arrays.asList(configData.allowedEditions).contains(candidate.getEdition());
+    }
+
     @Override
     protected Runnable getDownloadTask(String[] downloadUrls, String destPath, Runnable notifyObservers) {
         return new LibGDXDownloadTask(downloadUrls, destPath, notifyObservers);
@@ -30,31 +49,80 @@ public class LibGDXImageFetcher extends ImageFetcher {
             this.notifyObservers = notifyObservers;
         }
 
-        private void doFetch(String urlToDownload) throws IOException {
-            String newdespath = urlToDownload.contains(".fullborder.") || urlToDownload.startsWith(ForgeConstants.URL_PIC_SCRYFALL_DOWNLOAD) ?
+        private boolean doFetch(String urlToDownload) throws IOException {
+            if (disableHostedDownload && urlToDownload.startsWith(ForgeConstants.URL_CARDFORGE)) {
+                // Don't try to download card images from cardforge servers
+                return false;
+            }
+
+            if (ScryfallRateLimiter.shouldSkip(urlToDownload)) {
+                return false;
+            }
+
+            boolean isScryfallUrl = urlToDownload.startsWith(ForgeConstants.URL_PIC_SCRYFALL_DOWNLOAD)
+                    || urlToDownload.startsWith(ForgeConstants.URL_SCRYFALL_CDN);
+            String newdespath = urlToDownload.contains(".fullborder.") || isScryfallUrl ?
                     TextUtil.fastReplace(destPath, ".full.", ".fullborder.") : destPath;
-            if (!newdespath.contains(".full") && urlToDownload.startsWith(ForgeConstants.URL_PIC_SCRYFALL_DOWNLOAD))
-                newdespath = newdespath.replace(".jpg", ".fullborder.jpg"); //fix planes/phenomenon for round border options
+            if (!newdespath.contains(".full") && isScryfallUrl &&
+                    !destPath.startsWith(ForgeConstants.CACHE_TOKEN_PICS_DIR) && !destPath.startsWith(ForgeConstants.CACHE_PLANECHASE_PICS_DIR))
+                newdespath = newdespath.replace(".jpg", ".fullborder.jpg"); // fix planes/phenomenon for round border options
             URL url = new URL(urlToDownload);
             System.out.println("Attempting to fetch: " + url);
-            java.net.URLConnection c = url.openConnection();
-            c.setRequestProperty("User-Agent", "");
+            ScryfallRateLimiter.acquire(urlToDownload);
+            HttpURLConnection c = (HttpURLConnection) url.openConnection();
+            c.setRequestProperty("Accept", "*/*");
+            c.setRequestProperty("User-Agent", BuildInfo.getUserAgent());
+            // don't let a stalled connection hang the download thread forever
+            c.setConnectTimeout(10000);
+            c.setReadTimeout(30000);
 
-            InputStream is = c.getInputStream();
-            // First, save to a temporary file so that nothing tries to read
-            // a partial download.
+            int responseCode = c.getResponseCode();
+            String responseMessage = c.getResponseMessage();
+            System.out.println("HTTP Response: " + responseCode + " " + responseMessage + " for URL: " + urlToDownload);
+            if (responseCode != HttpURLConnection.HTTP_OK) {
+                System.err.println("Failed to fetch image. HTTP code: " + responseCode + " (" + responseMessage + ") for URL: " + urlToDownload);
+
+                if (responseCode == 429 && ScryfallRateLimiter.isApiUrl(urlToDownload)) {
+                    Sentry.captureMessage("Device has been rate limited. Adding reduction of download attempts for this device. " + urlToDownload);
+                    ScryfallRateLimiter.noteIfRateLimited(responseCode, urlToDownload, c.getHeaderField("Retry-After"));
+                }
+
+                c.disconnect();
+                return false;
+            }
+
+            // First, save to a temporary file so that nothing tries to read a partial download.
             FileHandle destFile = new FileHandle(newdespath + ".tmp");
             System.out.println(newdespath);
             destFile.parent().mkdirs();
-            OutputStream out = new FileOutputStream(destFile.file());
-            // Conversion to JPEG will be handled differently depending on the platform
-            Forge.getDeviceAdapter().convertToJPEG(is, out);
-            is.close();
-            out.close(); //close outputstream before destfile.moveto so it can delete the tmp file internally
+
+            // Instead of calling the heavy Forge->DeviceAdapter->Converter which decodes uncompressed rasters into memory,
+            // pipe the raw binary incoming network bytes directly down into the disk.
+            // This flatlines Object[], HashMap$Node, and ByteInterleavedRaster allocations down to 0 bytes on jfr
+            try (InputStream is = c.getInputStream();
+                 OutputStream out = Files.newOutputStream(destFile.file().toPath())) {
+
+                byte[] buffer = new byte[8192]; // Reusable local micro-buffer
+                int bytesRead;
+                while ((bytesRead = is.read(buffer)) != -1) {
+                    out.write(buffer, 0, bytesRead);
+                }
+            }
+
+            if (destFile.length() == 0) {
+                // never leave a poisoned 0-byte cache file ("downloaded" but
+                // undisplayable, and never retried because the file exists)
+                System.err.println("  Downloaded 0 bytes, skipping");
+                destFile.delete();
+                c.disconnect();
+                return false;
+            }
             destFile.moveTo(new FileHandle(newdespath));
+            c.disconnect();
 
             System.out.println("Saved image to " + newdespath);
             GuiBase.getInterface().invokeInEdtLater(notifyObservers);
+            return true;
         }
 
         private String tofullBorder(String imageurl) {
@@ -65,7 +133,7 @@ public class LibGDXImageFetcher extends ImageFetcher {
                 HttpURLConnection conn = (HttpURLConnection) url.openConnection();
                 //connection.setConnectTimeout(1000 * 5); //wait 5 seconds the most
                 //connection.setReadTimeout(1000 * 5);
-                conn.setRequestProperty("User-Agent", "");
+                conn.setRequestProperty("User-Agent", BuildInfo.getUserAgent());
                 if(conn.getResponseCode() == HttpURLConnection.HTTP_NOT_FOUND)
                     imageurl = TextUtil.fastReplace(imageurl, ".full.jpg", ".fullborder.jpg");
                 conn.disconnect();
@@ -76,21 +144,19 @@ public class LibGDXImageFetcher extends ImageFetcher {
         }
 
         public void run() {
+            boolean success = false;
             for (String urlToDownload : downloadUrls) {
-                boolean isPlanechaseBG = urlToDownload.startsWith("https://downloads.cardforge.org/images/planes/");
+                boolean isPlanechaseBG = urlToDownload.startsWith("PLANECHASEBG:");
                 try {
-                    if (isPlanechaseBG) {
-                        doFetch(urlToDownload);
-                        break;
-                    } else {
-                        doFetch(tofullBorder(urlToDownload));
+                    success = doFetch(urlToDownload.replace("PLANECHASEBG:", ""));
+                    if (success) {
                         break;
                     }
-                } catch (IOException e) {
+                } catch (Exception e) {
                     if (isPlanechaseBG) {
-                        System.out.println("Failed to download planechase background [" + destPath + "] image: " + e.getMessage());
+                        System.err.println("Failed to download planechase background [" + destPath + "] image: " + e.getMessage());
                     } else {
-                        System.out.println("Failed to download card [" + destPath + "] image: " + e.getMessage());
+                        System.err.println("Failed to download card [" + destPath + "] image: " + e.getMessage());
                         if (urlToDownload.contains("tokens")) {
                             int setIndex = urlToDownload.lastIndexOf('_');
                             int typeIndex = urlToDownload.lastIndexOf('.');
@@ -98,14 +164,24 @@ public class LibGDXImageFetcher extends ImageFetcher {
                             String extension = urlToDownload.substring(typeIndex);
                             urlToDownload = setlessFilename + extension;
                             try {
-                                doFetch(tofullBorder(urlToDownload));
-                                break;
-                            } catch (IOException t) {
-                                System.out.println("Failed to download setless token [" + destPath + "]: " + e.getMessage());
+                                try {
+                                    TimeUnit.MILLISECONDS.sleep(100);
+                                } catch (InterruptedException ex) {
+                                    throw new RuntimeException(ex);
+                                }
+                                success = doFetch(urlToDownload);
+                                if (success) {
+                                    break;
+                                }
+                            } catch (Exception t) {
+                                System.out.println("Failed to download setless token [" + destPath + "]: " + t.getMessage());
                             }
                         }
                     }
                 }
+            }
+            if (!success) {
+                System.err.println("All " + downloadUrls.length + " URLs failed for: " + destPath);
             }
         }
     }

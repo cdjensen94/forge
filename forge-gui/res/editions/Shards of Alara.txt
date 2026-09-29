@@ -2,7 +2,6 @@
 Code=ALA
 Date=2008-10-03
 Name=Shards of Alara
-Code2=ALA
 Type=Expansion
 BoosterCovers=5
 Booster=10 Common:fromsheet("ALA cards"), 3 Uncommon:fromSheet("ALA cards"), 1 RareMythic:fromSheet("ALA cards"), 1 BasicLand:fromSheet("ALA cards")
@@ -46,7 +45,7 @@ ScryfallCode=ALA
 33 C Cancel @David Palumbo
 34 C Cathartic Adept @Carl Critchlow
 35 C Cloudheath Drake @Izzy
-36 C Coma Veil @Dan Scott
+36 C Coma Veil @Dan Murayama Scott
 37 C Courier's Capsule @Andrew Murray
 38 R Covenant of Minds @Dan Seagrave
 39 U Dawnray Archer @Dan Dos Santos
@@ -54,7 +53,7 @@ ScryfallCode=ALA
 41 U Etherium Astrolabe @Michael Bruinsma
 42 C Etherium Sculptor @Steven Belledin
 43 U Fatestitcher @E. M. Gist
-44 U Filigree Sages @Dan Scott
+44 U Filigree Sages @Dan Murayama Scott
 45 R Gather Specimens @Michael Bruinsma
 46 C Jhessian Lookout @Donato Giancola
 47 C Kathari Screecher @Pete Venters
@@ -68,7 +67,7 @@ ScryfallCode=ALA
 55 R Sharding Sphinx @Michael Bruinsma
 56 R Skill Borrower @Shelly Wan
 57 C Spell Snip @Michael Sutfin
-58 U Sphinx's Herald @Dan Scott
+58 U Sphinx's Herald @Dan Murayama Scott
 59 C Steelclad Serpent @Carl Critchlow
 60 M Tezzeret the Seeker @Anthony Francisco
 61 C Tortoise Formation @Mark Zug
@@ -89,7 +88,7 @@ ScryfallCode=ALA
 76 U Fleshbag Marauder @Pete Venters
 77 C Glaze Fiend @Joshua Hagler
 78 U Grixis Battlemage @Nils Hamm
-79 R Immortal Coil @Dan Scott
+79 R Immortal Coil @Dan Murayama Scott
 80 U Infest @Karl Kopinski
 81 C Onyx Goblet @rk post
 82 U Puppet Conjurer @Steven Belledin
@@ -265,14 +264,13 @@ ScryfallCode=ALA
 250 M Rafiq of the Many @Meel Tamphanon
 
 [tokens]
-w_1_1_soldier
-u_0_1_a_homunculus
-u_1_1_a_thopter_flying
-b_1_1_skeleton_regenerate
-b_2_2_zombie
-r_4_4_dragon_flying
-r_1_1_goblin
-r_1_1_goblin_haste
-g_x_x_ooze
-g_1_1_saproling
-rgw_8_8_beast
+1 w_1_1_soldier @Alan Pollack
+2 u_0_1_a_homunculus @Howard Lyon
+3 u_1_1_a_thopter_flying @Andrew Murray
+4 b_1_1_skeleton_regenerate @Thomas M. Baxa
+5 b_2_2_zombie @Dave Kendall
+6 r_4_4_dragon_flying @Vance Kovacs
+7 r_1_1_goblin @Brandon Kitkouski
+8 g_x_x_ooze @Anthony S. Waters
+9 g_1_1_saproling @Trevor Claxton
+10 rgw_8_8_beast @Paolo Parente

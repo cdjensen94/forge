@@ -1,11 +1,6 @@
 package forge.ai.simulation;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-
 import com.google.common.collect.ArrayListMultimap;
-
 import forge.ai.ComputerUtilCard;
 import forge.game.GameObject;
 import forge.game.ability.AbilityUtils;
@@ -14,6 +9,10 @@ import forge.game.combat.Combat;
 import forge.game.player.Player;
 import forge.game.spellability.SpellAbility;
 import forge.game.spellability.TargetRestrictions;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
 
 public class PossibleTargetSelector {
     private final SpellAbility sa;
@@ -63,13 +62,13 @@ public class PossibleTargetSelector {
         if (targetingSa == null) {
             return;
         }
-        sa.setActivatingPlayer(player, true);
+        sa.setActivatingPlayer(player);
         targetingSa.resetTargets();
         TargetRestrictions tgt = targetingSa.getTargetRestrictions();
         maxTargets = tgt.getMaxTargets(sa.getHostCard(), targetingSa);
 
         SimilarTargetSkipper skipper = new SimilarTargetSkipper();
-        for (GameObject o : tgt.getAllCandidates(targetingSa, true)) {
+        for (GameObject o : tgt.getAllCandidates(targetingSa)) {
             if (maxTargets == 1 && skipper.shouldSkipTarget(o)) {
                 continue;
             }
@@ -88,7 +87,7 @@ public class PossibleTargetSelector {
                 if (score != null) {
                     return score;
                 }
-            } else  {
+            } else {
                 creatureScores = new HashMap<>();
             }
 
@@ -109,16 +108,15 @@ public class PossibleTargetSelector {
 
         public boolean shouldSkipTarget(GameObject o) {
             // TODO: Support non-card targets, such as spells on the stack.
-            if (!(o instanceof Card)) {
+            if (!(o instanceof Card c)) {
                 return false;
             }
 
-            Card c = (Card) o;
             Combat combat = c.getGame().getCombat();
             for (Card existingTarget : validTargetsMap.get(c.getName())) {
                 // Note: Checks are ordered from cheapest to more expensive ones. For example, type equals()
                 // ends up calling toString() on the type object and is more expensive than the checks above it.
-                if (c.getController() != c.getController() || c.getOwner() != existingTarget.getOwner()) {
+                if (c.getController() != existingTarget.getController() || c.getOwner() != existingTarget.getOwner()) {
                     continue;
                 }
                 if (c.getSpellAbilities().size() != existingTarget.getSpellAbilities().size()) {
@@ -149,7 +147,6 @@ public class PossibleTargetSelector {
                             continue;
                         }
                     }
-                    continue;
                 }
                 return true;
             }

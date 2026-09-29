@@ -17,39 +17,27 @@
  */
 package forge.item.generation;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.Iterator;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.TreeMap;
-
-import org.apache.commons.lang3.StringUtils;
-import org.apache.commons.lang3.tuple.Pair;
-
-import com.google.common.base.Predicate;
-import com.google.common.base.Predicates;
-import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
-
 import forge.StaticData;
 import forge.card.CardEdition;
 import forge.card.CardEdition.FoilType;
 import forge.card.CardRarity;
-import forge.card.CardRulesPredicates;
 import forge.card.CardSplitType;
 import forge.card.PrintSheet;
-import forge.item.IPaperCard;
-import forge.item.IPaperCard.Predicates.Presets;
-import forge.item.PaperCard;
-import forge.item.SealedProduct;
+import forge.item.*;
 import forge.util.Aggregates;
+import forge.util.IterableUtil;
 import forge.util.MyRandom;
 import forge.util.TextUtil;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.tuple.Pair;
+
+import java.util.*;
+import java.util.function.Function;
+import java.util.function.Predicate;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 /**
  * <p>
@@ -60,7 +48,7 @@ import forge.util.TextUtil;
  * @version $Id: BoosterGenerator.java 35014 2017-08-13 00:40:48Z Max mtg $
  */
 public class BoosterGenerator {
-
+    private final static Map<String, String> staticSheetsCorrespondance = new HashMap<>();
     private final static Map<String, PrintSheet> cachedSheets = new TreeMap<>(String.CASE_INSENSITIVE_ORDER);
     private static synchronized PrintSheet getPrintSheet(String key) {
         if (!cachedSheets.containsKey(key))
@@ -79,12 +67,34 @@ public class BoosterGenerator {
         return randomCard.getFoiled();
     }
 
-    public static List<PaperCard> getBoosterPack(SealedProduct.Template template) {
-        // TODO: tweak the chances of generating Masterpieces to be more authentic
-        // (currently merely added to the Rare/Mythic Rare print sheet via ExtraFoilSheetKey)
+    public static PrintSheet tryGetStaticSheet(String sheetName) {
+        if (staticSheetsCorrespondance.containsKey(sheetName)) {
+            return StaticData.instance().getPrintSheets().get(staticSheetsCorrespondance.get(sheetName));
+        };
+
+        String passedEdition = sheetName.split(" ")[0];
+        CardEdition realEdition = StaticData.instance().getEditions().get(passedEdition);
+
+        if (realEdition.getCode().equals(passedEdition)) {
+            staticSheetsCorrespondance.put(sheetName, sheetName);
+
+            return StaticData.instance().getPrintSheets().get(sheetName);
+        }
+        
+        String realEditionCode = realEdition.getCode();
+        String alteredSheetName = sheetName.replaceFirst(passedEdition, realEditionCode);
+
+        staticSheetsCorrespondance.put(sheetName, alteredSheetName);
+
+        return StaticData.instance().getPrintSheets().get(alteredSheetName);
+    }
+
+    public static List<PaperCard> getBoosterPack(SealedTemplate template) {
+        if (template instanceof SealedTemplateWithSlots slots) {
+            return BoosterGenerator.getBoosterPack(slots);
+        }
 
         List<PaperCard> result = new ArrayList<>();
-        List<PrintSheet> sheetsUsed = new ArrayList<>();
 
         CardEdition edition = StaticData.instance().getEditions().get(template.getEdition());
 
@@ -247,8 +257,7 @@ public class BoosterGenerator {
 
             if (sheetKey.startsWith("wholeSheet")) {
                 PrintSheet ps = getPrintSheet(sheetKey);
-                result.addAll(ps.all());
-                sheetsUsed.add(ps);
+                result.addAll(ps.toFlatList());
                 continue;
             }
 
@@ -267,7 +276,7 @@ public class BoosterGenerator {
                 if ((edition.getName().equals("Planeshift")) &&
                         (slotType.startsWith(BoosterSlots.RARE))
                         && (foilSlot.startsWith(BoosterSlots.SPECIAL))
-                        ) {
+                ) {
                     numCards--;
                 }
             }
@@ -279,7 +288,6 @@ public class BoosterGenerator {
                         : edition.getSlotReplaceCommonWith().trim();
                 PrintSheet replaceSheet = getPrintSheet(replaceKey);
                 result.addAll(replaceSheet.random(1, true));
-                sheetsUsed.add(replaceSheet);
                 System.out.println("Common was replaced with something from the replace sheet...");
                 replaceCommon = false;
             }
@@ -298,7 +306,6 @@ public class BoosterGenerator {
             }
 
             result.addAll(paperCards);
-            sheetsUsed.add(ps);
 
             if (foilInThisSlot) {
                 if (!foilAtEndOfPack) {
@@ -377,10 +384,10 @@ public class BoosterGenerator {
             String sheetReplaceCardFromSheet = edition.getSheetReplaceCardFromSheet();
             if (!sheetReplaceCardFromSheet.isEmpty()) {
                 String[] split = sheetReplaceCardFromSheet.split("_");
-                PrintSheet replaceThis = StaticData.instance().getPrintSheets().get(split[0]);
+                PrintSheet replaceThis = tryGetStaticSheet(split[0]);
                 List<PaperCard> candidates = Lists.newArrayList();
                 for (PaperCard p : result) {
-                    if (replaceThis.all().contains(p)) {
+                    if (replaceThis.contains(p)) {
                         candidates.add(candidates.size(), p);
                     }
                 }
@@ -391,10 +398,10 @@ public class BoosterGenerator {
             String sheetReplaceCardFromSheet2 = edition.getSheetReplaceCardFromSheet2();
             if (!sheetReplaceCardFromSheet2.isEmpty()) {
                 String[] split = sheetReplaceCardFromSheet2.split("_");
-                PrintSheet replaceThis = StaticData.instance().getPrintSheets().get(split[0]);
+                PrintSheet replaceThis = tryGetStaticSheet(split[0]);
                 List<PaperCard> candidates = Lists.newArrayList();
                 for (PaperCard p : result) {
-                    if (replaceThis.all().contains(p)) {
+                    if (replaceThis.contains(p)) {
                         candidates.add(candidates.size(), p);
                     }
                 }
@@ -407,7 +414,68 @@ public class BoosterGenerator {
         return result;
     }
 
-    private static void ensureGuaranteedCardInBooster(List<PaperCard> result, SealedProduct.Template template, String boosterMustContain) {
+    public static List<PaperCard> getBoosterPack(SealedTemplateWithSlots template) {
+        // SealedTemplateWithSlots ignores all Edition level params
+        // Instead each slot defines their percentages on their own
+        List<PaperCard> result = new ArrayList<>();
+        Map<String, BoosterSlot> boosterSlots = template.getNamedSlots();
+
+        for (Pair<String, Integer> slot : template.getSlots()) {
+            String slotType = slot.getLeft().trim();
+            int numCards = slot.getRight();
+            System.out.println(numCards + " of type " + slotType);
+
+            // For cards that end in '+', attempt to convert this card to foil.
+            boolean convertAllToFoil = slotType.endsWith("+");
+            if (convertAllToFoil) {
+                slotType = slotType.substring(0, slotType.length() - 1);
+            }
+
+            BoosterSlot boosterSlot = boosterSlots.get(slotType);
+
+            List<PaperCard> paperCards = Lists.newArrayList();
+            for(Map.Entry<String, Long> entry : bulkSlotReplacement(boosterSlot, numCards).entrySet()) {
+                String determineSheet = entry.getKey();
+                int numCardsToGenerate = (int)(long)entry.getValue();
+
+                if (determineSheet == null || determineSheet.isEmpty() || numCardsToGenerate == 0) {
+                    continue;
+                }
+
+                // If the sheet ends with a '+', convert all cards in replacement section to foil
+                boolean convertThisToFoil = false;
+                if (determineSheet.endsWith("+")) {
+                    determineSheet = determineSheet.substring(0, determineSheet.length() - 1);
+                    convertThisToFoil = true;
+                }
+
+                String setCode = template.getEdition();
+                PrintSheet ps;
+                try {
+                    // Apply the edition to the sheet name by default. We'll try again if that's not a real sheet
+                    ps = getPrintSheet(determineSheet + " " + setCode);
+                } catch (Exception e) {
+                    ps = getPrintSheet(determineSheet);
+                }
+                if (convertAllToFoil || convertThisToFoil) {
+                    for (PaperCard pc : ps.random(numCardsToGenerate, true)) {
+                        paperCards.add(pc.getFoiled());
+                    }
+                } else {
+                    paperCards.addAll(ps.random(numCardsToGenerate, true));
+                }
+            }
+            result.addAll(paperCards);
+        }
+
+        return result;
+    }
+
+    private static Map<String, Long> bulkSlotReplacement(BoosterSlot boosterSlot, int numCards) {
+        return Stream.generate(boosterSlot::replaceSlot).limit(numCards).collect(Collectors.groupingBy(Function.identity(), Collectors.counting()));
+    }
+
+    private static void ensureGuaranteedCardInBooster(List<PaperCard> result, SealedTemplate template, String boosterMustContain) {
         // First, see if there's already a card of the given type
         String[] types = TextUtil.split(boosterMustContain, ' ');
         boolean alreadyHaveCard = false;
@@ -431,8 +499,9 @@ public class BoosterGenerator {
             for (Pair<String, Integer> slot : template.getSlots()) {
                 String slotType = slot.getLeft();
                 String setCode = template.getEdition();
-                String sheetKey = StaticData.instance().getEditions().contains(setCode) ? slotType.trim() + " " + setCode
-                        : slotType.trim();
+                String sheetKey = StaticData.instance().getEditions().contains(setCode)
+                    ? slotType.trim() + " " + setCode
+                    : slotType.trim();
 
                 PrintSheet ps = getPrintSheet(sheetKey);
                 List<PaperCard> cardsInSlot = Lists.newArrayList(ps.toFlatList());
@@ -462,10 +531,10 @@ public class BoosterGenerator {
      * Replaces an already present card in the booster with a card from the supplied print sheet.
      * Nothing is replaced if there is no matching rarity found.
      * @param booster in which a card gets replaced
-     * @param printSheetKey
+     * @param printSheetKey print sheet key from which take the replacement card
      */
     public static void replaceCardFromExtraSheet(List<PaperCard> booster, String printSheetKey) {
-        PrintSheet replacementSheet = StaticData.instance().getPrintSheets().get(printSheetKey);
+        PrintSheet replacementSheet = tryGetStaticSheet(printSheetKey);
         PaperCard toAdd = replacementSheet.random(1, false).get(0);
         BoosterGenerator.replaceCard(booster, toAdd);
     }
@@ -477,29 +546,29 @@ public class BoosterGenerator {
      * @param toAdd new card which replaces a card in the booster
      */
     public static void replaceCard(List<PaperCard> booster, PaperCard toAdd) {
-        Predicate<PaperCard> rarityPredicate = null;
+        Predicate<PaperCard> rarityPredicate;
         switch (toAdd.getRarity()) {
             case BasicLand:
-                rarityPredicate = Presets.IS_BASIC_LAND;
+                rarityPredicate = PaperCardPredicates.IS_BASIC_LAND_RARITY;
                 break;
             case Common:
-                rarityPredicate = Presets.IS_COMMON;
+                rarityPredicate = PaperCardPredicates.IS_COMMON;
                 break;
             case Uncommon:
-                rarityPredicate = Presets.IS_UNCOMMON;
+                rarityPredicate = PaperCardPredicates.IS_UNCOMMON;
                 break;
             case Rare:
             case MythicRare:
-                rarityPredicate = Presets.IS_RARE_OR_MYTHIC;
+                rarityPredicate = PaperCardPredicates.IS_RARE_OR_MYTHIC;
                 break;
             default:
-                rarityPredicate = Presets.IS_SPECIAL;
+                rarityPredicate = PaperCardPredicates.IS_SPECIAL;
         }
 
         PaperCard toReplace = null;
         // Find first card in booster that matches the rarity
         for (PaperCard card : booster) {
-            if (rarityPredicate.apply(card)) {
+            if (rarityPredicate.test(card)) {
                 toReplace = card;
                 break;
             }
@@ -534,11 +603,12 @@ public class BoosterGenerator {
         }
     }
 
-    @SuppressWarnings("unchecked")
     public static PrintSheet makeSheet(String sheetKey, Iterable<PaperCard> src) {
         PrintSheet ps = new PrintSheet(sheetKey);
         String[] sKey = TextUtil.splitWithParenthesis(sheetKey, ' ', 2);
-        Predicate<PaperCard> setPred = (Predicate<PaperCard>) (sKey.length > 1 ? IPaperCard.Predicates.printedInSets(sKey[1].split(" ")) : Predicates.alwaysTrue());
+        Predicate<PaperCard> setPred = sKey.length > 1
+            ? PaperCardPredicates.printedInSets(sKey[1].split(" "))
+            : x1 -> true;
 
         List<String> operators = new LinkedList<>(Arrays.asList(TextUtil.splitWithParenthesis(sKey[0], ':')));
         Predicate<PaperCard> extraPred = buildExtraPredicate(operators);
@@ -551,10 +621,14 @@ public class BoosterGenerator {
             if (mainCode.regionMatches(true, 0, "fromSheet", 0, 9) ||
                     mainCode.regionMatches(true, 0, "wholeSheet", 0, 10)
             ) { // custom print sheet
+                System.out.println("Parsing from main code: " + mainCode);
                 String sheetName = StringUtils.strip(mainCode.substring(10), "()\" ");
-                System.out.println("Attempting to lookup :" + sheetName);
-                src = StaticData.instance().getPrintSheets().get(sheetName).toFlatList();
-                setPred = Predicates.alwaysTrue();
+                System.out.println("Attempting to lookup: " + sheetName);
+                PrintSheet fromSheet = tryGetStaticSheet(sheetName);
+                if (fromSheet == null)
+                    throw new RuntimeException("PrintSheet Error: " + ps.getName() + " didn't find " + sheetName + " from " + mainCode);
+                src = fromSheet.toFlatList();
+                setPred = x -> true;
 
             } else if (mainCode.startsWith("promo") || mainCode.startsWith("name")) { // get exactly the named cards, that's a tiny inlined print sheet
                 String list = StringUtils.strip(mainCode.substring(5), "() ");
@@ -566,7 +640,7 @@ public class BoosterGenerator {
                 }
 
                 src = srcList;
-                setPred = Predicates.alwaysTrue();
+                setPred = x -> true;
             } else {
                 continue;
             }
@@ -578,36 +652,36 @@ public class BoosterGenerator {
         String mainCode = operators.isEmpty() ? null : operators.get(0).trim();
 
         if (null == mainCode || mainCode.equalsIgnoreCase(BoosterSlots.ANY)) { // no restriction on rarity
-            Predicate<PaperCard> predicate = Predicates.and(setPred, extraPred);
-            ps.addAll(Iterables.filter(src, predicate));
+            Predicate<PaperCard> predicate = setPred.and(extraPred);
+            ps.addAll(IterableUtil.filter(src, predicate));
 
         } else if (mainCode.equalsIgnoreCase(BoosterSlots.UNCOMMON_RARE)) { // for sets like ARN, where U1 cards are considered rare and U3 are uncommon
-            Predicate<PaperCard> predicateRares = Predicates.and(setPred, IPaperCard.Predicates.Presets.IS_RARE, extraPred);
-            ps.addAll(Iterables.filter(src, predicateRares));
+            Predicate<PaperCard> predicateRares = setPred.and(PaperCardPredicates.IS_RARE).and(extraPred);
+            ps.addAll(IterableUtil.filter(src, predicateRares));
 
-            Predicate<PaperCard> predicateUncommon = Predicates.and( setPred, IPaperCard.Predicates.Presets.IS_UNCOMMON, extraPred);
-            ps.addAll(Iterables.filter(src, predicateUncommon), 3);
+            Predicate<PaperCard> predicateUncommon = setPred.and(PaperCardPredicates.IS_UNCOMMON).and(extraPred);
+            ps.addAll(IterableUtil.filter(src, predicateUncommon), 3);
 
         } else if (mainCode.equalsIgnoreCase(BoosterSlots.RARE_MYTHIC)) {
             // Typical ratio of rares to mythics is 53:15, changing to 35:10 in smaller sets.
             // To achieve the desired 1:8 are all mythics are added once, and all rares added twice per print sheet.
 
-            Predicate<PaperCard> predicateMythic = Predicates.and( setPred, IPaperCard.Predicates.Presets.IS_MYTHIC_RARE, extraPred);
-            ps.addAll(Iterables.filter(src, predicateMythic));
+            Predicate<PaperCard> predicateMythic = setPred.and(PaperCardPredicates.IS_MYTHIC_RARE).and(extraPred);
+            ps.addAll(IterableUtil.filter(src, predicateMythic));
 
-            Predicate<PaperCard> predicateRare = Predicates.and( setPred, IPaperCard.Predicates.Presets.IS_RARE, extraPred);
-            ps.addAll(Iterables.filter(src, predicateRare), 2);
+            Predicate<PaperCard> predicateRare = setPred.and(PaperCardPredicates.IS_RARE).and(extraPred);
+            ps.addAll(IterableUtil.filter(src, predicateRare), 2);
         } else if (mainCode.equalsIgnoreCase(BoosterSlots.UNCOMMON_RARE_MYTHIC)) {
             // Extended version of RARE_MYTHIC, used for Alchemy slots
 
-            Predicate<PaperCard> predicateMythic = Predicates.and( setPred, IPaperCard.Predicates.Presets.IS_MYTHIC_RARE, extraPred);
-            ps.addAll(Iterables.filter(src, predicateMythic));
+            Predicate<PaperCard> predicateMythic = setPred.and(PaperCardPredicates.IS_MYTHIC_RARE).and(extraPred);
+            ps.addAll(IterableUtil.filter(src, predicateMythic));
 
-            Predicate<PaperCard> predicateRare = Predicates.and( setPred, IPaperCard.Predicates.Presets.IS_RARE, extraPred);
-            ps.addAll(Iterables.filter(src, predicateRare), 2);
+            Predicate<PaperCard> predicateRare = setPred.and(PaperCardPredicates.IS_RARE).and(extraPred);
+            ps.addAll(IterableUtil.filter(src, predicateRare), 2);
 
-            Predicate<PaperCard> predicateUncommon = Predicates.and( setPred, IPaperCard.Predicates.Presets.IS_UNCOMMON, extraPred);
-            ps.addAll(Iterables.filter(src, predicateUncommon), 4);
+            Predicate<PaperCard> predicateUncommon = setPred.and(PaperCardPredicates.IS_UNCOMMON).and(extraPred);
+            ps.addAll(IterableUtil.filter(src, predicateUncommon), 4);
         } else {
             throw new IllegalArgumentException("Booster generator: operator could not be parsed - " + mainCode);
         }
@@ -638,55 +712,49 @@ public class BoosterGenerator {
 
             Predicate<PaperCard> toAdd = null;
             if (operator.equalsIgnoreCase(BoosterSlots.DUAL_FACED_CARD)) {
-                toAdd = Predicates.compose(
-                            Predicates.or(
-                                CardRulesPredicates.splitType(CardSplitType.Transform),
-                                CardRulesPredicates.splitType(CardSplitType.Meld),
-                                CardRulesPredicates.splitType(CardSplitType.Modal)
-                            ),
-                        PaperCard.FN_GET_RULES);
-            } else if (operator.equalsIgnoreCase(BoosterSlots.LAND)) {          toAdd = Predicates.compose(CardRulesPredicates.Presets.IS_LAND, PaperCard.FN_GET_RULES);
-            } else if (operator.equalsIgnoreCase(BoosterSlots.BASIC_LAND)) {    toAdd = IPaperCard.Predicates.Presets.IS_BASIC_LAND;
-            } else if (operator.equalsIgnoreCase(BoosterSlots.TIME_SHIFTED)) {  toAdd = IPaperCard.Predicates.Presets.IS_SPECIAL;
-            } else if (operator.equalsIgnoreCase(BoosterSlots.SPECIAL)) {       toAdd = IPaperCard.Predicates.Presets.IS_SPECIAL;
-            } else if (operator.equalsIgnoreCase(BoosterSlots.MYTHIC)) {        toAdd = IPaperCard.Predicates.Presets.IS_MYTHIC_RARE;
-            } else if (operator.equalsIgnoreCase(BoosterSlots.RARE)) {          toAdd = IPaperCard.Predicates.Presets.IS_RARE;
-            } else if (operator.equalsIgnoreCase(BoosterSlots.UNCOMMON)) {      toAdd = IPaperCard.Predicates.Presets.IS_UNCOMMON;
-            } else if (operator.equalsIgnoreCase(BoosterSlots.COMMON)) {        toAdd = IPaperCard.Predicates.Presets.IS_COMMON;
+                toAdd = card -> CardSplitType.DUAL_FACED_CARDS.contains(card.getRules().getSplitType());
+            } else if (operator.equalsIgnoreCase(BoosterSlots.LAND)) {          toAdd = PaperCardPredicates.IS_LAND;
+            } else if (operator.equalsIgnoreCase(BoosterSlots.BASIC_LAND)) {    toAdd = PaperCardPredicates.IS_BASIC_LAND_RARITY;
+            } else if (operator.equalsIgnoreCase(BoosterSlots.TIME_SHIFTED)) {  toAdd = PaperCardPredicates.IS_SPECIAL;
+            } else if (operator.equalsIgnoreCase(BoosterSlots.SPECIAL)) {       toAdd = PaperCardPredicates.IS_SPECIAL;
+            } else if (operator.equalsIgnoreCase(BoosterSlots.MYTHIC)) {        toAdd = PaperCardPredicates.IS_MYTHIC_RARE;
+            } else if (operator.equalsIgnoreCase(BoosterSlots.RARE)) {          toAdd = PaperCardPredicates.IS_RARE;
+            } else if (operator.equalsIgnoreCase(BoosterSlots.UNCOMMON)) {      toAdd = PaperCardPredicates.IS_UNCOMMON;
+            } else if (operator.equalsIgnoreCase(BoosterSlots.COMMON)) {        toAdd = PaperCardPredicates.IS_COMMON;
             } else if (operator.startsWith("name(")) {
                 operator = StringUtils.strip(operator.substring(4), "() ");
                 String[] cardNames = TextUtil.splitWithParenthesis(operator, ',', '"', '"');
-                toAdd = IPaperCard.Predicates.names(Lists.newArrayList(cardNames));
+                toAdd = PaperCardPredicates.names(Lists.newArrayList(cardNames));
             } else if (operator.startsWith("color(")) {
                 operator = StringUtils.strip(operator.substring("color(".length() + 1), "()\" ");
                 switch (operator.toLowerCase()) {
                     case "black":
-                        toAdd = Presets.IS_BLACK;
+                        toAdd = PaperCardPredicates.IS_BLACK;
                         break;
                     case "blue":
-                        toAdd = Presets.IS_BLUE;
+                        toAdd = PaperCardPredicates.IS_BLUE;
                         break;
                     case "green":
-                        toAdd = Presets.IS_GREEN;
+                        toAdd = PaperCardPredicates.IS_GREEN;
                         break;
                     case "red":
-                        toAdd = Presets.IS_RED;
+                        toAdd = PaperCardPredicates.IS_RED;
                         break;
                     case "white":
-                        toAdd = Presets.IS_WHITE;
+                        toAdd = PaperCardPredicates.IS_WHITE;
                         break;
                     case "colorless":
-                        toAdd = Presets.IS_COLORLESS;
+                        toAdd = PaperCardPredicates.IS_COLORLESS;
                         break;
                 }
             } else if (operator.startsWith("fromSets(")) {
                 operator = StringUtils.strip(operator.substring("fromSets(".length() + 1), "()\" ");
                 String[] sets = operator.split(",");
-                toAdd = IPaperCard.Predicates.printedInSets(sets);
+                toAdd = PaperCardPredicates.printedInSets(sets);
             } else if (operator.startsWith("fromSheet(") && invert) {
                 String sheetName = StringUtils.strip(operator.substring(9), "()\" ");
-                Iterable<PaperCard> cards = StaticData.instance().getPrintSheets().get(sheetName).toFlatList();
-                toAdd = IPaperCard.Predicates.cards(Lists.newArrayList(cards));
+                Set<PaperCard> cards = Sets.newHashSet(tryGetStaticSheet(sheetName).toFlatList());
+                toAdd = cards::contains;
             }
 
             if (toAdd == null) {
@@ -696,16 +764,16 @@ public class BoosterGenerator {
             itOp.remove();
 
             if (invert) {
-                toAdd = Predicates.not(toAdd);
+                toAdd = toAdd.negate();
             }
             conditions.add(toAdd);
         }
 
         if (conditions.isEmpty()) {
-            return Predicates.alwaysTrue();
+            return x -> true;
         }
 
-        return Predicates.and(conditions);
+        return IterableUtil.and(conditions);
     }
 
 }

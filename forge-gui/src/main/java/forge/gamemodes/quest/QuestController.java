@@ -18,13 +18,8 @@
 package forge.gamemodes.quest;
 
 import java.io.File;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.TreeMap;
+import java.util.*;
+import java.util.stream.Collectors;
 
 import com.google.common.collect.Lists;
 import com.google.common.eventbus.Subscribe;
@@ -32,9 +27,11 @@ import com.google.common.eventbus.Subscribe;
 import forge.card.CardEdition;
 import forge.deck.Deck;
 import forge.deck.DeckGroup;
+import forge.game.Game;
 import forge.game.GameFormat;
 import forge.game.event.GameEvent;
 import forge.game.event.GameEventMulligan;
+import forge.game.player.Player;
 import forge.gamemodes.quest.bazaar.QuestBazaarManager;
 import forge.gamemodes.quest.bazaar.QuestItemType;
 import forge.gamemodes.quest.bazaar.QuestPetStorage;
@@ -59,6 +56,7 @@ import forge.util.storage.StorageBase;
  *
  */
 public class QuestController {
+    private Game activeGame;
     private QuestData model;
     // gadgets
 
@@ -222,7 +220,7 @@ public class QuestController {
             // read with a special class, that will fill sell rules as it processes each PreconDeck
             preconManager = new StorageBase<>("Quest shop decks", new PreconDeck.Reader(new File(ForgeConstants.QUEST_PRECON_DIR)) {
                 @Override
-                protected PreconDeck getPreconDeckFromSections(java.util.Map<String, java.util.List<String>> sections) {
+                protected PreconDeck getPreconDeckFromSections(Map<String, List<String>> sections) {
                     PreconDeck result = super.getPreconDeckFromSections(sections);
                     preconDeals.put(result.getName(), new SellRules(sections.get("shop")));
                     return result;
@@ -444,7 +442,6 @@ public class QuestController {
      * Reset the duels manager.
      */
     public void resetDuelsManager() {
-
         QuestWorld world = getWorld();
         String path = ForgeConstants.DEFAULT_CHALLENGES_DIR;
 
@@ -480,7 +477,6 @@ public class QuestController {
         } else {
             this.duelManager = new QuestEventDuelManager(new File(path));            
         }
-
     }
 
     public HashSet<StarRating> GetRating() {
@@ -493,7 +489,6 @@ public class QuestController {
      * Reset the challenges manager.
      */
     public void resetChallengesManager() {
-
         QuestWorld world = getWorld();
         String path = ForgeConstants.DEFAULT_CHALLENGES_DIR;
 
@@ -516,7 +511,6 @@ public class QuestController {
         }
 
         this.allChallenges = new StorageBase<>("Quest Challenges", new QuestChallengeReader(new File(path)));
-
     }
 
     /**
@@ -550,18 +544,21 @@ public class QuestController {
         return unlocksAvaliable > unlocksSpent ? Math.min(unlocksAvaliable - unlocksSpent, cntLocked) : 0;
     }
 
+    public void setActiveGame(Game game) {
+        this.activeGame = game;
+    }
+
     @Subscribe
     public void receiveGameEvent(GameEvent ev) { // Receives events only during quest games
-        if (ev instanceof GameEventMulligan) {
-            GameEventMulligan mev = (GameEventMulligan) ev;
+        if (ev instanceof GameEventMulligan mev && activeGame != null) {
             // First mulligan is free
-            if (mev.player.getLobbyPlayer() == GamePlayerUtil.getGuiPlayer()
-                    && getAssets().hasItem(QuestItemType.SLEIGHT) && mev.player.getStats().getMulliganCount() < 7) {
-                mev.player.drawCard();
+            Player player = activeGame.getPlayer(mev.player());
+            if (player != null && player.getLobbyPlayer().equals(GamePlayerUtil.getGuiPlayer())
+                    && getAssets().hasItem(QuestItemType.SLEIGHT) && player.getStats().getMulliganCount() < 7) {
+                player.drawCard();
             }
         }
     }
-
 
     public int getTurnsToUnlockChallenge() {
     	int turns = FModel.getQuestPreferences().getPrefInt(QPref.WINS_NEW_CHALLENGE);
@@ -576,7 +573,6 @@ public class QuestController {
 
         return Math.max(turns, 1);
     }
-
 
     public final void regenerateChallenges() {
         final QuestAchievements achievements = model.getAchievements();
@@ -626,15 +622,19 @@ public class QuestController {
     }
 
     public CardEdition getDefaultLandSet() {
-        List<String> availableEditionCodes = questFormat != null ? questFormat.getAllowedSetCodes() : Lists.newArrayList(FModel.getMagicDb().getEditions().getItemNames());
-        List<CardEdition> availableEditions = new ArrayList<>();
-
-        for (String s : availableEditionCodes) {
-            availableEditions.add(FModel.getMagicDb().getEditions().get(s));
-        }
+        List<CardEdition> availableEditions = getAvailableLandSets();
 
         CardEdition randomLandSet = CardEdition.Predicates.getRandomSetWithAllBasicLands(availableEditions);
         return randomLandSet == null ? FModel.getMagicDb().getEditions().get("ZEN") : randomLandSet;
+    }
+
+    public List<CardEdition> getAvailableLandSets() {
+        List<String> availableEditionCodes = questFormat != null ? questFormat.getAllowedSetCodes() : Lists.newArrayList(FModel.getMagicDb().getEditions().getItemNames());
+        CardEdition.Collection editions = FModel.getMagicDb().getEditions();
+        return availableEditionCodes.stream()
+                .map(editions::get)
+                .filter(CardEdition::hasBasicLands)
+                .collect(Collectors.toList());
     }
 
     public String getCurrentDeck() {

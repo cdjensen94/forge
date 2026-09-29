@@ -2,6 +2,7 @@ package forge.screens.constructed;
 
 import java.util.List;
 import java.util.Map;
+import java.util.function.Consumer;
 
 import com.badlogic.gdx.graphics.g2d.TextureRegion;
 import com.badlogic.gdx.utils.Align;
@@ -13,11 +14,8 @@ import forge.assets.FSkinImage;
 import forge.assets.FTextureRegionImage;
 import forge.screens.FScreen;
 import forge.toolbox.FDisplayObject;
-import forge.toolbox.FEvent;
-import forge.toolbox.FEvent.FEventHandler;
 import forge.toolbox.FLabel;
 import forge.toolbox.FScrollPane;
-import forge.util.Callback;
 import forge.util.MyRandom;
 import forge.util.Utils;
 
@@ -30,7 +28,7 @@ public class AvatarSelector extends FScreen {
         return random;
     }
 
-    public static void show(final String playerName, final int currentIndex0, final List<Integer> usedAvatars0, final Callback<Integer> callback0) {
+    public static void show(final String playerName, final int currentIndex0, final List<Integer> usedAvatars0, final Consumer<Integer> callback0) {
         AvatarSelector selector = new AvatarSelector(playerName, currentIndex0, usedAvatars0, callback0);
         Forge.openScreen(selector);
     }
@@ -40,7 +38,7 @@ public class AvatarSelector extends FScreen {
 
     private final int currentIndex;
     private final List<Integer> usedAvatars;
-    private final Callback<Integer> callback;
+    private final Consumer<Integer> callback;
     private final FScrollPane scroller = new FScrollPane() {
         @Override
         protected ScrollBounds layoutAndGetScrollBounds(float visibleWidth, float visibleHeight) {
@@ -62,7 +60,7 @@ public class AvatarSelector extends FScreen {
         }
     };
 
-    private AvatarSelector(final String playerName, final int currentIndex0, final List<Integer> usedAvatars0, final Callback<Integer> callback0) {
+    private AvatarSelector(final String playerName, final int currentIndex0, final List<Integer> usedAvatars0, final Consumer<Integer> callback0) {
         super(Forge.getLocalizer().getMessage("lblSelectAvatarFor").replace("%s",playerName));
 
         currentIndex = currentIndex0;
@@ -92,21 +90,15 @@ public class AvatarSelector extends FScreen {
                 .build();
 
         if (index == -1) {
-            lbl.setCommand(new FEventHandler() {
-                @Override
-                public void handleEvent(FEvent e) {
-                    callback.run(getRandomAvatar(usedAvatars));
-                    Forge.back();
-                }
+            lbl.setCommand(e -> {
+                callback.accept(getRandomAvatar(usedAvatars));
+                Forge.back();
             });
         }
         else {
-            lbl.setCommand(new FEventHandler() {
-                @Override
-                public void handleEvent(FEvent e) {
-                    callback.run(index);
-                    Forge.back();
-                }
+            lbl.setCommand(e -> {
+                callback.accept(index);
+                Forge.back();
             });
         }
         scroller.add(lbl);

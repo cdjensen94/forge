@@ -7,13 +7,11 @@ import forge.game.zone.ZoneType;
 
 public class StaticAbilityIgnoreLandwalk {
 
-    static String MODE = "IgnoreLandWalk";
-    
     public static boolean ignoreLandWalk(Card attacker, Card blocker, KeywordInterface k) {
         final Game game = attacker.getGame();
         for (final Card ca : game.getCardsIn(ZoneType.STATIC_ABILITIES_SOURCE_ZONES)) {
             for (final StaticAbility stAb : ca.getStaticAbilities()) {
-                if (!stAb.checkConditions(MODE)) {
+                if (!stAb.checkConditions(StaticAbilityMode.IgnoreLandwalk)) {
                     continue;
                 }
 
@@ -23,9 +21,8 @@ public class StaticAbilityIgnoreLandwalk {
             }
         }
         return false;
-
     }
-    
+
     public static boolean ignoreLandWalkAbility(final StaticAbility stAb, Card attacker, Card blocker, KeywordInterface k) {
         if (!stAb.matchesValidParam("ValidAttacker", attacker)) {
             return false;

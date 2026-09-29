@@ -84,7 +84,7 @@ public class CountersPutAllEffect extends SpellAbilityEffect  {
             }
             if (sa.hasParam("AmountByChosenMap")) {
                 final String[] parse = sa.getParam("AmountByChosenMap").split(" INDEX ");
-                final int index = parse.length > 1 ? Integer.valueOf(parse[1]) : 0;
+                final int index = parse.length > 1 ? Integer.parseInt(parse[1]) : 0;
                 if (index >= host.getChosenMap().get(placer).size()) continue;
                 final Card chosen = host.getChosenMap().get(placer).get(index);
                 counterAmount = AbilityUtils.xCount(chosen, parse[0], sa);
@@ -115,13 +115,7 @@ public class CountersPutAllEffect extends SpellAbilityEffect  {
             }
         }
 
-        table.replaceCounterEffect(game, sa, true);
-
-        //for cards like Agitator Ant/Spectacular Showdown that care if counters were actually put on,
-        // instead use "RememberPut" – this checks after replacement
-        if (sa.hasParam("RememberCards")) { // remembers whether counters actually placed or not
-            host.addRemembered(table.columnKeySet());
-        }
+        table.replaceCounterEffect(game, sa);
     }
 
 }

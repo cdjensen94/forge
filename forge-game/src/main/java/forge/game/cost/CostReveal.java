@@ -17,18 +17,15 @@
  */
 package forge.game.cost;
 
-import java.util.Arrays;
-import java.util.List;
-
 import forge.game.GameLogEntryType;
-import forge.game.card.Card;
-import forge.game.card.CardCollection;
-import forge.game.card.CardCollectionView;
-import forge.game.card.CardLists;
-import forge.game.card.CardPredicates;
+import forge.game.event.GameEventAddLog;
+import forge.game.card.*;
 import forge.game.player.Player;
 import forge.game.spellability.SpellAbility;
 import forge.game.zone.ZoneType;
+
+import java.util.Arrays;
+import java.util.List;
 
 /**
  * The Class CostReveal.
@@ -41,7 +38,7 @@ public class CostReveal extends CostPartWithList {
      */
     private static final long serialVersionUID = 1L;
 
-    private List<ZoneType> revealFrom = Arrays.asList(ZoneType.Hand);
+    protected List<ZoneType> revealFrom = Arrays.asList(ZoneType.Hand);
 
     public CostReveal(final String amount, final String type, final String description) {
         super(amount, type, description);
@@ -71,13 +68,13 @@ public class CostReveal extends CostPartWithList {
             modifiedHand.remove(source); // can't pay for itself
             handList = modifiedHand;
         }
-        handList = CardLists.getValidCards(handList, getType(), payer, source, ability);
+        handList = CardLists.getValidCards(handList, getType().split(";"), payer, source, ability);
 
         return handList.size();
     }
 
     @Override
-    public final boolean canPay(final SpellAbility ability, final Player payer, final boolean effect) {
+    public boolean canPay(final SpellAbility ability, final Player payer, final boolean effect) {
         final Card source = ability.getHostCard();
 
         CardCollectionView handList = payer.getCardsIn(revealFrom);
@@ -85,22 +82,23 @@ public class CostReveal extends CostPartWithList {
 
         if (this.payCostFromSource()) {
             return revealFrom.contains(source.getLastKnownZone().getZoneType());
-        } else if (this.getType().equals("Hand")) {
+        }
+        if (this.getType().equals("Hand")) {
             return true;
-        } else if (this.getType().equals("SameColor")) {
+        }
+        if (this.getType().equals("SameColor")) {
             for (final Card card : handList) {
                 if (CardLists.count(handList, CardPredicates.sharesColorWith(card)) >= amount) {
                     return true;
                 }
             }
             return false;
-        } else {
-            return amount <= getMaxAmountX(ability, payer, effect);
         }
+        return amount <= getMaxAmountX(ability, payer, effect);
     }
 
     @Override
-    public final String toString() {
+    public String toString() {
         final StringBuilder sb = new StringBuilder();
         sb.append("Reveal ");
 
@@ -151,7 +149,7 @@ public class CostReveal extends CostPartWithList {
         }
         sb.append(targetCard).append(" to pay a cost for ");
         sb.append(ability);
-        targetCard.getGame().getGameLog().add(GameLogEntryType.INFORMATION, sb.toString());
+        targetCard.getGame().fireEvent(new GameEventAddLog(GameLogEntryType.INFORMATION, sb.toString()));
         return targetCard;
     }
 

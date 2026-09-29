@@ -2,11 +2,13 @@ package forge.game.keyword;
 
 import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import com.google.common.collect.Lists;
 
+import forge.game.IHasSVars;
 import forge.game.card.Card;
 import forge.game.card.CardFactoryUtil;
 import forge.game.player.Player;
@@ -25,7 +27,7 @@ public abstract class KeywordInstance<T extends KeywordInstance<?>> implements K
 
     private Keyword keyword;
     private String original;
-    private long staticId = 0;
+    private StaticAbility st = null;
     private long idx = -1;
 
     private List<Trigger> triggers = Lists.newArrayList();
@@ -33,24 +35,14 @@ public abstract class KeywordInstance<T extends KeywordInstance<?>> implements K
     private List<SpellAbility> abilities = Lists.newArrayList();
     private List<StaticAbility> staticAbilities = Lists.newArrayList();
 
-
-    /* (non-Javadoc)
-     * @see forge.game.keyword.KeywordInterface#getOriginal()
-     */
     @Override
     public String getOriginal() {
         return original;
     }
-    /* (non-Javadoc)
-     * @see forge.game.keyword.KeywordInterface#getKeyword()
-     */
     @Override
     public Keyword getKeyword() {
         return keyword;
     }
-    /* (non-Javadoc)
-     * @see forge.game.keyword.KeywordInterface#getReminderText()
-     */
     @Override
     public String getReminderText() {
         String result = formatReminderText(keyword.reminderText);
@@ -63,12 +55,13 @@ public abstract class KeywordInstance<T extends KeywordInstance<?>> implements K
         m.appendTail(sb);
         return sb.toString();
     }
-    /* (non-Javadoc)
-     * @see forge.game.keyword.KeywordInterface#getAmount()
-     */
     @Override
     public int getAmount() {
         return 1;
+    }
+    @Override
+    public String getAmountString() {
+        return String.valueOf(getAmount());
     }
     protected void initialize(String original0, Keyword keyword0, String details) {
         original = original0;
@@ -77,14 +70,6 @@ public abstract class KeywordInstance<T extends KeywordInstance<?>> implements K
     }
     protected abstract void parse(String details);
     protected abstract String formatReminderText(String reminderText);
-
-    /*
-     * (non-Javadoc)
-     * @see forge.game.keyword.KeywordInterface#createTraits(forge.game.card.Card, boolean)
-     */
-    public final void createTraits(final Card host, final boolean intrinsic) {
-        createTraits(host, intrinsic, false);
-    }
 
     /*
      * (non-Javadoc)
@@ -106,7 +91,7 @@ public abstract class KeywordInstance<T extends KeywordInstance<?>> implements K
             Breadcrumb bread = new Breadcrumb(msg);
             bread.setData("Card", host.getName());
             bread.setData("Keyword", this.original);
-            Sentry.addBreadcrumb(bread, this);
+            Sentry.addBreadcrumb(bread);
 
             // add Extra for debugging
             Sentry.setExtra("Card", host.getName());
@@ -122,7 +107,7 @@ public abstract class KeywordInstance<T extends KeywordInstance<?>> implements K
             Breadcrumb bread = new Breadcrumb(msg);
             bread.setData("Card", host.getName());
             bread.setData("Keyword", this.original);
-            Sentry.addBreadcrumb(bread, this);
+            Sentry.addBreadcrumb(bread);
 
             //rethrow
             throw new RuntimeException("Error in Keyword " + this.original + " for card " + host.getName(), e);
@@ -133,13 +118,6 @@ public abstract class KeywordInstance<T extends KeywordInstance<?>> implements K
         }
     }
 
-    /* (non-Javadoc)
-     * @see forge.game.keyword.KeywordInterface#createTraits(forge.game.player.Player)
-     */
-    @Override
-    public void createTraits(Player player) {
-        createTraits(player, false);
-    }
     /* (non-Javadoc)
      * @see forge.game.keyword.KeywordInterface#createTraits(forge.game.player.Player, boolean)
      */
@@ -153,11 +131,11 @@ public abstract class KeywordInstance<T extends KeywordInstance<?>> implements K
         }
         try {
             String msg = "KeywordInstance:createTraits: make Traits for Keyword";
-            
+
             Breadcrumb bread = new Breadcrumb(msg);
             bread.setData("Player", player.getName());
             bread.setData("Keyword", this.original);
-            Sentry.addBreadcrumb(bread, this);
+            Sentry.addBreadcrumb(bread);
 
             // add Extra for debugging
             Sentry.setExtra("Player", player.getName());
@@ -173,7 +151,7 @@ public abstract class KeywordInstance<T extends KeywordInstance<?>> implements K
             Breadcrumb bread = new Breadcrumb(msg);
             bread.setData("Player", player.getName());
             bread.setData("Keyword", this.original);
-            Sentry.addBreadcrumb(bread, this);
+            Sentry.addBreadcrumb(bread);
 
             //rethrow
             throw new RuntimeException("Error in Keyword " + this.original + " for player " + player.getName(), e);
@@ -219,6 +197,18 @@ public abstract class KeywordInstance<T extends KeywordInstance<?>> implements K
         staticAbilities.add(st);
     }
 
+    public boolean hasTraits() {
+        if (!getAbilities().isEmpty())
+            return true;
+        if (!getTriggers().isEmpty())
+            return true;
+        if (!getReplacements().isEmpty())
+            return true;
+        if (!getStaticAbilities().isEmpty())
+            return true;
+        return false;
+    }
+
     /*
      * (non-Javadoc)
      * @see forge.game.keyword.KeywordInterface#getTriggers()
@@ -246,6 +236,24 @@ public abstract class KeywordInstance<T extends KeywordInstance<?>> implements K
      */
     public Collection<StaticAbility> getStaticAbilities() {
         return staticAbilities;
+    }
+
+
+    public List<SpellAbility> applySpellAbility(List<SpellAbility> list) {
+        list.addAll(getAbilities());
+        return list;
+    }
+    public List<Trigger> applyTrigger(List<Trigger> list) {
+        list.addAll(getTriggers());
+        return list;
+    }
+    public List<ReplacementEffect> applyReplacementEffect(List<ReplacementEffect> list) {
+        list.addAll(getReplacements());
+        return list;
+    }
+    public List<StaticAbility> applyStaticAbility(List<StaticAbility> list) {
+        list.addAll(getStaticAbilities());
+        return list;
     }
 
     /*
@@ -366,12 +374,12 @@ public abstract class KeywordInstance<T extends KeywordInstance<?>> implements K
             sa.setIntrinsic(value);
         }
     }
-    
-    public long getStaticId() {
-        return this.staticId;
+
+    public StaticAbility getStatic() {
+        return this.st;
     }
-    public void setStaticId(long v) {
-        this.staticId = v;
+    public void setStatic(StaticAbility st) {
+        this.st = st;
     }
 
     public long getIdx() {
@@ -381,4 +389,38 @@ public abstract class KeywordInstance<T extends KeywordInstance<?>> implements K
         idx = i;
     }
 
+    protected IHasSVars getSVarFallback() {
+        if (getStatic() != null) {
+            return getStatic();
+        }
+        return getHostCard();
+    }
+
+    @Override
+    public String getSVar(final String name) {
+        return getSVarFallback().getSVar(name);
+    }
+
+    @Override
+    public boolean hasSVar(final String name) {
+        return getSVarFallback().hasSVar(name);
+    }
+
+    @Override
+    public final void setSVar(final String name, final String value) {
+
+    }
+
+    @Override
+    public Map<String, String> getSVars() {
+        return getSVarFallback().getSVars();
+    }
+
+    @Override
+    public void setSVars(Map<String, String> newSVars) {
+    }
+
+    @Override
+    public void removeSVar(String var) {
+    }
 }

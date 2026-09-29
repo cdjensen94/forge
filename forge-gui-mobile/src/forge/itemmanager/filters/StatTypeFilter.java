@@ -10,8 +10,6 @@ import forge.itemmanager.ItemManager;
 import forge.itemmanager.SFilterUtil;
 import forge.itemmanager.SItemManagerUtil;
 import forge.itemmanager.SItemManagerUtil.StatTypes;
-import forge.toolbox.FEvent;
-import forge.toolbox.FEvent.FEventHandler;
 import forge.toolbox.FLabel;
 
 public abstract class StatTypeFilter<T extends InventoryItem> extends ToggleButtonsFilter<T> {
@@ -27,14 +25,11 @@ public abstract class StatTypeFilter<T extends InventoryItem> extends ToggleButt
         buttonMap.put(st, button);
 
         //hook so long-pressing a button toggles itself on and toggles off all other buttons
-        button.setLongPressHandler(new FEventHandler() {
-            @Override
-            public void handleEvent(FEvent e) {
-                lockFiltering = true;
-                SFilterUtil.showOnlyStat(st, button, buttonMap);
-                lockFiltering = false;
-                applyChange();
-            }
+        button.setLongPressHandler(e -> {
+            lockFiltering = true;
+            SFilterUtil.showOnlyStat(st, button, buttonMap);
+            lockFiltering = false;
+            applyChange();
         });
     }
 
@@ -42,7 +37,7 @@ public abstract class StatTypeFilter<T extends InventoryItem> extends ToggleButt
     protected <U extends InventoryItem> boolean showUnsupportedItem(U item) {
         FLabel btnPackOrDeck = buttonMap.get(StatTypes.PACK_OR_DECK); //support special pack/deck case
         if (btnPackOrDeck != null && btnPackOrDeck.isSelected()) {
-            return ItemPredicate.Presets.IS_PACK_OR_DECK.apply(item);
+            return ItemPredicate.IS_PACK_OR_DECK.test(item);
         }
         return false;
     }

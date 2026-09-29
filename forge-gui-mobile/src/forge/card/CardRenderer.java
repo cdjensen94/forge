@@ -1,7 +1,6 @@
 package forge.card;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.List;
@@ -27,6 +26,7 @@ import com.badlogic.gdx.graphics.g2d.freetype.FreeTypeFontGenerator.FreeTypeFont
 import com.badlogic.gdx.graphics.glutils.PixmapTextureData;
 import com.badlogic.gdx.utils.Align;
 import com.badlogic.gdx.utils.Array;
+import com.google.common.collect.Multiset;
 
 import forge.CachedCardImage;
 import forge.Forge;
@@ -37,6 +37,8 @@ import forge.assets.FRotatedImage;
 import forge.assets.FSkin;
 import forge.assets.FSkinColor;
 import forge.assets.FSkinFont;
+import forge.assets.FSkinImage;
+import forge.assets.FSkinImageInterface;
 import forge.assets.FTextureRegionImage;
 import forge.assets.ImageCache;
 import forge.card.CardZoom.ActivateHandler;
@@ -44,6 +46,7 @@ import forge.card.mana.ManaCost;
 import forge.game.card.CardView;
 import forge.game.card.CardView.CardStateView;
 import forge.game.card.CounterType;
+import forge.game.keyword.Keyword;
 import forge.game.zone.ZoneType;
 import forge.gui.FThreads;
 import forge.gui.card.CardDetailUtil;
@@ -51,18 +54,49 @@ import forge.gui.card.CardDetailUtil.DetailColors;
 import forge.item.IPaperCard;
 import forge.item.InventoryItem;
 import forge.localinstance.properties.ForgeConstants.CounterDisplayType;
-import forge.localinstance.properties.ForgePreferences;
 import forge.localinstance.properties.ForgePreferences.FPref;
 import forge.localinstance.skin.FSkinProp;
 import forge.model.FModel;
 import forge.screens.match.MatchController;
 import forge.toolbox.FList;
 
+import static forge.assets.FSkin.getDefaultSkinFile;
+
 public class CardRenderer {
+    private static final ArrayList<String> listItemPtPieces = new ArrayList<>(8);
+    private static final float[] listItemPtWidths = new float[8];
+    private static final StringBuilder stringBuilder = new StringBuilder(128);
     public enum CardStackPosition {
         Top,
         BehindHorz,
         BehindVert
+    }
+
+    /** Pref is normalized to 6 hex chars on the write side; this just parses,
+     *  falling back to the FPref default if the stored value is malformed. */
+    private static Color parseActionableHighlightColor() {
+        String s = FModel.getPreferences().getPref(FPref.UI_ACTIONABLE_HIGHLIGHT_COLOR);
+        try {
+            if (s != null && s.length() == 6) return rgbFromHex(s);
+        } catch (NumberFormatException ignored) {}
+        return rgbFromHex(FPref.UI_ACTIONABLE_HIGHLIGHT_COLOR.getDefault());
+    }
+
+    private static Color rgbFromHex(String s) {
+        int r = Integer.parseInt(s.substring(0, 2), 16);
+        int g = Integer.parseInt(s.substring(2, 4), 16);
+        int b = Integer.parseInt(s.substring(4, 6), 16);
+        return FSkinColor.fromRGB(r, g, b);
+    }
+
+    /** Outset-only rings so the actionable border on the card edge stays visible underneath. */
+    private static void drawAutoTapGlow(Graphics g, float cx, float cy, float cw, float ch) {
+        final float outer = Utils.scale(3f);
+        final float inner = Utils.scale(1.5f);
+        g.drawRect(BORDER_THICKNESS, FSkinColor.alphaColor(Color.YELLOW, 0.30f),
+                cx - outer, cy - outer, cw + outer * 2, ch + outer * 2);
+        g.drawRect(BORDER_THICKNESS, FSkinColor.alphaColor(Color.YELLOW, 0.55f),
+                cx - inner, cy - inner, cw + inner * 2, ch + inner * 2);
     }
 
     // class that simplifies the callback logic of CachedCardImage
@@ -86,11 +120,20 @@ public class CardRenderer {
 
         @Override
         public void onImageFetched() {
-            ImageCache.clear();
+            ImageCache.getInstance().clear();
             if (clearcardArtCache) {
                 clearcardArtCache();
             }
         }
+    }
+
+    private static float calcSymbolSize(FSkinProp skinProp) {
+        if (skinProp == null)
+            return 0f;
+        FSkinImageInterface image = FSkin.getImages().get(skinProp);
+        if (image == null)
+            return 0f;
+        return image.getNearestHQWidth(2 * (NAME_FONT.getCapHeight() - MANA_COST_PADDING));
     }
 
     private static final FSkinFont NAME_FONT = FSkinFont.get(16);
@@ -99,23 +142,21 @@ public class CardRenderer {
     public static final float PT_BOX_TINT = 0.2f;
     private static final float MANA_COST_PADDING = Utils.scale(3);
     public static final float SET_BOX_MARGIN = Utils.scale(1);
-    public static final float MANA_SYMBOL_SIZE = FSkin.getImages().get(FSkinProp.IMG_MANA_1).getNearestHQWidth(2 * (NAME_FONT.getCapHeight() - MANA_COST_PADDING));
+    public static final float MANA_SYMBOL_SIZE = calcSymbolSize(FSkinProp.IMG_MANA_1);
     private static final float NAME_COST_THRESHOLD = Utils.scale(200);
     private static final float BORDER_THICKNESS = Utils.scale(1);
     public static final float PADDING_MULTIPLIER = 0.021f;
     public static final float CROP_MULTIPLIER = 0.96f;
-    private static final Color counterBackgroundColor = new Color(0f, 0f, 0f, 0.9f);
+    private static final Color counterBackgroundColor = new Color(0f, 0f, 0f, 0.7f);
     private static final Map<CounterType, Color> counterColorCache = new HashMap<>();
-    private static final GlyphLayout layout = new GlyphLayout();
+    private static final GlyphLayout glyphLayout = new GlyphLayout();
 
     static {
         try {
             for (int fontSize = 8; fontSize <= 22; fontSize++) {
                 generateFontForCounters(fontSize);
             }
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
+        } catch (Exception ignored) {}
     }
 
     private static Color fromDetailColor(DetailColors detailColor) {
@@ -210,6 +251,10 @@ public class CardRenderer {
         if (pc.getRules() == null)
             return getCardArt(pc.getImageKey(backFace), false, false, false, false, false, false, false, false, true, false);
 
+        if (pc.getRules().isUnsupported()) {
+            return CardImageRenderer.forgeArt;
+        }
+
         CardType type = pc.getRules().getType();
         return getCardArt(pc.getImageKey(backFace), pc.getRules().getSplitType() == CardSplitType.Split,
                 type.isPlane() || type.isPhenomenon(), pc.getRules().getOracleText().contains("Aftermath"),
@@ -230,7 +275,7 @@ public class CardRenderer {
         if (cardArt == null) {
             Texture image = new RendererCachedCardImage(imageKey, true).getImage();
             if (image != null) {
-                if (image == ImageCache.getDefaultImage()) {
+                if (image == ImageCache.getInstance().getDefaultImage()) {
                     cardArt = CardImageRenderer.forgeArt;
                 } else {
                     float x, y;
@@ -331,12 +376,12 @@ public class CardRenderer {
             Texture image = new CachedCardImage(imageKey) {
                 @Override
                 public void onImageFetched() {
-                    ImageCache.clear();
+                    ImageCache.getInstance().clear();
                     Forge.getAssets().cardArtCache().remove("Aftermath_second_" + imageKey);
                 }
             }.getImage();
             if (image != null) {
-                if (image == ImageCache.getDefaultImage()) {
+                if (image == ImageCache.getInstance().getDefaultImage()) {
                     cardArt = CardImageRenderer.forgeArt;
                 } else {
                     float x, y;
@@ -359,17 +404,22 @@ public class CardRenderer {
     }
 
     public static FImageComplex getAlternateCardArt(final String imageKey, boolean isPlanesWalker) {
-        FImageComplex cardArt = Forge.getAssets().cardArtCache().get("Alternate_" + imageKey);
+        stringBuilder.setLength(0);
+        String compiledCacheKey = stringBuilder.append("Alternate_").append(imageKey).toString();
+
+        FImageComplex cardArt = Forge.getAssets().cardArtCache().get(compiledCacheKey);
         if (cardArt == null) {
             Texture image = new CachedCardImage(imageKey) {
                 @Override
                 public void onImageFetched() {
-                    ImageCache.clear();
-                    Forge.getAssets().cardArtCache().remove("Alternate_" + imageKey);
+                    ImageCache.getInstance().clear();
+                    stringBuilder.setLength(0);
+                    String clearKey = stringBuilder.append("Alternate_").append(imageKey).toString();
+                    Forge.getAssets().cardArtCache().remove(clearKey);
                 }
             }.getImage();
             if (image != null) {
-                if (image == ImageCache.getDefaultImage()) {
+                if (image == ImageCache.getInstance().getDefaultImage()) {
                     cardArt = CardImageRenderer.forgeArt;
                 } else {
                     float x, y;
@@ -417,13 +467,13 @@ public class CardRenderer {
             Texture image = new CachedCardImage(imageKey) {
                 @Override
                 public void onImageFetched() {
-                    ImageCache.clear();
+                    ImageCache.getInstance().clear();
                     Forge.getAssets().cardArtCache().remove("Meld_primary_" + imageKey);
                     Forge.getAssets().cardArtCache().remove("Meld_secondary_" + imageKey);
                 }
             }.getImage();
             if (image != null) {
-                if (image == ImageCache.getDefaultImage()) {
+                if (image == ImageCache.getInstance().getDefaultImage()) {
                     cardArt = CardImageRenderer.forgeArt;
                 } else {
                     float x = 0;
@@ -476,7 +526,7 @@ public class CardRenderer {
             float artX = x - FList.PADDING;
             float artY = y - FList.PADDING;
 
-            if (card.isSplitCard() && !card.getText().contains("Aftermath")) {
+            if (card.isSplitCard() && !CardRendererUtils.hasAftermath(card)) {
                 //draw split art with proper orientation
                 float srcY = cardArt.getHeight() * 13f / 354f;
                 float srcHeight = cardArt.getHeight() * 150f / 354f;
@@ -485,7 +535,7 @@ public class CardRenderer {
                 srcY += dh / 2;
                 g.drawRotatedImage(cardArt.getTexture(), artX, artY, cardArtHeight, cardArtWidth / 2, artX + cardArtWidth / 2, artY + cardArtWidth / 2, cardArt.getRegionX(), (int) srcY, (int) cardArt.getWidth(), (int) srcHeight, -90);
                 g.drawRotatedImage(cardArt.getTexture(), artX, artY + cardArtWidth / 2, cardArtHeight, cardArtWidth / 2, artX + cardArtWidth / 2, artY + cardArtWidth / 2, cardArt.getRegionX(), (int) cardArt.getHeight() - (int) (srcY + srcHeight), (int) cardArt.getWidth(), (int) srcHeight, -90);
-            } else if (card.getText().contains("Aftermath")) {
+            } else if (CardRendererUtils.hasAftermath(card)) {
                 FImageComplex secondArt = CardRenderer.getAftermathSecondCardArt(cardCurrentState.getImageKey());
                 g.drawRotatedImage(cardArt.getTexture(), artX, artY, cardArtWidth, cardArtHeight / 2, artX + cardArtWidth, artY + cardArtHeight / 2, cardArt.getRegionX(), cardArt.getRegionY(), (int) cardArt.getWidth(), (int) cardArt.getHeight() / 2, 0);
                 g.drawRotatedImage(secondArt.getTexture(), artX - cardArtHeight / 2, artY + cardArtHeight / 2, cardArtHeight / 2, cardArtWidth, artX, artY + cardArtHeight / 2, secondArt.getRegionX(), secondArt.getRegionY(), (int) secondArt.getWidth(), (int) secondArt.getHeight(), 90);
@@ -497,18 +547,25 @@ public class CardRenderer {
         //render card name and mana cost on first line
         float manaCostWidth = 0;
         ManaCost mainManaCost = cardCurrentState.getManaCost();
-        if (card.isSplitCard()) {
-            //handle rendering both parts of split card
-            mainManaCost = card.getLeftSplitState().getManaCost();
-            ManaCost otherManaCost = card.getAlternateState().getManaCost();
-            manaCostWidth = CardFaceSymbols.getWidth(otherManaCost, MANA_SYMBOL_SIZE) + MANA_COST_PADDING;
-            CardFaceSymbols.drawManaCost(g, otherManaCost, x + w - manaCostWidth + MANA_COST_PADDING, y, MANA_SYMBOL_SIZE);
-            //draw "//" between two parts of mana cost
-            manaCostWidth += font.getBounds("//").width + MANA_COST_PADDING;
-            g.drawText("//", font, foreColor, x + w - manaCostWidth + MANA_COST_PADDING, y, w, MANA_SYMBOL_SIZE, false, Align.left, true);
+        if (!mainManaCost.isNoCost() || (card.isSplitCard() && !card.getLeftSplitState().getManaCost().isNoCost())) {
+            if (card.isSplitCard()) {
+                //handle rendering both parts of split card
+                mainManaCost = card.getLeftSplitState().getManaCost();
+                ManaCost otherManaCost = card.getAlternateState().getManaCost();
+                manaCostWidth = CardFaceSymbols.getWidth(otherManaCost, MANA_SYMBOL_SIZE) + MANA_COST_PADDING;
+                CardFaceSymbols.drawManaCost(g, otherManaCost, x + w - manaCostWidth + MANA_COST_PADDING, y, MANA_SYMBOL_SIZE);
+                //draw "//" between two parts of mana cost
+                manaCostWidth += font.getBounds("//").width + MANA_COST_PADDING;
+                g.drawText("//", font, foreColor, x + w - manaCostWidth + MANA_COST_PADDING, y, w, MANA_SYMBOL_SIZE, false, Align.left, true);
+            }
+            manaCostWidth += CardFaceSymbols.getWidth(mainManaCost, MANA_SYMBOL_SIZE);
+            CardFaceSymbols.drawManaCost(g, mainManaCost, x + w - manaCostWidth, y, MANA_SYMBOL_SIZE);
         }
-        manaCostWidth += CardFaceSymbols.getWidth(mainManaCost, MANA_SYMBOL_SIZE);
-        CardFaceSymbols.drawManaCost(g, mainManaCost, x + w - manaCostWidth, y, MANA_SYMBOL_SIZE);
+        else if(cardCurrentState.isAttraction()) {
+            //For attractions, draw their lights instead of a mana cost.
+            float lightWidth = (6 * MANA_SYMBOL_SIZE) + MANA_COST_PADDING;
+            CardFaceSymbols.drawAttractionLights(g, cardCurrentState.getAttractionLights(), x + w - lightWidth, y, MANA_SYMBOL_SIZE, false);
+        }
 
         x += cardArtWidth;
         String name = CardTranslation.getTranslatedName(card.getCurrentState().getName());
@@ -544,9 +601,6 @@ public class CardRenderer {
             type += String.format(" [%s / %s]", power, toughness);
         } else if (cardCurrentState.isBattle()) {
             type += " (" + cardCurrentState.getDefense() + ")";
-        } else if (cardCurrentState.isAttraction()) {
-            //TODO: Probably shouldn't be non-localized text here? Not sure what to do if someone makes an attraction with no lights...
-            type += " (" + (cardCurrentState.getAttractionLights().isEmpty() ? "No Lights" : StringUtils.join(cardCurrentState.getAttractionLights(), ", ")) + ")";
         }
         g.drawText(type, typeFont, foreColor, x, y, availableTypeWidth, lineHeight, false, Align.left, true);
     }
@@ -582,6 +636,7 @@ public class CardRenderer {
 
     public static void drawCard(Graphics g, IPaperCard pc, float x, float y, float w, float h, CardStackPosition pos) {
         Texture image = new RendererCachedCardImage(pc, false).getImage();
+        final CardView card = CardView.getCardForUi(pc);
         float radius = (h - w) / 8;
         float croppedArea = isModernFrame(pc) ? CROP_MULTIPLIER : 0.97f;
         float minusxy = isModernFrame(pc) ? 0.0f : 0.13f * radius;
@@ -589,103 +644,90 @@ public class CardRenderer {
             croppedArea = 0.975f;
             minusxy = 0.135f * radius;
         }
+        if (pc.isFoil()) { //draw foil effect if needed
+            if (card.getCurrentState().getFoilIndex() == 0) { //if foil finish not yet established, assign a random one
+                card.getCurrentState().setFoilIndexOverride(-2);
+            }
+        }
         if (image != null) {
-            if (image == ImageCache.getDefaultImage() || Forge.enableUIMask.equals("Art")) {
-                CardImageRenderer.drawCardImage(g, CardView.getCardForUi(pc), false, x, y, w, h, pos, true, true);
+            if (image == ImageCache.getInstance().getDefaultImage() || (Forge.enableUIMask.equals("Art") || card.useCardArt())) {
+                CardImageRenderer.drawCardImage(g, card, false, x, y, w, h, pos, true, true);
             } else {
                 if (Forge.enableUIMask.equals("Full")) {
-                    if (image.toString().contains(".fullborder."))
-                        g.drawCardRoundRect(image, null, x, y, w, h, false, false);
-                    else {
-                        //tint the border
-                        g.drawImage(ImageCache.getBorderImage(image.toString()), ImageCache.borderColor(image), x, y, w, h);
-                        g.drawImage(ImageCache.croppedBorderImage(image), x + radius / 2.4f - minusxy, y + radius / 2 - minusxy, w * croppedArea, h * croppedArea);
-                    }
+                    g.drawCardRoundRect(image, null, x, y, w, h, false, false, CardRendererUtils.getFoilIndex(card));
                 } else if (Forge.enableUIMask.equals("Crop")) {
-                    g.drawImage(ImageCache.croppedBorderImage(image), x, y, w, h);
+                    g.drawImage(ImageCache.getInstance().croppedBorderImage(image), x, y, w, h, CardRendererUtils.getFoilIndex(card));
                 } else
-                    g.drawImage(image, x, y, w, h);
-            }
-            if (pc.isFoil()) { //draw foil effect if needed
-                final CardView card = CardView.getCardForUi(pc);
-                if (card.getCurrentState().getFoilIndex() == 0) { //if foil finish not yet established, assign a random one
-                    card.getCurrentState().setFoilIndexOverride(-1);
-                }
-                drawFoilEffect(g, card, x, y, w, h, false);
+                    g.drawImage(image, x, y, w, h, CardRendererUtils.getFoilIndex(card));
             }
         } else {
             //if card has invalid or no texture due to sudden changes in ImageCache, draw CardImageRenderer instead and wait for it to refresh automatically
-            CardImageRenderer.drawCardImage(g, CardView.getCardForUi(pc), false, x, y, w, h, pos, true, true);
+            CardImageRenderer.drawCardImage(g, card, false, x, y, w, h, pos, true, true);
         }
+    }
+
+    //get crackoverlay by level of damage light 0, medium 1, heavy 2, max 3
+    public static int getCrackOverlay(int damage) {
+        return switch (damage) {
+            case 0,1,2 -> 0;
+            case 3,4 -> 1;
+            case 5,6 -> 2;
+            default -> 3;
+        };
     }
 
     public static void drawCard(Graphics g, CardView card, float x, float y, float w, float h, CardStackPosition pos, boolean rotate) {
         drawCard(g, card, x, y, w, h, pos, rotate, false, false, false);
     }
-
     public static void drawCard(Graphics g, CardView card, float x, float y, float w, float h, CardStackPosition pos, boolean rotate, boolean showAltState, boolean isChoiceList, boolean magnify) {
         boolean canshow = MatchController.instance.mayView(card);
         boolean showsleeves = card.isFaceDown() && card.isInZone(EnumSet.of(ZoneType.Exile)); //fix facedown card image ie gonti lord of luxury
         Texture image = new RendererCachedCardImage(card, false).getImage(showAltState ? card.getAlternateState().getImageKey() : card.getCurrentState().getImageKey());
-        TextureRegion crack_overlay = FSkin.getCracks().get(card.getCrackOverlayInt());
+        TextureRegion crack_overlay = FSkin.getCracks().get(getCrackOverlay(card.getDamage()));
         FImage sleeves = MatchController.getPlayerSleeve(card.getOwner());
         float radius = (h - w) / 8;
         float croppedArea = isModernFrame(card) ? CROP_MULTIPLIER : 0.97f;
         float minusxy = isModernFrame(card) ? 0.0f : 0.13f * radius;
+        boolean needsRotation = rotate && !Forge.enableUIMask.equals("Art") && CardRendererUtils.needsRotation(card, showAltState);
         if (card.getCurrentState().getSetCode().equals("LEA") || card.getCurrentState().getSetCode().equals("LEB")) {
             croppedArea = 0.975f;
             minusxy = 0.135f * radius;
         }
-        float oldAlpha = g.getfloatAlphaComposite();
-        if (card.isPhasedOut() && !magnify)
-            g.setAlphaComposite(0.2f);
         if (image != null) {
-            if (image == ImageCache.getDefaultImage() || Forge.enableUIMask.equals("Art")) {
-                CardImageRenderer.drawCardImage(g, card, showAltState, x, y, w, h, pos, true, false, isChoiceList, !showCardIdOverlay(card));
+            if (image == ImageCache.getInstance().getDefaultImage() || (Forge.enableUIMask.equals("Art") ||card.useCardArt())) {
+                CardImageRenderer.drawCardImage(g, card, showAltState, x, y, w, h, pos, true, false, isChoiceList, !CardRendererUtils.showCardIdOverlay(card));
             } else if (showsleeves) {
                 if (!card.isForeTold())
-                    g.drawCardImage(sleeves, crack_overlay, x, y, w, h, card.wasDestroyed(), magnify ? false : card.getDamage() > 0);
+                    g.drawCardImage(sleeves, crack_overlay, x, y, w, h, CardRendererUtils.drawGray(card), CardRendererUtils.drawCracks(card, magnify));
                 else
-                    g.drawCardImage(image, crack_overlay, x, y, w, h, card.wasDestroyed(), magnify ? false : card.getDamage() > 0);
+                    g.drawCardImage(image, crack_overlay, x, y, w, h, CardRendererUtils.drawGray(card), CardRendererUtils.drawCracks(card, magnify), CardRendererUtils.getFoilIndex(card));
             } else {
-                if (FModel.getPreferences().getPrefBoolean(ForgePreferences.FPref.UI_ROTATE_PLANE_OR_PHENOMENON)
-                        && (card.getCurrentState().isPhenomenon() || card.getCurrentState().isPlane() || (card.getCurrentState().isBattle() && !showAltState) || (card.getAlternateState() != null && card.getAlternateState().isBattle() && showAltState)) && rotate) {
+                if (card.isFlipped() || needsRotation) {
+                    float rotation = card.isFlipped() ? 180 
+                        : CardRendererUtils.hasAftermath(card) ? 90 : -90;
                     if (Forge.enableUIMask.equals("Full")) {
-                        if (image.toString().contains(".fullborder."))
-                            g.drawCardRoundRect(image, x, y, w, h, x + w / 2, y + h / 2, -90);
-                        else {
-                            g.drawRotatedImage(FSkin.getBorders().get(0), x, y, w, h, x + w / 2, y + h / 2, -90);
-                            g.drawRotatedImage(ImageCache.croppedBorderImage(image), x + radius / 2.3f - minusxy, y + radius / 2 - minusxy, w * croppedArea, h * croppedArea, (x + radius / 2.3f - minusxy) + (w * croppedArea) / 2, (y + radius / 2 - minusxy) + (h * croppedArea) / 2, -90);
-                        }
+                        g.drawCardRoundRect(image, x, y, w, h, x + w / 2, y + h / 2, rotation, 1f, CardRendererUtils.getFoilIndex(card));
                     } else if (Forge.enableUIMask.equals("Crop")) {
-                        g.drawRotatedImage(ImageCache.croppedBorderImage(image), x, y, w, h, x + w / 2, y + h / 2, -90);
+                        g.drawCardRoundRect(ImageCache.getInstance().croppedBorderImage(image), x, y, w, h, x + w / 2, y + h / 2, rotation, 0f, CardRendererUtils.getFoilIndex(card));
                     } else
-                        g.drawRotatedImage(image, x, y, w, h, x + w / 2, y + h / 2, -90);
+                        g.drawCardRoundRect(image, x, y, w, h, x + w / 2, y + h / 2, rotation, 0f, CardRendererUtils.getFoilIndex(card));
                 } else {
                     if (Forge.enableUIMask.equals("Full") && canshow) {
-                        if (image.toString().contains(".fullborder."))
-                            g.drawCardRoundRect(image, crack_overlay, x, y, w, h, card.wasDestroyed(), magnify ? false : card.getDamage() > 0);
-                        else {
-                            boolean t = (card.getCurrentState().getOriginalColors() != card.getCurrentState().getColors()) || card.getCurrentState().hasChangeColors();
-                            g.drawBorderImage(ImageCache.getBorderImage(image.toString(), canshow), ImageCache.borderColor(image), ImageCache.getTint(card, image), x, y, w, h, t); //tint check for changed colors
-                            g.drawCardImage(ImageCache.croppedBorderImage(image), crack_overlay, x + radius / 2.4f-minusxy, y + radius / 2-minusxy, w * croppedArea, h * croppedArea, card.wasDestroyed(), magnify ? false : card.getDamage() > 0);
-                        }
+                        g.drawCardRoundRect(image, crack_overlay, x, y, w, h, CardRendererUtils.drawGray(card), CardRendererUtils.drawCracks(card, magnify), CardRendererUtils.getFoilIndex(card));
                     } else if (Forge.enableUIMask.equals("Crop") && canshow) {
-                        g.drawCardImage(ImageCache.croppedBorderImage(image), crack_overlay, x, y, w, h, card.wasDestroyed(), magnify ? false : card.getDamage() > 0);
+                        g.drawCardImage(ImageCache.getInstance().croppedBorderImage(image), crack_overlay, x, y, w, h, CardRendererUtils.drawGray(card), CardRendererUtils.drawCracks(card, magnify), CardRendererUtils.getFoilIndex(card));
                     } else {
                         if (canshow)
-                            g.drawCardImage(image, crack_overlay, x, y, w, h, card.wasDestroyed(), magnify ? false : card.getDamage() > 0);
+                            g.drawCardImage(image, crack_overlay, x, y, w, h, CardRendererUtils.drawGray(card), CardRendererUtils.drawCracks(card, magnify), CardRendererUtils.getFoilIndex(card));
                         else // draw card back sleeves
-                            g.drawCardImage(sleeves, crack_overlay, x, y, w, h, card.wasDestroyed(), magnify ? false : card.getDamage() > 0);
+                            g.drawCardImage(sleeves, crack_overlay, x, y, w, h, CardRendererUtils.drawGray(card), CardRendererUtils.drawCracks(card, magnify));
                     }
                 }
             }
-            drawFoilEffect(g, card, x, y, w, h, false);
         } else {
             //if card has invalid or no texture due to sudden changes in ImageCache, draw CardImageRenderer instead and wait for it to refresh automatically
-            CardImageRenderer.drawCardImage(g, card, showAltState, x, y, w, h, pos, true, false, isChoiceList, !showCardIdOverlay(card));
+            CardImageRenderer.drawCardImage(g, card, showAltState, x, y, w, h, pos, true, false, isChoiceList, !CardRendererUtils.showCardIdOverlay(card));
         }
-        g.setAlphaComposite(oldAlpha);
     }
 
     public static void drawCardWithOverlays(Graphics g, CardView card, float x, float y, float w, float h, CardStackPosition pos) {
@@ -726,15 +768,27 @@ public class CardRenderer {
             return;
         } //remaining rendering not needed if card is behind another card in a vertical stack
         boolean onTop = (pos == CardStackPosition.Top);
+        if (canShow && ZoneType.Battlefield.equals(card.getZone())) {
+            //locked room
+            if (card.isSplitCard() && card.hasAlternateState() && !card.isFaceDown() && !CardStateName.Original.equals(details.getState())) {
+                switch (details.getState()) {
+                    case EmptyRoom -> {
+                        g.drawImage(FSkinImage.PADLOCK, cx, cy + ch / 2, cw, ch);
+                        g.drawImage(FSkinImage.PADLOCK, cx, cy, cw, ch);
+                    }
+                    case RightSplit -> g.drawImage(FSkinImage.PADLOCK, cx, cy + ch / 2, cw, ch);
+                    case LeftSplit -> g.drawImage(FSkinImage.PADLOCK, cx, cy, cw, ch);
+                }
+            }
+        }
 
-        if (canShow && showCardIdOverlay(card)) {
+        if (canShow && CardRendererUtils.showCardIdOverlay(card)) {
             FSkinFont idFont = FSkinFont.forHeight(h * 0.11f);
             float idHeight = idFont.getCapHeight();
             g.drawOutlinedText(String.valueOf(card.getId()), idFont, Color.WHITE, Color.BLACK, x + padding, y + h - idHeight - padding, w, h, false, Align.left, false);
         }
 
         if (card.getCounters() != null && !card.getCounters().isEmpty()) {
-
             switch (CounterDisplayType.from(FModel.getPreferences().getPref(FPref.UI_CARD_COUNTER_DISPLAY_TYPE))) {
                 case OLD_WHEN_SMALL:
                 case TEXT:
@@ -748,31 +802,18 @@ public class CardRenderer {
                     drawCounterTabs(card, g, x, y, w, h);
                     break;
             }
-
         }
 
-        if (card.getCurrentRoom() != null && !card.getCurrentRoom().isEmpty()) {
-            List<String> markers = new ArrayList<>();
-            markers.add("In Room:");
-            markers.add(card.getCurrentRoom());
-            drawMarkersTabs(markers, g, x, y, w, h, false);
-        }
-        //Class level
-        if (card.getCurrentState().getType().hasStringType("Class") && ZoneType.Battlefield.equals(card.getZone())) {
-            List<String> markers = new ArrayList<>();
-            markers.add("CL:" + card.getClassLevel());
-            drawMarkersTabs(markers, g, x, y - markersHeight, w, h, true);
-        }
-        //Ring level
-        if (card.getRingLevel() > 0) {
-            List<String> markers = new ArrayList<>();
-            markers.add("RL:" + card.getRingLevel());
-            drawMarkersTabs(markers, g, x, y - markersHeight, w, h, true);
+        if(card.getMarkerText() != null) {
+            List<String> markers = card.getMarkerText();
+            if(markers.size() > 1) //Use smaller text for multi-line strings.
+                drawMarkersTabs(markers, g, x, y, w, h, false);
+            else
+                drawMarkersTabs(markers, g, x, y - markersHeight, w, h, true);
         }
 
         float otherSymbolsSize = w / 4f;
         final float combatXSymbols = (x + (w / 4)) - otherSymbolsSize / 2 - 10;
-        final float stateXSymbols = (x + (w / 2)) - otherSymbolsSize / 2 - 10;
         final float ySymbols = (y + h) - (h / 12) - otherSymbolsSize / 2;
 
         if (card.isAttacking()) {
@@ -781,12 +822,12 @@ public class CardRenderer {
             CardFaceSymbols.drawSymbol("defend", g, combatXSymbols, ySymbols, otherSymbolsSize, otherSymbolsSize);
         }
 
-        if (MatchController.instance.isUsedToPay(card)) {
+        if (MatchController.instance.isHighlighted(card)) {
             float sacSymbolSize = otherSymbolsSize * 1.2f;
             CardFaceSymbols.drawSymbol("sacrifice", g, (x + (w / 2)) - sacSymbolSize / 2, (y + (h / 2)) - sacSymbolSize / 2, otherSymbolsSize, otherSymbolsSize);
         }
 
-        if (onTop && showCardPowerOverlay(card) && (canShow || card.isFaceDown())) { //make sure card p/t box appears on top
+        if (onTop && CardRendererUtils.showCardPowerOverlay(card) && (canShow || card.isFaceDown())) { //make sure card p/t box appears on top
             //only needed if on top since otherwise P/T will be hidden
             drawPtBox(g, card, details, color, x, y, w, h);
         }
@@ -795,30 +836,36 @@ public class CardRenderer {
             g.fillRect(FSkinColor.getStandardColor(Color.BLACK).alphaColor(0.6f), cx, cy, cw, ch);
         }
         //Magenta outline when card is chosen
-        if (MatchController.instance.isUsedToPay(card)) {
+        if (MatchController.instance.isHighlighted(card)) {
             g.drawRect(BORDER_THICKNESS, Color.MAGENTA, cx, cy, cw, ch);
+        } else {
+            if (!unselectable && FModel.getPreferences().getPrefBoolean(FPref.UI_SHOW_ACTIONABLE_HIGHLIGHTS)
+                    && MatchController.instance.isWeaklySelectable(card)) {
+                g.drawRect(BORDER_THICKNESS, parseActionableHighlightColor(), cx, cy, cw, ch);
+            }
+            if (FModel.getPreferences().getPrefBoolean(FPref.UI_SHOW_AUTOTAP_PREVIEW)
+                    && MatchController.instance.getWeakSelectableStrength(card) >= 2) {
+                drawAutoTapGlow(g, cx, cy, cw, ch);
+            }
         }
         //Ability Icons
-        boolean onbattlefield = ZoneType.Battlefield.equals(card.getZone());
         if (unselectable) {
             g.setAlphaComposite(0.6f);
         }
-        if (onbattlefield && onTop) {
-            drawAbilityIcons(g, card, cx, cy, cw, cx + ((cw * 2) / 2.3f), cy, cw / 5.5f, cw / 5.7f, showAbilityIcons(card));
-        } else if (canShow && !onbattlefield && showAbilityIcons(card)) {
+        if (ZoneType.Battlefield.equals(card.getZone()) && onTop) {
+            drawAbilityIcons(g, card, cx, cy, cw, ch, cx + ((cw * 2) / 2.3f), cy, cw / 5.5f, cw / 5.7f, CardRendererUtils.showAbilityIcons(card));
+        } else if (canShow && !ZoneType.Battlefield.equals(card.getZone()) && CardRendererUtils.showAbilityIcons(card)) {
             //draw indicator for flash or can be cast at instant speed, enabled if show ability icons is enabled
-            String keywordKey = card.getCurrentState().getKeywordKey();
             String abilityText = card.getCurrentState().getAbilityText();
-            if ((keywordKey.indexOf("Flash") != -1)
-                    || ((abilityText.indexOf("May be played by") != -1)
-                    && (abilityText.indexOf("and as though it has flash") != -1))) {
-                if (keywordKey.indexOf("Flashback") == -1)
-                    CardFaceSymbols.drawSymbol("flash", g, cx + ((cw * 2) / 2.3f), cy, cw / 5.5f, cw / 5.5f);
+            if ((card.getCurrentState().hasKeyword(Keyword.FLASH))
+                    || ((abilityText.contains("May be played by"))
+                    && (abilityText.contains("and as though it has flash")))) {
+                g.drawImage(FSkin.getImages().get(FSkinProp.IMG_ABILITY_FLASH), cx + ((cw * 2) / 2.3f), cy, cw / 5.5f, cw / 5.5f);
             }
         }
         //draw name and mana cost overlays if card is small or default card image being used
         if (h <= NAME_COST_THRESHOLD && canShow) {
-            if (showCardNameOverlay(card)) {
+            if (CardRendererUtils.showCardNameOverlay(card)) {
                 float multiplier;
                 switch (Forge.extrawide) {
                     case "default":
@@ -834,26 +881,29 @@ public class CardRenderer {
                         multiplier = 0.150f;
                         break;
                 }
-                g.drawOutlinedText(CardTranslation.getTranslatedName(details.getName()), FSkinFont.forHeight(h * multiplier), Color.WHITE, Color.BLACK, x + padding - 1f, y + padding, w - 2 * padding, h * 0.4f, true, Align.left, false, true);
+                g.drawOutlinedText(CardTranslation.getTranslatedName(details.getName()), FSkinFont.forHeight(h * multiplier), Color.WHITE, Color.BLACK, cx + padding - 1f, cy + padding, cw - 2 * padding, ch * 0.4f, true, Align.left, false, true);
             }
-            if (showCardManaCostOverlay(card)) {
+            if (CardRendererUtils.showCardManaCostOverlay(card)) {
+                boolean showPerpetualManaCost = CardRendererUtils.showCardPerpetualManaCostOverlay();
                 float manaSymbolSize = w / 4.5f;
-                if (card.isSplitCard() && card.hasAlternateState()) {
-                    if (!card.isFaceDown()) { // no need to draw mana symbols on face down split cards (e.g. manifested)
-                        if (isChoiceList) {
-                            if (card.getRightSplitState().getName().equals(details.getName()))
-                                drawManaCost(g, card.getRightSplitState().getManaCost(), x - padding, y, w + 2 * padding, h, manaSymbolSize);
-                            else
-                                drawManaCost(g, card.getLeftSplitState().getManaCost(), x - padding, y, w + 2 * padding, h, manaSymbolSize);
-                        } else {
-                            ManaCost leftManaCost = card.getLeftSplitState().getManaCost();
-                            ManaCost rightManaCost = card.getRightSplitState().getManaCost();
-                            drawManaCost(g, leftManaCost, x - padding, y-(manaSymbolSize/1.5f), w + 2 * padding, h, manaSymbolSize);
-                            drawManaCost(g, rightManaCost, x - padding, y+(manaSymbolSize/1.5f), w + 2 * padding, h, manaSymbolSize);
-                        }
+                if (card.isSplitCard() && card.hasAlternateState() && !card.isFaceDown() && card.getZone() != ZoneType.Stack && card.getZone() != ZoneType.Battlefield) {
+                    if (isChoiceList) {
+                        ManaCost manaCost = showPerpetualManaCost ? details.getManaCost() : details.getOriginalManaCost();
+                        drawManaCost(g, manaCost, x - padding, y, w + 2 * padding, h, manaSymbolSize);
+                    } else {
+                        ManaCost leftManaCost = showPerpetualManaCost ? card.getLeftSplitState().getManaCost() : card.getLeftSplitState().getOriginalManaCost();
+                        ManaCost rightManaCost = showPerpetualManaCost ? card.getRightSplitState().getManaCost() : card.getRightSplitState().getOriginalManaCost();
+                        drawManaCost(g, leftManaCost, x - padding, y-(manaSymbolSize/1.5f), w + 2 * padding, h, manaSymbolSize);
+                        drawManaCost(g, rightManaCost, x - padding, y+(manaSymbolSize/1.5f), w + 2 * padding, h, manaSymbolSize);
                     }
                 } else {
-                    drawManaCost(g, showAltState ? card.getAlternateState().getManaCost() : card.getCurrentState().getManaCost(), x - padding, y, w + 2 * padding, h, manaSymbolSize);
+                    ManaCost manaCost;
+                    if (showAltState) {
+                        manaCost = showPerpetualManaCost ? card.getAlternateState().getManaCost() : card.getAlternateState().getOriginalManaCost();
+                    } else {
+                        manaCost = showPerpetualManaCost ? card.getCurrentState().getManaCost() : card.getCurrentState().getOriginalManaCost();
+                    }
+                    drawManaCost(g, manaCost, cx - padding, cy, cw + 2 * padding, ch, manaSymbolSize);
                 }
             }
         }
@@ -861,7 +911,7 @@ public class CardRenderer {
         g.setAlphaComposite(oldAlpha);
     }
 
-    public static void drawAbilityIcons(Graphics g, CardView card, float cx, float cy, float cw, float abiX, float abiY, float abiScale, float abiSpace, boolean showAbilityIcons) {
+    public static void drawAbilityIcons(Graphics g, CardView card, float cx, float cy, float cw, float ch, float abiX, float abiY, float abiScale, float abiSpace, boolean showAbilityIcons) {
         float abiCount = 0;
         //show token indicator as status
         if (card.isToken()) {
@@ -870,9 +920,15 @@ public class CardRenderer {
             abiCount += 1;
         }
         if (card.isSick()) {
-            CardFaceSymbols.drawSymbol("summonsick", g, abiX, abiY, cw / 4.7f, cw / 4.7f);
-            abiY += abiSpace + 1.7f;
-            abiCount += 1;
+            Texture spiral = Forge.getAssets().getTexture(getDefaultSkinFile("spiral.png"), false);
+            if (spiral != null) {
+                g.drawRotatedImage(spiral, cx, cy, cw, ch, cx + cw / 2f, cy + ch / 2f, -(Forge.deltaTime * 16f));
+            } else {
+                //old indicator
+                CardFaceSymbols.drawSymbol("summonsick", g, abiX, abiY, cw / 4.7f, cw / 4.7f);
+                abiY += abiSpace + 1.7f;
+                abiCount += 1;
+            }
         }
         if (card.isPhasedOut()) {
             CardFaceSymbols.drawSymbol("phasing", g, abiX, abiY, cw / 4.7f, cw / 4.7f);
@@ -881,334 +937,19 @@ public class CardRenderer {
         }
         if (!showAbilityIcons)
             return;
-        if (card.isCommander()) {
-            CardFaceSymbols.drawSymbol("commander", g, abiX, abiY, abiScale, abiScale);
-            abiY += abiSpace;
-            abiCount += 1;
-        }
-        if (card.isRingBearer()) {
-            CardFaceSymbols.drawSymbol("ringbearer", g, abiX, abiY, abiScale, abiScale);
-            abiY += abiSpace;
-            abiCount += 1;
-        }
-        if (card.getCurrentState().hasFlying()) {
-            CardFaceSymbols.drawSymbol("flying", g, abiX, abiY, abiScale, abiScale);
-            abiY += abiSpace;
-            abiCount += 1;
-        }
-        if (card.getCurrentState().hasHaste()) {
-            CardFaceSymbols.drawSymbol("haste", g, abiX, abiY, abiScale, abiScale);
-            abiY += abiSpace;
-            abiCount += 1;
-        }
-        if (card.getCurrentState().hasDoubleStrike()) {
-            CardFaceSymbols.drawSymbol("doublestrike", g, abiX, abiY, abiScale, abiScale);
-            abiY += abiSpace;
-            abiCount += 1;
-        } else if (card.getCurrentState().hasFirstStrike()) {
-            CardFaceSymbols.drawSymbol("firststrike", g, abiX, abiY, abiScale, abiScale);
-            abiY += abiSpace;
-            abiCount += 1;
-        }
-        if (card.getCurrentState().hasAnnihilator()) {
+
+        for (FSkinProp prop : FSkinProp.iconsFromCardState(card.getCurrentState())) {
             if (abiCount > 5) {
                 abiY = cy + (abiSpace * (abiCount - 6));
                 abiX = cx + ((cw * 2) / 1.92f);
             }
-            CardFaceSymbols.drawSymbol("annihilator", g, abiX, abiY, abiScale, abiScale);
+            g.drawImage(FSkin.getImages().get(prop), abiX, abiY, abiScale, abiScale);
             abiY += abiSpace;
             abiCount += 1;
-        }
-        if (card.getCurrentState().hasExalted()) {
-            if (abiCount > 5) {
-                abiY = cy + (abiSpace * (abiCount - 6));
-                abiX = cx + ((cw * 2) / 1.92f);
-            }
-            CardFaceSymbols.drawSymbol("exalted", g, abiX, abiY, abiScale, abiScale);
-            abiY += abiSpace;
-            abiCount += 1;
-        }
-        if (card.getCurrentState().hasDeathtouch()) {
-            if (abiCount > 5) {
-                abiY = cy + (abiSpace * (abiCount - 6));
-                abiX = cx + ((cw * 2) / 1.92f);
-            }
-            CardFaceSymbols.drawSymbol("deathtouch", g, abiX, abiY, abiScale, abiScale);
-            abiY += abiSpace;
-            abiCount += 1;
-        }
-        if (card.getCurrentState().hasToxic()) {
-            if (abiCount > 5) {
-                abiY = cy + (abiSpace * (abiCount - 6));
-                abiX = cx + ((cw * 2) / 1.92f);
-            }
-            CardFaceSymbols.drawSymbol("toxic", g, abiX, abiY, abiScale, abiScale);
-            abiY += abiSpace;
-            abiCount += 1;
-        }
-        if (card.getCurrentState().hasIndestructible()) {
-            if (abiCount > 5) {
-                abiY = cy + (abiSpace * (abiCount - 6));
-                abiX = cx + ((cw * 2) / 1.92f);
-            }
-            CardFaceSymbols.drawSymbol("indestructible", g, abiX, abiY, abiScale, abiScale);
-            abiY += abiSpace;
-            abiCount += 1;
-        }
-        if (card.getCurrentState().hasMenace()) {
-            if (abiCount > 5) {
-                abiY = cy + (abiSpace * (abiCount - 6));
-                abiX = cx + ((cw * 2) / 1.92f);
-            }
-            CardFaceSymbols.drawSymbol("menace", g, abiX, abiY, abiScale, abiScale);
-            abiY += abiSpace;
-            abiCount += 1;
-        }
-        if (card.getCurrentState().hasFear()) {
-            if (abiCount > 5) {
-                abiY = cy + (abiSpace * (abiCount - 6));
-                abiX = cx + ((cw * 2) / 1.92f);
-            }
-            CardFaceSymbols.drawSymbol("fear", g, abiX, abiY, abiScale, abiScale);
-            abiY += abiSpace;
-            abiCount += 1;
-        }
-        if (card.getCurrentState().hasIntimidate()) {
-            if (abiCount > 5) {
-                abiY = cy + (abiSpace * (abiCount - 6));
-                abiX = cx + ((cw * 2) / 1.92f);
-            }
-            CardFaceSymbols.drawSymbol("intimidate", g, abiX, abiY, abiScale, abiScale);
-            abiY += abiSpace;
-            abiCount += 1;
-        }
-        if (card.getCurrentState().hasShadow()) {
-            if (abiCount > 5) {
-                abiY = cy + (abiSpace * (abiCount - 6));
-                abiX = cx + ((cw * 2) / 1.92f);
-            }
-            CardFaceSymbols.drawSymbol("shadow", g, abiX, abiY, abiScale, abiScale);
-            abiY += abiSpace;
-            abiCount += 1;
-        }
-        if (card.getCurrentState().hasHorsemanship()) {
-            if (abiCount > 5) {
-                abiY = cy + (abiSpace * (abiCount - 6));
-                abiX = cx + ((cw * 2) / 1.92f);
-            }
-            CardFaceSymbols.drawSymbol("horsemanship", g, abiX, abiY, abiScale, abiScale);
-            abiY += abiSpace;
-            abiCount += 1;
-        }
-        if (card.getCurrentState().hasLandwalk()) {
-            CardFaceSymbols.drawSymbol("landwalk", g, abiX, abiY, abiScale, abiScale);
-            abiY += abiSpace;
-            abiCount += 1;
-        }
-        if (card.getCurrentState().hasHexproof()) {
-            if (abiCount > 5) {
-                abiY = cy + (abiSpace * (abiCount - 6));
-                abiX = cx + ((cw * 2) / 1.92f);
-            }
-            if (!card.getCurrentState().getHexproofKey().isEmpty()) {
-                String[] splitK = card.getCurrentState().getHexproofKey().split(":");
-                List<String> listHK = Arrays.asList(splitK);
-                if (listHK.contains("generic")) {
-                    CardFaceSymbols.drawSymbol("hexproof", g, abiX, abiY, abiScale, abiScale);
-                    abiY += abiSpace;
-                    abiCount += 1;
-                }
-                if (listHK.contains("R")) {
-                    CardFaceSymbols.drawSymbol("hexproofR", g, abiX, abiY, abiScale, abiScale);
-                    abiY += abiSpace;
-                    abiCount += 1;
-                }
-                if (listHK.contains("B")) {
-                    CardFaceSymbols.drawSymbol("hexproofB", g, abiX, abiY, abiScale, abiScale);
-                    abiY += abiSpace;
-                    abiCount += 1;
-                }
-                if (listHK.contains("U")) {
-                    CardFaceSymbols.drawSymbol("hexproofU", g, abiX, abiY, abiScale, abiScale);
-                    abiY += abiSpace;
-                    abiCount += 1;
-                }
-                if (listHK.contains("G")) {
-                    CardFaceSymbols.drawSymbol("hexproofG", g, abiX, abiY, abiScale, abiScale);
-                    abiY += abiSpace;
-                    abiCount += 1;
-                }
-                if (listHK.contains("W")) {
-                    CardFaceSymbols.drawSymbol("hexproofW", g, abiX, abiY, abiScale, abiScale);
-                    abiY += abiSpace;
-                    abiCount += 1;
-                }
-                if (listHK.contains("monocolored")) {
-                    CardFaceSymbols.drawSymbol("hexproofC", g, abiX, abiY, abiScale, abiScale);
-                    abiY += abiSpace;
-                    abiCount += 1;
-                }
-            } else {
-                CardFaceSymbols.drawSymbol("hexproof", g, abiX, abiY, abiScale, abiScale);
-                abiY += abiSpace;
-                abiCount += 1;
-            }
-        } else if (card.getCurrentState().hasShroud()) {
-            if (abiCount > 5) {
-                abiY = cy + (abiSpace * (abiCount - 6));
-                abiX = cx + ((cw * 2) / 1.92f);
-            }
-            CardFaceSymbols.drawSymbol("shroud", g, abiX, abiY, abiScale, abiScale);
-            abiY += abiSpace;
-            abiCount += 1;
-        }
-        if (card.getCurrentState().hasVigilance()) {
-            if (abiCount > 5) {
-                abiY = cy + (abiSpace * (abiCount - 6));
-                abiX = cx + ((cw * 2) / 1.92f);
-            }
-            CardFaceSymbols.drawSymbol("vigilance", g, abiX, abiY, abiScale, abiScale);
-            abiY += abiSpace;
-            abiCount += 1;
-        }
-        if (card.getCurrentState().hasTrample()) {
-            if (abiCount > 5) {
-                abiY = cy + (abiSpace * (abiCount - 6));
-                abiX = cx + ((cw * 2) / 1.92f);
-            }
-            CardFaceSymbols.drawSymbol("trample", g, abiX, abiY, abiScale, abiScale);
-            abiY += abiSpace;
-            abiCount += 1;
-        }
-        if (card.getCurrentState().hasReach()) {
-            if (abiCount > 5) {
-                abiY = cy + (abiSpace * (abiCount - 6));
-                abiX = cx + ((cw * 2) / 1.92f);
-            }
-            CardFaceSymbols.drawSymbol("reach", g, abiX, abiY, abiScale, abiScale);
-            abiY += abiSpace;
-            abiCount += 1;
-        }
-        if (card.getCurrentState().hasLifelink()) {
-            if (abiCount > 5) {
-                abiY = cy + (abiSpace * (abiCount - 6));
-                abiX = cx + ((cw * 2) / 1.92f);
-            }
-            CardFaceSymbols.drawSymbol("lifelink", g, abiX, abiY, abiScale, abiScale);
-            abiY += abiSpace;
-            abiCount += 1;
-        }
-        if (card.getCurrentState().hasWard()) {
-            if (abiCount > 5) {
-                abiY = cy + (abiSpace * (abiCount - 6));
-                abiX = cx + ((cw * 2) / 1.92f);
-            }
-            CardFaceSymbols.drawSymbol("ward", g, abiX, abiY, abiScale, abiScale);
-            abiY += abiSpace;
-            abiCount += 1;
-        }
-        if (card.getCurrentState().hasWither()) {
-            if (abiCount > 5) {
-                abiY = cy + (abiSpace * (abiCount - 6));
-                abiX = cx + ((cw * 2) / 1.92f);
-            }
-            CardFaceSymbols.drawSymbol("wither", g, abiX, abiY, abiScale, abiScale);
-            abiY += abiSpace;
-            abiCount += 1;
-        }
-        if (card.getCurrentState().hasDefender()) {
-            if (abiCount > 5) {
-                abiY = cy + (abiSpace * (abiCount - 6));
-                abiX = cx + ((cw * 2) / 1.92f);
-            }
-            CardFaceSymbols.drawSymbol("defender", g, abiX, abiY, abiScale, abiScale);
-            abiY += abiSpace;
-            abiCount += 1;
-        }
-        //Protection Icons
-        if (!card.getCurrentState().getProtectionKey().isEmpty()) {
-            if (abiCount > 5) {
-                abiY = cy + (abiSpace * (abiCount - 6));
-                abiX = cx + ((cw * 2) / 1.92f);
-            }
-            if (card.getCurrentState().getProtectionKey().contains("everything") || card.getCurrentState().getProtectionKey().contains("allcolors")) {
-                CardFaceSymbols.drawSymbol("protectAll", g, abiX, abiY, abiScale, abiScale);
-                abiY += abiSpace;
-                abiCount += 1;
-            } else if (card.getCurrentState().getProtectionKey().contains("coloredspells")) {
-                CardFaceSymbols.drawSymbol("protectColoredSpells", g, abiX, abiY, abiScale, abiScale);
-                abiY += abiSpace;
-                abiCount += 1;
-            } else if (card.getCurrentState().getProtectionKey().equals("R")) {
-                CardFaceSymbols.drawSymbol("protectR", g, abiX, abiY, abiScale, abiScale);
-                abiY += abiSpace;
-                abiCount += 1;
-            } else if (card.getCurrentState().getProtectionKey().equals("G")) {
-                CardFaceSymbols.drawSymbol("protectG", g, abiX, abiY, abiScale, abiScale);
-                abiY += abiSpace;
-                abiCount += 1;
-            } else if (card.getCurrentState().getProtectionKey().equals("B")) {
-                CardFaceSymbols.drawSymbol("protectB", g, abiX, abiY, abiScale, abiScale);
-                abiY += abiSpace;
-                abiCount += 1;
-            } else if (card.getCurrentState().getProtectionKey().equals("U")) {
-                CardFaceSymbols.drawSymbol("protectU", g, abiX, abiY, abiScale, abiScale);
-                abiY += abiSpace;
-                abiCount += 1;
-            } else if (card.getCurrentState().getProtectionKey().equals("W")) {
-                CardFaceSymbols.drawSymbol("protectW", g, abiX, abiY, abiScale, abiScale);
-                abiY += abiSpace;
-                abiCount += 1;
-            } else if (card.getCurrentState().getProtectionKey().equals("RG") || card.getCurrentState().getProtectionKey().equals("GR")) {
-                CardFaceSymbols.drawSymbol("protectRG", g, abiX, abiY, abiScale, abiScale);
-                abiY += abiSpace;
-                abiCount += 1;
-            } else if (card.getCurrentState().getProtectionKey().equals("RB") || card.getCurrentState().getProtectionKey().equals("BR")) {
-                CardFaceSymbols.drawSymbol("protectRB", g, abiX, abiY, abiScale, abiScale);
-                abiY += abiSpace;
-                abiCount += 1;
-            } else if (card.getCurrentState().getProtectionKey().equals("RU") || card.getCurrentState().getProtectionKey().equals("UR")) {
-                CardFaceSymbols.drawSymbol("protectRU", g, abiX, abiY, abiScale, abiScale);
-                abiY += abiSpace;
-                abiCount += 1;
-            } else if (card.getCurrentState().getProtectionKey().equals("RW") || card.getCurrentState().getProtectionKey().equals("WR")) {
-                CardFaceSymbols.drawSymbol("protectRW", g, abiX, abiY, abiScale, abiScale);
-                abiY += abiSpace;
-                abiCount += 1;
-            } else if (card.getCurrentState().getProtectionKey().equals("GB") || card.getCurrentState().getProtectionKey().equals("BG")) {
-                CardFaceSymbols.drawSymbol("protectGB", g, abiX, abiY, abiScale, abiScale);
-                abiY += abiSpace;
-                abiCount += 1;
-            } else if (card.getCurrentState().getProtectionKey().equals("GU") || card.getCurrentState().getProtectionKey().equals("UG")) {
-                CardFaceSymbols.drawSymbol("protectGU", g, abiX, abiY, abiScale, abiScale);
-                abiY += abiSpace;
-                abiCount += 1;
-            } else if (card.getCurrentState().getProtectionKey().equals("GW") || card.getCurrentState().getProtectionKey().equals("WG")) {
-                CardFaceSymbols.drawSymbol("protectGW", g, abiX, abiY, abiScale, abiScale);
-                abiY += abiSpace;
-                abiCount += 1;
-            } else if (card.getCurrentState().getProtectionKey().equals("BU") || card.getCurrentState().getProtectionKey().equals("UB")) {
-                CardFaceSymbols.drawSymbol("protectBU", g, abiX, abiY, abiScale, abiScale);
-                abiY += abiSpace;
-                abiCount += 1;
-            } else if (card.getCurrentState().getProtectionKey().equals("BW") || card.getCurrentState().getProtectionKey().equals("WB")) {
-                CardFaceSymbols.drawSymbol("protectBW", g, abiX, abiY, abiScale, abiScale);
-                abiY += abiSpace;
-                abiCount += 1;
-            } else if (card.getCurrentState().getProtectionKey().equals("UW") || card.getCurrentState().getProtectionKey().equals("WU")) {
-                CardFaceSymbols.drawSymbol("protectUW", g, abiX, abiY, abiScale, abiScale);
-                abiY += abiSpace;
-                abiCount += 1;
-            } else if (card.getCurrentState().getProtectionKey().contains("generic") || card.getCurrentState().getProtectionKey().length() > 2) {
-                CardFaceSymbols.drawSymbol("protectGeneric", g, abiX, abiY, abiScale, abiScale);
-                abiY += abiSpace;
-                abiCount += 1;
-            }
         }
     }
 
     private static void drawCounterTabs(final CardView card, final Graphics g, final float x, final float y, final float w, final float h) {
-
         int fontSize = Math.max(11, Math.min(22, (int) (h * 0.08)));
         BitmapFont font = Forge.getAssets().counterFonts().get(fontSize);
 
@@ -1224,34 +965,59 @@ public class CardRenderer {
 
         final float spaceFromTopOfCard = y + h - counterBoxHeight - counterBoxSpacing - otherSymbolsSize + ySymbols;
 
-        int currentCounter = 0;
+        Multiset<CounterType> countersSet = card.getCounters();
+        if (countersSet == null || countersSet.isEmpty()) {
+            return;
+        }
 
         if (CounterDisplayType.from(FModel.getPreferences().getPref(FPref.UI_CARD_COUNTER_DISPLAY_TYPE)) == CounterDisplayType.OLD_WHEN_SMALL) {
-
             int maxCounters = 0;
-            for (Integer numberOfCounters : card.getCounters().values()) {
-                maxCounters = Math.max(maxCounters, numberOfCounters);
+            for (Multiset.Entry<CounterType> entry : countersSet.entrySet()) {
+                if (entry != null && entry.getCount() > maxCounters) {
+                    maxCounters = entry.getCount();
+                }
             }
 
-            //if (counterBoxBaseWidth + font.getBounds(String.valueOf(maxCounters)).width > w) {
             if (font != null && !String.valueOf(maxCounters).isEmpty()) {
-                layout.setText(font, String.valueOf(maxCounters));
-                if (counterBoxBaseWidth + layout.width > w) {
+                glyphLayout.setText(font, String.valueOf(maxCounters));
+                if (counterBoxBaseWidth + glyphLayout.width > w) {
                     drawCounterImage(card, g, x, y, w, h);
                     return;
                 }
             }
         }
-        int c = 0;
-        for (Map.Entry<CounterType, Integer> counterEntry : card.getCounters().entrySet()) {
-            final CounterType counter = counterEntry.getKey();
-            final int numberOfCounters = counterEntry.getValue();
-            //final float counterBoxRealWidth = counterBoxBaseWidth + font.getBounds(String.valueOf(numberOfCounters)).width + 4;
-            if (font != null && !String.valueOf(numberOfCounters).isEmpty()) {
-                layout.setText(font, String.valueOf(numberOfCounters));
-                final float counterBoxRealWidth = counterBoxBaseWidth + layout.width + 4;
 
-                final float counterYOffset = spaceFromTopOfCard - (currentCounter++ * (counterBoxHeight + counterBoxSpacing));
+        int currentCounter = 0;
+        int verticalLayout = 0;
+
+        for (Multiset.Entry<CounterType> counterEntry : countersSet.entrySet()) {
+            if (counterEntry == null) continue;
+
+            final CounterType counter = counterEntry.getElement();
+            final int numberOfCounters = counterEntry.getCount();
+
+            if (font != null && numberOfCounters > 0) {
+                String counterValueStr = String.valueOf(numberOfCounters);
+                String displayName = counter.getCounterOnCardDisplayName();
+
+                stringBuilder.setLength(0);
+
+                if (displayName != null && !displayName.isEmpty()) {
+                    int maxCharLimit = 7; // Enforces a tight text boundary limit
+                    if (displayName.length() > maxCharLimit) {
+                        stringBuilder.append(displayName, 0, maxCharLimit).append("..");
+                    } else {
+                        stringBuilder.append(displayName);
+                    }
+                }
+
+                String finalDisplayName = stringBuilder.toString();
+
+                glyphLayout.setText(font, counterValueStr);
+
+                final float counterBoxRealWidth = counterBoxBaseWidth + glyphLayout.width + 4f;
+                final float counterYOffset = spaceFromTopOfCard - (currentCounter * (counterBoxHeight + counterBoxSpacing));
+                currentCounter++;
 
                 g.fillRect(counterBackgroundColor, x - 3, counterYOffset, counterBoxRealWidth, counterBoxHeight);
 
@@ -1261,26 +1027,26 @@ public class CardRenderer {
 
                 Color counterColor = counterColorCache.get(counter);
 
-                drawText(g, counter.getCounterOnCardDisplayName(), font, counterColor, x + 2 + additionalXOffset, counterYOffset, counterBoxRealWidth, counterBoxHeight, Align.left);
-                drawText(g, String.valueOf(numberOfCounters), font, counterColor, x + counterBoxBaseWidth - 4f - additionalXOffset, counterYOffset, counterBoxRealWidth, counterBoxHeight, Align.left);
-                c += counterBoxHeight;
+                drawText(g, finalDisplayName, font, counterColor, x + 2f + additionalXOffset, counterYOffset, counterBoxRealWidth, counterBoxHeight, Align.left);
+                drawText(g, counterValueStr, font, counterColor, x + counterBoxBaseWidth - 4f - additionalXOffset, counterYOffset, counterBoxRealWidth, counterBoxHeight, Align.left);
+
+                verticalLayout += counterBoxHeight;
             }
         }
-        markersHeight = c;
+        markersHeight = verticalLayout;
     }
 
     private static final int GL_BLEND = GL20.GL_BLEND;
 
     private static void drawText(Graphics g, String text, BitmapFont font, Color color, float x, float y, float w, float h, int horizontalAlignment) {
-
-        if (color.a < 1) { //enable blending so alpha colored shapes work properly
+        if (color.a < 1) { // enable blending so alpha colored shapes work properly
             Gdx.gl.glEnable(GL_BLEND);
         }
-        if (font != null && !text.isEmpty()) {
-            layout.setText(font, text);
-            TextBounds textBounds = new TextBounds(layout.width, layout.height);
+        if (font != null && text != null && !text.isEmpty()) {
+            glyphLayout.setText(font, text);
 
-            float textHeight = textBounds.height;
+            float textHeight = glyphLayout.height;
+
             if (h > textHeight) {
                 y += (h - textHeight) / 2;
             }
@@ -1295,12 +1061,9 @@ public class CardRenderer {
     }
 
     private static void drawCounterImage(final CardView card, final Graphics g, final float x, final float y, final float w, final float h) {
-
         int number = 0;
         if (card.getCounters() != null) {
-            for (final Integer i : card.getCounters().values()) {
-                number += i;
-            }
+            number = card.getCounters().size();
         }
 
         final int counters = number;
@@ -1318,10 +1081,12 @@ public class CardRenderer {
         } else if (counters > 3) {
             CardFaceSymbols.drawSymbol("countersMulti", g, xCounters, yCounters, countersSize, countersSize);
         }
-
     }
 
     private static void drawMarkersTabs(final List<String> markers, final Graphics g, final float x, final float y, final float w, final float h, boolean larger) {
+        if (markers == null || markers.isEmpty()) {
+            return;
+        }
 
         int fontSize = larger ? Math.max(9, Math.min(22, (int) (h * 0.08))) : Math.max(8, Math.min(22, (int) (h * 0.05)));
         BitmapFont font = Forge.getAssets().counterFonts().get(fontSize);
@@ -1338,11 +1103,13 @@ public class CardRenderer {
         final float spaceFromTopOfCard = y + h - markerBoxHeight - markerBoxSpacing - otherSymbolsSize + ySymbols;
 
         int markerCounter = markers.size() - 1;
+        final int markersCount = markers.size();
 
-        for (String marker : markers) {
-            if (font != null && !marker.isEmpty()) {
-                layout.setText(font, marker);
-                final float markerBoxRealWidth = markerBoxBaseWidth + layout.width + 4;
+        for (int i = 0; i < markersCount; i++) {
+            final String marker = markers.get(i);
+            if (font != null && marker != null && !marker.isEmpty()) {
+                glyphLayout.setText(font, marker);
+                final float markerBoxRealWidth = markerBoxBaseWidth + glyphLayout.width + 4;
 
                 final float markerYOffset = spaceFromTopOfCard - (markerCounter-- * (markerBoxHeight + markerBoxSpacing));
 
@@ -1356,39 +1123,39 @@ public class CardRenderer {
     }
 
     private static void drawPtBox(Graphics g, CardView card, CardStateView details, Color color, float x, float y, float w, float h) {
-        //use array of strings to render separately with a tiny amount of space in between
-        //instead of using actual spaces which are too wide
-        List<String> pieces = new ArrayList<>();
+        listItemPtPieces.clear();
+
         if (details.isCreature()) {
-            pieces.add(String.valueOf(details.getPower()));
-            pieces.add("/");
-            pieces.add(String.valueOf(details.getToughness()));
-        } else if (details.getType().hasSubtype("Vehicle")) {
-            pieces.add("[");
-            pieces.add(String.valueOf(details.getPower()));
-            pieces.add("/");
-            pieces.add(String.valueOf(details.getToughness()));
-            pieces.add("]");
+            listItemPtPieces.add(String.valueOf(details.getPower()));
+            listItemPtPieces.add("/");
+            listItemPtPieces.add(String.valueOf(details.getToughness()));
+        } else if (details.hasPrintedPT()) {
+            listItemPtPieces.add("[");
+            listItemPtPieces.add(String.valueOf(details.getPower()));
+            listItemPtPieces.add("/");
+            listItemPtPieces.add(String.valueOf(details.getToughness()));
+            listItemPtPieces.add("]");
         }
         if (details.isPlaneswalker()) {
-            if (pieces.isEmpty()) {
-                pieces.add(String.valueOf(details.getLoyalty()));
+            if (listItemPtPieces.isEmpty()) {
+                listItemPtPieces.add(String.valueOf(details.getLoyalty()));
             } else {
-                pieces.add("(" + details.getLoyalty() + ")");
+                listItemPtPieces.add("(" + details.getLoyalty() + ")");
             }
         }
 
-        if (pieces.isEmpty()) {
+        if (listItemPtPieces.isEmpty()) {
             return;
         }
 
         FSkinFont font = FSkinFont.forHeight(h * 0.15f);
-        float padding = Math.round(font.getCapHeight() / 4);
+        float padding = Math.round(font.getCapHeight() / 4f);
         float boxWidth = padding;
-        List<Float> pieceWidths = new ArrayList<>();
-        for (String piece : pieces) {
-            float pieceWidth = font.getBounds(piece).width + padding;
-            pieceWidths.add(pieceWidth);
+
+        int piecesCount = listItemPtPieces.size();
+        for (int i = 0; i < piecesCount; i++) {
+            float pieceWidth = font.getBounds(listItemPtPieces.get(i)).width + padding;
+            listItemPtWidths[i] = pieceWidth;
             boxWidth += pieceWidth;
         }
         float boxHeight = font.getCapHeight() + font.getAscent() + 2 * padding;
@@ -1398,18 +1165,19 @@ public class CardRenderer {
         w = boxWidth;
         h = boxHeight;
 
-        //draw card damage above P/T box if needed
+        // draw card damage above P/T box if needed
         if (card.getDamage() > 0) {
             g.drawOutlinedText(">" + card.getDamage() + "<", font, Color.RED, Color.WHITE, x, y - h + padding, w, h, false, Align.center, true);
         }
 
-        g.fillRect(color, x, y, w, h);
+        g.fillRect(details.isVehicle() ? CardImageRenderer.VEHICLE_PTBOX_COLOR[0] :
+                details.isSpaceCraft() ? CardImageRenderer.SPACECRAFT_PTBOX_COLOR[0] : color, x, y, w, h);
         g.drawRect(BORDER_THICKNESS, Color.BLACK, x, y, w, h);
 
         x += padding;
-        for (int i = 0; i < pieces.size(); i++) {
-            g.drawText(pieces.get(i), font, Color.BLACK, x, y, w, h, false, Align.left, true);
-            x += pieceWidths.get(i);
+        for (int i = 0; i < piecesCount; i++) {
+            g.drawText(listItemPtPieces.get(i), font, details.isVehicle() || details.isSpaceCraft() ? Color.WHITE : Color.BLACK, x, y, w, h, false, Align.left, true);
+            x += listItemPtWidths[i];
         }
     }
 
@@ -1422,70 +1190,8 @@ public class CardRenderer {
         CardFaceSymbols.drawManaCost(g, cost, x + (w - manaCostWidth) / 2, y + (h - manaSymbolSize) / 2, manaSymbolSize);
     }
 
-    public static void drawFoilEffect(Graphics g, CardView card, float x, float y, float w, float h, boolean inZoomer) {
-        if (card.getCurrentState().isBattle())
-            return;
-        if (card.getAlternateState() != null && card.getCurrentState().isBattle())
-            return;
-        //todo add support for battle, better to move the render inside the draw method for card in the future or a general foil effect shader..
-        float new_x = x;
-        float new_y = y;
-        float new_w = w;
-        float new_h = h;
-        float radius = (h - w) / 8;
-        float croppedArea = isModernFrame(card) ? CROP_MULTIPLIER : 0.97f;
-        float minusxy = isModernFrame(card) ? 0.0f : 0.13f * radius;
-        if (card.getCurrentState().getSetCode().equals("LEA") || card.getCurrentState().getSetCode().equals("LEB")) {
-            croppedArea = 0.975f;
-            minusxy = 0.135f * radius;
-        }
-        if (Forge.enableUIMask.equals("Full")) {
-            new_x += radius / 2.4f - minusxy;
-            new_y += radius / 2 - minusxy;
-            new_w = w * croppedArea;
-            new_h = h * croppedArea;
-        }
-        if (isPreferenceEnabled(FPref.UI_OVERLAY_FOIL_EFFECT) && MatchController.instance.mayView(card)) {
-            boolean rotateSplit = isPreferenceEnabled(FPref.UI_ROTATE_SPLIT_CARDS) && card.isSplitCard() && inZoomer;
-            int foil = card.getCurrentState().getFoilIndex();
-            if (foil > 0) {
-                CardFaceSymbols.drawOther(g, String.format("foil%02d", foil), new_x, new_y, new_w, new_h, rotateSplit);
-            }
-        }
-    }
-
-    private static boolean isPreferenceEnabled(FPref preferenceName) {
-        return FModel.getPreferences().getPrefBoolean(preferenceName);
-    }
-
-    private static boolean isShowingOverlays(CardView card) {
-        return isPreferenceEnabled(FPref.UI_SHOW_CARD_OVERLAYS) && card != null;
-    }
-
-    private static boolean showCardNameOverlay(CardView card) {
-        return isShowingOverlays(card) && isPreferenceEnabled(FPref.UI_OVERLAY_CARD_NAME);
-    }
-
-    private static boolean showCardPowerOverlay(CardView card) {
-        return isShowingOverlays(card) && isPreferenceEnabled(FPref.UI_OVERLAY_CARD_POWER);
-    }
-
-    private static boolean showCardManaCostOverlay(CardView card) {
-        return isShowingOverlays(card) &&
-                isPreferenceEnabled(FPref.UI_OVERLAY_CARD_MANA_COST);
-    }
-
-    public static boolean showAbilityIcons(CardView card) {
-        return isShowingOverlays(card) && isPreferenceEnabled(FPref.UI_OVERLAY_ABILITY_ICONS);
-    }
-
-    private static boolean showCardIdOverlay(CardView card) {
-        return card.getId() > 0 && isShowingOverlays(card) && isPreferenceEnabled(FPref.UI_OVERLAY_CARD_ID);
-    }
-
     //TODO Make FSkinFont accept more than one kind of font and merge this with it
     private static void generateFontForCounters(final int fontSize) {
-
         FileHandle ttfFile = Gdx.files.absolute(ForgeConstants.COMMON_FONTS_DIR).child("Roboto-Bold.ttf");
 
         if (!ttfFile.exists()) {
@@ -1498,7 +1204,7 @@ public class CardRenderer {
         int pageSize = 128;
 
         //only generate images for characters that could be used by Forge
-        String chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz1234567890/-+:'";
+        String chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz1234567890./-+:'!—";
 
         final PixmapPacker packer = new PixmapPacker(pageSize, pageSize, Pixmap.Format.RGBA8888, 2, false);
         final FreeTypeFontParameter parameter = new FreeTypeFontParameter();
@@ -1534,10 +1240,7 @@ public class CardRenderer {
 
                 generator.dispose();
                 packer.dispose();
-
             }
         });
-
     }
-
 }

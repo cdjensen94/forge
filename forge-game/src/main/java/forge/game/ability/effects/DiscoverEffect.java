@@ -1,7 +1,5 @@
 package forge.game.ability.effects;
 
-import com.google.common.base.Predicates;
-import com.google.common.collect.Iterables;
 import forge.game.Game;
 import forge.game.ability.AbilityKey;
 import forge.game.ability.AbilityUtils;
@@ -15,13 +13,12 @@ import forge.game.cost.CostPart;
 import forge.game.cost.CostReveal;
 import forge.game.player.Player;
 import forge.game.player.PlayerCollection;
-import forge.game.spellability.LandAbility;
+
 import forge.game.spellability.SpellAbility;
 import forge.game.trigger.TriggerType;
 import forge.game.zone.PlayerZone;
 import forge.game.zone.Zone;
 import forge.game.zone.ZoneType;
-import forge.util.CardTranslation;
 import forge.util.Lang;
 import forge.util.Localizer;
 
@@ -33,6 +30,11 @@ import java.util.List;
 import java.util.Map;
 
 public class DiscoverEffect extends SpellAbilityEffect {
+
+    @Override
+    public boolean movesCardToOrFromLibrary(final SpellAbility sa) {
+        return true;
+    }
 
     @Override
     protected String getStackDescription(SpellAbility sa) {
@@ -81,7 +83,7 @@ public class DiscoverEffect extends SpellAbilityEffect {
             params.put("Card", found);
             if (found != null) {
                 String prompt = Localizer.getInstance().getMessage("lblDiscoverChoice",
-                        CardTranslation.getTranslatedName(found.getName()));
+                        found.getTranslatedName());
                 final Zone origin = found.getZone();
                 List<String> options =
                         Arrays.asList(StringUtils.capitalize(Localizer.getInstance().getMessage("lblCast")),
@@ -94,7 +96,7 @@ public class DiscoverEffect extends SpellAbilityEffect {
                     List<SpellAbility> sas = AbilityUtils.getBasicSpellsFromPlayEffect(found, p);
 
                     // filter out land abilities due to MDFC or similar
-                    Iterables.removeIf(sas, Predicates.instanceOf(LandAbility.class));
+                    sas.removeIf(SpellAbility::isLandAbility);
                     // the spell must also have a mana value equal to or less than the discover number
                     sas.removeIf(sp -> sp.getPayCosts().getTotalMana().getCMC() > num);
 
@@ -179,4 +181,5 @@ public class DiscoverEffect extends SpellAbilityEffect {
         }
         if (!exileSeq) table.triggerChangesZoneAll(game, sa);
     }
+
 }

@@ -144,11 +144,13 @@
    <properties>
     <property name="dialog">[
   {
-    &quot;text&quot;: &quot;A big gate is blocking the path, through the bars you can see an imposing figure in the room beyond. (you need all five shards from this dungeon to open this gate)&quot;,
+    &quot;text&quot;: &quot;A big gate is blocking the path. Through the bars you can see an imposing figure in the room beyond. (You need all five shards from this dungeon to open this gate.)&quot;,
+    &quot;loctext&quot;: &quot;adv.cave_cave_multilevel_cave_16BR3U.83.d.n0.text&quot;,
     &quot;options&quot;: [
-      { &quot;name&quot;: &quot;go away&quot; },
+      { &quot;name&quot;: &quot;Leave&quot;, &quot;locname&quot;: &quot;adv.shared.leave&quot; },
       {
-        &quot;name&quot;: &quot;unlock with the five shards&quot;,
+        &quot;name&quot;: &quot;Unlock with the five shards&quot;,
+        &quot;locname&quot;: &quot;adv.cave_cave_multilevel_cave_16BR3U.83.d.n3.name&quot;,
         &quot;condition&quot;: [
           { &quot;item&quot;: &quot;First Shard&quot; },
           { &quot;item&quot;: &quot;Second Shard&quot; },
@@ -156,10 +158,12 @@
           { &quot;item&quot;: &quot;Fourth Shard&quot; },
           { &quot;item&quot;: &quot;Fifth Shard&quot; }
         ],
-        &quot;text&quot;: &quot;The gate is unlocked&quot;,
+        &quot;text&quot;: &quot;The gate is unlocked.&quot;,
+        &quot;loctext&quot;: &quot;adv.cave_cave_multilevel_cave_16BR3U.83.d.n2.text&quot;,
         &quot;options&quot;: [
           {
-            &quot;name&quot;: &quot;continue&quot;,
+            &quot;name&quot;: &quot;Continue&quot;,
+            &quot;locname&quot;: &quot;adv.shared.continue&quot;,
             &quot;action&quot;: [
               { &quot;deleteMapObject&quot;: -1 },
               { &quot;removeItem&quot;: &quot;First Shard&quot; },
@@ -184,7 +188,7 @@
     &quot;type&quot;: &quot;item&quot;,
     &quot;count&quot;: 1,
     &quot;probability&quot;: 1,
-    &quot;itemName&quot;: &quot;Lightbringers Boots'&quot;
+    &quot;itemName&quot;: &quot;Lightbringers Boots&quot;
   }
 ]</property>
     <property name="spawn.Easy" type="bool" value="true"/>

@@ -25,8 +25,6 @@ import forge.model.FModel;
 import forge.toolbox.FButton;
 import forge.toolbox.FContainer;
 import forge.toolbox.FDisplayObject;
-import forge.toolbox.FEvent;
-import forge.toolbox.FEvent.FEventHandler;
 import forge.toolbox.FLabel;
 import forge.toolbox.FOverlay;
 import forge.toolbox.FTextArea;
@@ -64,7 +62,7 @@ public class ViewWinLose extends FOverlay implements IWinLoseView<FButton> {
         btnContinue.setEnabled(!game0.isMatchOver());
 
         lblLog = add(new FLabel.Builder().text(Forge.getLocalizer().getMessage("lblGameLog")).align(Align.center).font(FSkinFont.get(18)).build());
-        txtLog = add(new FTextArea(true, StringUtils.join(game.getGameLog().getLogEntries(null), "\r\n").replace("[COMPUTER]", "[AI]")) {
+        txtLog = add(new FTextArea(true, StringUtils.join(game.getGameLog().getLogEntries(null), "\r\n")) {
             @Override
             public boolean tap(float x, float y, int count) {
                 if (txtLog.getMaxScrollTop() > 0) {
@@ -75,23 +73,16 @@ public class ViewWinLose extends FOverlay implements IWinLoseView<FButton> {
         });
         txtLog.setFont(FSkinFont.get(12));
 
-        btnCopyLog = add(new FLabel.ButtonBuilder().text(Forge.getLocalizer().getMessage("btnCopyToClipboard")).selectable().command(new FEventHandler() {
-            @Override
-            public void handleEvent(FEvent e) {
-                Forge.getClipboard().setContents(txtLog.getText());
-            }
-        }).build());
+        btnCopyLog = add(new FLabel.ButtonBuilder().text(Forge.getLocalizer().getMessage("btnCopyToClipboard")).selectable()
+                .command(e -> Forge.getClipboard().setContents(txtLog.getText())).build()
+        );
 
-        btnShowBattlefield = add(new FLabel.ButtonBuilder().text(Forge.getLocalizer().getMessage("lblShowBattlefield")).font(FSkinFont.get(12)).selectable().command(new FEventHandler() {
-            @Override
-            public void handleEvent(FEvent e) {
-                hide();
-            }
-        }).build());
+        btnShowBattlefield = add(new FLabel.ButtonBuilder().text(Forge.getLocalizer().getMessage("lblShowBattlefield")).font(FSkinFont.get(12)).selectable()
+                .command(e -> hide()).build()
+        );
         lblTitle.setText(composeTitle(game0));
 
-        // Control of the win/lose is handled differently for various game
-        // modes.
+        // Control of the win/lose is handled differently for various game modes
         ControlWinLose control = null;
         switch (game0.getGameType()) {
         case Quest:
@@ -162,13 +153,13 @@ public class ViewWinLose extends FOverlay implements IWinLoseView<FButton> {
 
     private void showGameOutcomeSummary() {
         for (GameLogEntry o : game.getGameLog().getLogEntriesExact(GameLogEntryType.GAME_OUTCOME)) {
-            pnlOutcomes.add(new FLabel.Builder().text(o.message).font(FSkinFont.get(14)).build());
+            pnlOutcomes.add(new FLabel.Builder().text(o.message()).font(FSkinFont.get(14)).build());
         }
     }
 
     private void showPlayerScores() {
         for (GameLogEntry o : game.getGameLog().getLogEntriesExact(GameLogEntryType.MATCH_RESULTS)) {
-            lblStats.setText(removePlayerTypeFromLogMessage(o.message));
+            lblStats.setText(removePlayerTypeFromLogMessage(o.message()));
         }
     }
 

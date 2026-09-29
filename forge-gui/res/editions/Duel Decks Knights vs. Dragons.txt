@@ -28,7 +28,7 @@ ScryfallCode=DDG
 20 C Plover Knights @Quinton Hoover
 21 U Juniper Order Ranger @Greg Hildebrandt
 22 U Paladin of Prahv @William Simpson
-23 U Harm's Way @Dan Scott
+23 U Harm's Way @Dan Murayama Scott
 24 U Reciprocate @Pat Lee
 25 C Edge of Autumn @Jean-Sébastien Rossbach
 26 C Mighty Leap @rk post
@@ -89,5 +89,4 @@ ScryfallCode=DDG
 81 L Mountain @Matt Cavotta
 
 [tokens]
-w_2_2_griffin_flying
-r_1_1_goblin
+1 r_1_1_goblin @Brandon Kitkouski

@@ -22,10 +22,13 @@ import forge.gui.framework.DragTab;
 import forge.gui.framework.EDocID;
 import forge.gui.framework.IVDoc;
 import forge.screens.match.controllers.CCombat;
+import forge.toolbox.FScrollPane;
 import forge.toolbox.FSkin;
 import forge.toolbox.FSkin.SkinnedTextArea;
 import forge.util.Localizer;
 import net.miginfocom.swing.MigLayout;
+
+import javax.swing.ScrollPaneConstants;
 
 /** 
  * Assembles Swing components of combat report.
@@ -39,6 +42,8 @@ public class VCombat implements IVDoc<CCombat> {
     private final DragTab tab = new DragTab(Localizer.getInstance().getMessage("lblCombatTab"));
 
     private final SkinnedTextArea tar = new SkinnedTextArea();
+    private final FScrollPane scroller = new FScrollPane(tar, false,
+            ScrollPaneConstants.VERTICAL_SCROLLBAR_AS_NEEDED, ScrollPaneConstants.HORIZONTAL_SCROLLBAR_NEVER);
 
     private final CCombat controller;
     public VCombat(final CCombat controller) {
@@ -59,7 +64,7 @@ public class VCombat implements IVDoc<CCombat> {
     public void populate() {
         parentCell.getBody().removeAll();
         parentCell.getBody().setLayout(new MigLayout("insets 0, gap 0, wrap"));
-        parentCell.getBody().add(tar, "w 95%!, gapleft 3%, gaptop 1%, h 95%");
+        parentCell.getBody().add(scroller, "w 95%!, gapleft 3%, gaptop 1%, h 95%");
     }
 
     /* (non-Javadoc)
@@ -104,10 +109,9 @@ public class VCombat implements IVDoc<CCombat> {
 
     //========= Observer update methods
 
-    /** @param s0 &emsp; {@link java.lang.String} */
     public void updateCombat(final int cntAttackers, final String desc) {
         // No need to update this unless it's showing
-        if (!this.equals(parentCell.getSelected())) { return; }
+        if (parentCell == null || !this.equals(parentCell.getSelected())) { return; }
 
         tab.setText(cntAttackers > 0 ? (Localizer.getInstance().getMessage("lblCombatTab") + " : " + cntAttackers) : Localizer.getInstance().getMessage("lblCombatTab"));
         tar.setText(desc);

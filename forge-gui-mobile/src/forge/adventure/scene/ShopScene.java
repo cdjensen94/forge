@@ -1,11 +1,18 @@
 package forge.adventure.scene;
 
+import com.badlogic.gdx.graphics.g2d.TextureRegion;
+import forge.Adventure;
+import forge.Forge;
 import forge.adventure.player.AdventurePlayer;
 import forge.adventure.pointofintrest.PointOfInterestChanges;
 import forge.adventure.stage.GameHUD;
 import forge.adventure.util.Current;
 import forge.item.PaperCard;
+import forge.localinstance.properties.ForgePreferences;
+import forge.model.FModel;
 import forge.screens.FScreen;
+import forge.toolbox.FOptionPane;
+import forge.util.ItemPool;
 
 /**
  * DeckEditScene
@@ -14,10 +21,12 @@ import forge.screens.FScreen;
 public class ShopScene extends ForgeScene {
     private static ShopScene object;
     private PointOfInterestChanges changes;
+    TextureRegion textureRegion;
 
-    public static ShopScene instance() {
-        if(object==null)
-            object=new ShopScene();
+    public static ShopScene instance(TextureRegion textureRegion) {
+        if (object == null)
+            object = new ShopScene();
+        object.textureRegion = textureRegion;
         return object;
     }
 
@@ -32,43 +41,65 @@ public class ShopScene extends ForgeScene {
     }
 
 
-
     @Override
     public void enter() {
         GameHUD.getInstance().getTouchpad().setVisible(false);
         screen = null;
         getScreen();
         screen.refresh();
+        Adventure.getInstance().renderTransitionScreen = false;
         super.enter();
-        doAutosell();
-    } 
+        processAutoSell();
+    }
+
     @Override
     public FScreen getScreen() {
-        return screen==null?screen = new AdventureDeckEditor(true, null):screen;
+        return screen == null ? screen = new AdventureDeckEditor(true, textureRegion) : screen;
     }
 
-    public void doAutosell() {
-        boolean promptToConfirmSale = false; //Todo: config option
-        if (promptToConfirmSale) {
+    @Override
+    public boolean leave() {
+        Adventure.getInstance().renderTransitionScreen = true;
+        return super.leave();
+    }
+
+    private void processAutoSell() {
+        if (FModel.getPreferences().getPrefBoolean(ForgePreferences.FPref.PROMPT_FOR_AUTOSELL)) {
             int profit = 0;
             int cards = 0;
-            for (PaperCard cardToSell: Current.player().autoSellCards.toFlatList()) {
+            for (PaperCard cardToSell : Current.player().autoSellCards.toFlatList()) {
                 cards++;
-                profit += AdventurePlayer.current().cardSellPrice(cardToSell);
+                profit += getCardPrice(cardToSell);
             }
-            if (!confirmAutosell(profit, cards, changes.getTownPriceModifier())) {
+            if (profit == 0 || cards == 0)
                 return;
-            }
+            FOptionPane.showConfirmDialog(Forge.getLocalizer().getMessage("lblSellAllConfirm", cards, profit),
+                Forge.getLocalizer().getMessage("lblAutoSellable"), Forge.getLocalizer().getMessage("lblSell"),
+                Forge.getLocalizer().getMessage("lblCancel"), false, result -> {
+                    if (result) {
+                        doAutosell();
+                    }
+                }
+            );
+        } else {
+            doAutosell();
         }
-        AdventurePlayer.current().doAutosell();
     }
 
-    private boolean confirmAutosell(int profit, int cards, float townPriceModifier) {
-        return true;
+    private void doAutosell() {
+        ItemPool<PaperCard> autoSellCards = AdventurePlayer.current().autoSellCards;
+        AdventurePlayer.current().doBulkSell(autoSellCards);
+        autoSellCards.clear();
+        if (screen != null)
+            screen.refresh();
     }
 
     public void loadChanges(PointOfInterestChanges changes) {
         AdventurePlayer.current().loadChanges(changes);
         this.changes = changes;
+    }
+
+    public int getCardPrice(PaperCard pc) {
+        return AdventurePlayer.current().cardSellPrice(pc);
     }
 }

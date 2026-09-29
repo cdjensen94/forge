@@ -2,13 +2,12 @@ package forge.game.ability.effects;
 
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 
-import org.apache.commons.lang3.ObjectUtils;
 import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.commons.lang3.tuple.Pair;
 
 import com.google.common.collect.ArrayListMultimap;
-import com.google.common.collect.Maps;
 import com.google.common.collect.Multimap;
 import com.google.common.collect.Sets;
 
@@ -22,6 +21,7 @@ import forge.game.card.CardLists;
 import forge.game.card.TokenCreateTable;
 import forge.game.card.token.TokenInfo;
 import forge.game.player.Player;
+import forge.game.replacement.ReplacementEffect;
 import forge.game.replacement.ReplacementResult;
 import forge.game.spellability.SpellAbility;
 import forge.game.zone.ZoneType;
@@ -39,6 +39,7 @@ public class ReplaceTokenEffect extends SpellAbilityEffect {
         if (repSA.getReplacingObjects().isEmpty()) {
             repSA = sa.getRootAbility();
         }
+        ReplacementEffect re = repSA.getReplacementEffect();
         // ReplaceToken Effect only applies to one Player
         Player affected = (Player) repSA.getReplacingObject(AbilityKey.Player);
         TokenCreateTable table = (TokenCreateTable) repSA.getReplacingObject(AbilityKey.Token);
@@ -50,7 +51,7 @@ public class ReplaceTokenEffect extends SpellAbilityEffect {
         if ("Amount".equals(sa.getParam("Type"))) {
             final String mod = sa.getParamOrDefault("Amount", "Twice");
             for (Map.Entry<Card, Integer> e : table.row(affected).entrySet()) {
-                if (!sa.matchesValidParam("ValidCard", e.getKey())) {
+                if (!re.matchesValidParam("ValidToken", e.getKey())) {
                     continue;
                 }
                 int newAmt = AbilityUtils.doXMath(e.getValue(), mod, card, sa);
@@ -59,15 +60,9 @@ public class ReplaceTokenEffect extends SpellAbilityEffect {
         } else if ("AddToken".equals(sa.getParam("Type"))) {
             long timestamp = game.getNextTimestamp();
 
-            Map<Player, Integer> byController = Maps.newHashMap();
-            for (Map.Entry<Card, Integer> e : table.row(affected).entrySet()) {
-                if (!sa.matchesValidParam("ValidCard", e.getKey())) {
-                    continue;
-                }
-                Player contoller = e.getKey().getController();
-                int old = ObjectUtils.defaultIfNull(byController.get(contoller), 0);
-                byController.put(contoller, old + e.getValue());
-            }
+            Map<Player, Integer> byController = table.row(affected).entrySet().stream()
+                    .filter(e -> re.matchesValidParam("ValidToken", e.getKey()))
+                    .collect(Collectors.groupingBy(e -> e.getKey().getController(), Collectors.summingInt(e -> e.getValue())));
 
             if (!byController.isEmpty()) {
                 // for Xorn, might matter if you could somehow create Treasure under multiple players control
@@ -106,7 +101,7 @@ public class ReplaceTokenEffect extends SpellAbilityEffect {
             Multimap<Player, Pair<Integer, Iterable<Object>>> toInsertMap = ArrayListMultimap.create();
             Set<Card> toRemoveSet = Sets.newHashSet();
             for (Map.Entry<Card, Integer> e : table.row(affected).entrySet()) {
-                if (!sa.matchesValidParam("ValidCard", e.getKey())) {
+                if (!re.matchesValidParam("ValidToken", e.getKey())) {
                     continue;
                 }
                 Player controller = e.getKey().getController();
@@ -152,7 +147,7 @@ public class ReplaceTokenEffect extends SpellAbilityEffect {
                 newController = AbilityUtils.getDefinedPlayers(sa.getHostCard(), sa.getParam("NewController"), sa).get(0);
             }
             for (Map.Entry<Card, Integer> c : table.row(affected).entrySet()) {
-                if (!sa.matchesValidParam("ValidCard", c.getKey())) {
+                if (!re.matchesValidParam("ValidToken", c.getKey())) {
                     continue;
                 }
                 c.getKey().setController(newController, timestamp);

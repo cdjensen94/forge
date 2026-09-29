@@ -1,5 +1,7 @@
 package forge.screens.deckeditor.controllers;
 
+import java.awt.Color;
+
 import forge.gui.FThreads;
 import forge.gui.framework.ICDoc;
 import forge.screens.deckeditor.views.VEditorLog;
@@ -32,6 +34,10 @@ public enum CEditorLog implements ICDoc {
         view.addLogEntry(entry);
     }
 
+    public final void addLogEntry(final String message, final Color foreground) {
+        view.addLogEntry(message, foreground);
+    }
+
     @Override
     public void register() {
     }
@@ -56,11 +62,6 @@ public enum CEditorLog implements ICDoc {
      */
     @Override
     public void update() {
-        FThreads.invokeInEdtNowOrLater(new Runnable() {
-            @Override
-            public void run() {
-                view.updateConsole();
-            }
-        });
+        FThreads.invokeInEdtNowOrLater(view::updateConsole);
     }
 }

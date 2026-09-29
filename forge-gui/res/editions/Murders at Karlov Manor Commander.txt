@@ -7,7 +7,7 @@ ScryfallCode=MKC
 
 [cards]
 1 M Kaust, Eyes of the Glade @Volkan Baǵa
-2 M Mirko, Obsessive Theorist @Heonhwa Choe
+2 M Mirko, Obsessive Theorist @Heonhwa
 3 M Morska, Undersea Sleuth @Ekaterina Burmak
 4 M Nelly Borca, Impulsive Accuser @James Ryman
 5 M Duskana, the Rage Mother @Samuel Perin
@@ -55,7 +55,7 @@ ScryfallCode=MKC
 47 R Ransom Note @Gaboleps
 48 R Ransom Note @Gaboleps
 49 M Kaust, Eyes of the Glade @Volkan Baǵa
-50 M Mirko, Obsessive Theorist @Heonhwa Choe
+50 M Mirko, Obsessive Theorist @Heonhwa
 51 M Morska, Undersea Sleuth @Ekaterina Burmak
 52 M Nelly Borca, Impulsive Accuser @James Ryman
 53 R Ugin's Mastery @David Astruga
@@ -117,7 +117,7 @@ ScryfallCode=MKC
 109 M Mechanized Production @Adam Paquette
 110 R Mission Briefing @Matt Stewart
 111 U Mulldrifter @Eric Fortune
-112 R Nadir Kraken @Dan Scott
+112 R Nadir Kraken @Dan Murayama Scott
 113 U Nightveil Sprite @Uriah Voth
 114 U Ongoing Investigation @Bud Cook
 115 C Otherworldly Gaze @Chris Cold
@@ -198,7 +198,7 @@ ScryfallCode=MKC
 190 R Tireless Tracker @Eric Deschamps
 191 R Toski, Bearer of Secrets @Jason Rainville
 192 R Trail of Mystery @Raymond Swanland
-193 U Ulvenwald Mysteries @Marzena Nereida Piwowar
+193 U Ulvenwald Mysteries @Nereida
 194 M Whisperwood Elemental @Raymond Swanland
 195 C Wild Growth @Tony Szczudlo
 196 U Wilderness Reclamation @Tyler Walpole
@@ -208,7 +208,7 @@ ScryfallCode=MKC
 200 R Baleful Strix @Nils Hamm
 201 R Boros Reckoner @Howard Lyon
 202 M Chulane, Teller of Tales @Victor Adame Minguez
-203 R Connive // Concoct @Dan Scott
+203 R Connive // Concoct @Dan Murayama Scott
 204 R Decimate @Zoltan Boros
 205 R Deflecting Palm @Eric Deschamps
 206 U Dimir Spybug @James Paick
@@ -228,7 +228,7 @@ ScryfallCode=MKC
 220 C Wavesifter @Nils Hamm
 221 R Academy Manufactor @Campbell White
 222 R Ancient Stone Idol @Josh Hass
-223 C Arcane Signet @Dan Scott
+223 C Arcane Signet @Dan Murayama Scott
 224 U Azorius Signet @Raoul Vitale
 225 U Bloodthirsty Blade @Jason Kang
 226 U Dimir Signet @Raoul Vitale
@@ -243,7 +243,7 @@ ScryfallCode=MKC
 235 R Scroll of Fate @Piotr Dura
 236 U Simic Signet @Mike Sass
 237 U Sol Ring @Mike Bierek
-238 R Solemn Simulacrum @Dan Scott
+238 R Solemn Simulacrum @Dan Murayama Scott
 239 R Steel Hellkite @James Paick
 240 U Talisman of Conviction @Lindsey Look
 241 U Talisman of Curiosity @Lindsey Look
@@ -321,7 +321,7 @@ ScryfallCode=MKC
 313 M Feather, Radiant Arbiter @Dan Dos Santos
 314 M Kaust, Eyes of the Glade @Volkan Baǵa
 315 M Marvo, Deep Operative @John Tedrick
-316 M Mirko, Obsessive Theorist @Heonhwa Choe
+316 M Mirko, Obsessive Theorist @Heonhwa
 317 M Morska, Undersea Sleuth @Ekaterina Burmak
 318 M Nelly Borca, Impulsive Accuser @James Ryman
 319 M Sophia, Dogged Detective @Campbell White
@@ -366,31 +366,36 @@ ScryfallCode=MKC
 358 R Ransom Note @Gaboleps
 
 [tokens]
-b_0_0_phyrexian_germ
-b_2_2_zombie
-c_10_10_eldrazi
-c_6_12_a_construct_trample
-c_a_clue_draw
-c_a_food_sac
-c_a_gold_sac
-c_a_treasure_sac
-g_1_1_insect
-g_1_1_insect_flying_deathtouch
-g_1_1_saproling
-g_1_1_snake
-g_2_2_cat
-g_4_4_rhino_warrior
-kobolds_of_kher_keep
-komas_coil
-lightning_rager
-r_3_3_ogre
-tiny
-u_1_1_tentacle
-u_2_2_drake_flying
-u_4_3_salamander_warrior
-w_1_1_human_soldier
-w_1_1_soldier
-w_1_1_spirit_flying
+1 c_10_10_eldrazi @Jack Wang
+2 w_1_1_human_soldier @Deruchenko Alexander
+3 w_1_1_soldier @Greg Staples
+4 w_1_1_spirit_flying @Kim Sokol
+6 u_2_2_drake_flying @Svetlin Velinov
+7 komas_coil @Simon Dominic
+8 u_4_3_salamander_warrior @J.P. Targete
+9 u_1_1_tentacle @Dan Murayama Scott
+10 b_0_0_phyrexian_germ @Igor Kieryluk
+11 b_2_2_zombie @Jason A. Engle
+12 kobolds_of_kher_keep @Paolo Parente
+13 lightning_rager @Svetlin Velinov
+14 r_3_3_ogre @Paul Bonner
+15 g_2_2_cat @Raoul Vitale
+16 g_1_1_insect @Martina Pilcerova
+17 g_1_1_insect_flying_deathtouch @Martina Pilcerova
+18 g_4_4_rhino_warrior @Zoltan Boros
+19 g_1_1_saproling @Sam White
+20 g_1_1_snake @Lars Grant-West
+21 tiny @Campbell White
+22 c_a_clue_draw @Daneen Wilkerson
+23 c_6_12_a_construct_trample @Jung Park
+24 c_a_food_sac @Steven Belledin
+25 c_a_gold_sac @Richard Wright
+26 c_a_treasure_sac @Florian de Gesincourt
 
 [other]
-embalm_vizier_of_many_faces
+5 embalm_vizier_of_many_faces @Ryan Yee
+27 copy @David Palumbo
+28 blessing @Carlos Palma Cruchaga
+29 manifest @Jason A. Engle
+30 morph @Raymond Swanland
+31 monarch @Volkan Baǵa

@@ -29,7 +29,7 @@ public class RepeatEffect extends SpellAbilityEffect {
         Integer maxRepeat = null;
         if (sa.hasParam("MaxRepeat")) {
             maxRepeat = AbilityUtils.calculateAmount(source, sa.getParam("MaxRepeat"), sa);
-            if (maxRepeat.intValue() == 0) return; // do nothing if maxRepeat is 0. the next loop will execute at least once
+            if (maxRepeat == 0) return; // do nothing if maxRepeat is 0. the next loop will execute at least once
         }
 
         //execute repeat ability at least once
@@ -65,6 +65,10 @@ public class RepeatEffect extends SpellAbilityEffect {
         //boolean doAgain = false;
         final Player activator = sa.getActivatingPlayer();
         final Game game = activator.getGame();
+
+        if (game.isGameOver()) {
+            return false;
+        }
 
         if (sa.hasParam("RepeatPresent")) {
             final String repeatPresent = sa.getParam("RepeatPresent");

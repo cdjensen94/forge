@@ -17,13 +17,7 @@
  */
 package forge.gui.error;
 
-import java.io.BufferedWriter;
-import java.io.File;
-import java.io.FileWriter;
-import java.io.IOException;
-import java.io.PrintWriter;
-import java.io.StringWriter;
-
+import forge.game.ability.IllegalAbilityException;
 import forge.gui.FThreads;
 import forge.gui.GuiBase;
 import forge.gui.util.SOptionPane;
@@ -31,6 +25,10 @@ import forge.localinstance.properties.ForgePreferences;
 import forge.model.FModel;
 import forge.util.Localizer;
 import io.sentry.Sentry;
+
+import java.io.*;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 
 /**
  * The class ErrorViewer. Enables showing and saving error messages that
@@ -41,12 +39,6 @@ import io.sentry.Sentry;
  */
 public class BugReporter {
     private static final int STACK_OVERFLOW_MAX_MESSAGE_LEN = 16 * 1024;
-
-    public static final String REPORT = Localizer.getInstance().getMessage("lblReport");
-    public static final String SAVE = Localizer.getInstance().getMessage("lblSave");
-    public static final String DISCARD = Localizer.getInstance().getMessage("lblDiscardError");
-    public static final String EXIT = Localizer.getInstance().getMessage("lblExit");
-    public static final String SENTRY = Localizer.getInstance().getMessage("lblAutoSubmitBugReports");
 
     private static Throwable exception;
     private static String message;
@@ -88,10 +80,10 @@ public class BugReporter {
         else {
             sb.append(swStr);
         }
-        if (isSentryEnabled()) {
+        if ((!(exception instanceof IllegalAbilityException iae) || !iae.isCustom()) && isSentryEnabled()) {
             sendSentry();
         } else {
-            GuiBase.getInterface().showBugReportDialog(Localizer.getInstance().getMessage("lblReportCrash"), sb.toString(), true);
+            GuiBase.getInterface().showBugReportDialog(Localizer.getInstance().getMessageorUseDefault("lblReportCrash", "Report a Crash"), sb.toString(), true);
         }
     }
 
@@ -126,22 +118,31 @@ public class BugReporter {
         if (isSentryEnabled()) {
             sendSentry();
         } else {
-            GuiBase.getInterface().showBugReportDialog(Localizer.getInstance().getMessage("btnReportBug"), message, false);
+            GuiBase.getInterface().showBugReportDialog(Localizer.getInstance().getMessageorUseDefault("btnReportBug", "Report a Bug"), message, false);
         }
     }
 
-    public static void saveToFile(final String text) {
+    public static void saveToFile(final String error) {
         File f;
-        final long curTime = System.currentTimeMillis();
-        for (int i = 0;; i++) {
-            final String name = String.format("%TF-%02d.txt", curTime, i);
-            f = new File(name);
-            if (!f.exists()) {
-                break;
+        String text;
+        if (GuiBase.getInterface().isLibgdxPort()) {
+            text = GuiBase.getHWInfo() + "\n\n" + error;
+            // Save in downloads directory instead for easy access without filepicker
+            String filename = "forge-bug-" + LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd-HHmmss")) + ".txt";
+            f = new File(GuiBase.getDownloadsDir() + filename);
+        } else {
+            text = error;
+            final long curTime = System.currentTimeMillis();
+            for (int i = 0; ; i++) {
+                final String name = String.format("%TF-%02d.txt", curTime, i);
+                f = new File(name);
+                if (!f.exists()) {
+                    break;
+                }
             }
-        }
 
-        f = GuiBase.getInterface().getSaveFile(f);
+            f = GuiBase.getInterface().getSaveFile(f);
+        }
 
         try (BufferedWriter bw = new BufferedWriter(new FileWriter(f))){
             bw.write(text);
@@ -152,11 +153,13 @@ public class BugReporter {
     }
 
     public static void sendSentry() {
-        if (exception != null) {
-            Sentry.captureException(exception);
-        } else if (message !=null) {
-            Sentry.captureMessage(message);
-        }
+        try {
+            if (exception != null) {
+                Sentry.captureException(exception);
+            } else if (message !=null) {
+                Sentry.captureMessage(message);
+            }
+        } catch (Exception ignored) {}
     }
 
     /**

@@ -6,14 +6,18 @@ import com.badlogic.gdx.scenes.scene2d.Actor;
 import com.badlogic.gdx.scenes.scene2d.utils.ChangeListener;
 import com.badlogic.gdx.utils.Array;
 import com.badlogic.gdx.utils.Json;
+import com.badlogic.gdx.utils.Timer;
+import forge.Forge;
 import forge.adventure.character.EnemySprite;
 import forge.adventure.data.*;
 import forge.adventure.pointofintrest.PointOfInterest;
 import forge.adventure.pointofintrest.PointOfInterestChanges;
+import forge.adventure.scene.TileMapScene;
 import forge.adventure.stage.GameStage;
 import forge.adventure.stage.MapStage;
 import forge.adventure.world.WorldSave;
 import forge.util.Aggregates;
+import forge.util.Localizer;
 
 import java.io.Serializable;
 import java.time.LocalDate;
@@ -98,8 +102,7 @@ public class AdventureQuestController implements Serializable {
                     if (!toBoost.isEmpty()) {
                         float value = totalWeightToAssign / toBoost.size();
                         for (String key : toBoost) {
-                            float existingValue = boostedSpawns.getOrDefault(key, 0.0f);
-                                boostedSpawns.put(key, value + existingValue);
+                            boostedSpawns.merge(key, value, Float::sum);
                         }
                     }
                 }
@@ -146,64 +149,63 @@ public class AdventureQuestController implements Serializable {
     }
     private Map<String, Long> nextQuestDate = new HashMap<>();
     private int maximumSideQuests = 5; //todo: move to configuration file
-    private transient boolean inDialog = false;
+    private transient MapDialog activeDialog = null;
     private transient Array<AdventureQuestData> allQuests = new Array<>();
-    private transient Array<AdventureQuestData> allSideQuests = new Array<>();
+    private final transient Array<AdventureQuestData> allSideQuests = new Array<>();
     private Queue<DialogData> dialogQueue = new LinkedList<>();
     private Map<String,Date> questAvailability = new HashMap<>();
     public PointOfInterest mostRecentPOI;
-    private List<EnemySprite> enemySpriteList= new ArrayList<>();
+    private final List<EnemySprite> enemySpriteList= new ArrayList<>();
     private int nextQuestID = 0;
     public void showQuestDialogs(GameStage stage) {
         List<AdventureQuestData> finishedQuests = new ArrayList<>();
-
-            for (AdventureQuestData quest : Current.player().getQuests()) {
-                DialogData prologue = quest.getPrologue();
-                if (prologue != null){
-                    dialogQueue.add(prologue);
-                }
-                for (AdventureQuestStage questStage : quest.stages)
-                {
-                    if (questStage.getStatus() == INACTIVE)
-                        continue;
-                    if (questStage.prologue != null && !questStage.prologueDisplayed){
-                        questStage.prologueDisplayed = true;
-                        dialogQueue.add(questStage.prologue);
-                    }
-
-                    if (questStage.getStatus() == FAILED && questStage.failureDialog != null){
-                        dialogQueue.add(questStage.failureDialog);
-                        continue;
-                    }
-
-                    if (questStage.getStatus() == COMPLETE && questStage.epilogue != null && !questStage.epilogueDisplayed){
-                        questStage.epilogueDisplayed = true;
-                        dialogQueue.add(questStage.epilogue);
-                    }
-                }
-
-                if (quest.failed){
-                    finishedQuests.add(quest);
-                    if (quest.failureDialog != null){
-                        dialogQueue.add(quest.failureDialog);
-                    }
-                }
-
-                if (!quest.completed)
+        for (AdventureQuestData quest : Current.player().getQuests()) {
+            DialogData prologue = quest.getPrologue();
+            if (prologue != null){
+                dialogQueue.add(prologue);
+            }
+            for (AdventureQuestStage questStage : quest.stages)
+            {
+                if (questStage.getStatus() == INACTIVE)
                     continue;
-                DialogData epilogue = quest.getEpilogue();
-                if (epilogue != null){
-                    dialogQueue.add(epilogue);
+                if (questStage.prologue != null && !questStage.prologueDisplayed){
+                    questStage.prologueDisplayed = true;
+                    dialogQueue.add(questStage.prologue);
                 }
-                finishedQuests.add(quest);
-                updateQuestComplete(quest);
-            }
-            if (!inDialog){
-                inDialog = true;
-                displayNextDialog((MapStage) stage);
-            }
-        for (AdventureQuestData toRemove : finishedQuests) {
 
+                if (questStage.getStatus() == FAILED && questStage.failureDialog != null){
+                    dialogQueue.add(questStage.failureDialog);
+                    continue;
+                }
+
+                if (questStage.getStatus() == COMPLETE && questStage.epilogue != null && !questStage.epilogueDisplayed){
+                    questStage.epilogueDisplayed = true;
+                    dialogQueue.add(questStage.epilogue);
+                }
+            }
+
+            if (quest.failed){
+                finishedQuests.add(quest);
+                if (quest.failureDialog != null){
+                    dialogQueue.add(quest.failureDialog);
+                }
+            }
+
+            if (!quest.completed)
+                continue;
+            DialogData epilogue = quest.getEpilogue();
+            if (epilogue != null){
+                dialogQueue.add(epilogue);
+            }
+            finishedQuests.add(quest);
+            updateQuestComplete(quest);
+        }
+
+        if (activeDialog == null && !dialogQueue.isEmpty()){
+            displayNextDialog((MapStage) stage);
+        }
+
+        for (AdventureQuestData toRemove : finishedQuests) {
             if (!toRemove.failed && locationHasMoreQuests()){
                 nextQuestDate.remove(toRemove.sourceID);
             }
@@ -219,35 +221,43 @@ public class AdventureQuestController implements Serializable {
         return new Random().nextFloat() <= 0.85f;
     }
     public void displayNextDialog(MapStage stage){
-        if (dialogQueue.peek() == null)
-        {
-            inDialog = false;
+        if (dialogQueue.peek() == null) {
+            activeDialog = null;
             return;
         }
 
         DialogData data = dialogQueue.remove();
-        MapDialog dialog = new MapDialog(data, stage, -1, null);
-
+        activeDialog = new MapDialog(data, stage, -1, null);
         if (data.options == null || data.options.length == 0) {
-            dialog.setEffects(data.action);
+            activeDialog.setEffects(data.action);
             displayNextDialog(stage);
             return;
         }
 
-        stage.showDialog();
-        dialog.activate();
         ChangeListener listen = new ChangeListener() {
             @Override
             public void changed(ChangeEvent changeEvent, Actor actor) {
+                activeDialog = null;
+
                 displayNextDialog(stage);
             }
         };
-        dialog.addDialogCompleteListener(listen);
-        if (data.options == null || data.options.length == 0)
-        {
-            displayNextDialog(stage);
-        }
+
+        activeDialog.addDialogCompleteListener(listen);
+
+        Timer.schedule(new Timer.Task() {
+            @Override
+            public void run() {
+                stage.showDialog();
+                activeDialog.activate();
+                // Seems weird that data would be null here, but not null up there. Are we changing these values inside activate?
+                if (data.options == null || data.options.length == 0) {
+                    displayNextDialog(stage);
+                }
+            }
+        }, 0.25f);
     }
+
     public static class DistanceSort implements Comparator<PointOfInterest>
     {
         //ToDo: Make this more generic, compare PoI, mobs, random points, and player position
@@ -276,6 +286,22 @@ public class AdventureQuestController implements Serializable {
 
     public static void clear(){
         object = null;
+    }
+
+    public boolean hasClearQuestActive() {
+        if (!MapStage.getInstance().isInMap() || TileMapScene.instance().rootPoint == null) {
+            return false;
+        }
+        for (AdventureQuestData quest : Current.player().getQuests()) {
+            for (AdventureQuestStage stage : quest.stages) {
+                if (stage.getStatus() == ACTIVE
+                        && stage.objective == ObjectiveTypes.Clear
+                        && stage.checkIfTargetLocation(TileMapScene.instance().rootPoint)) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     private AdventureQuestController(){
@@ -524,7 +550,18 @@ public class AdventureQuestController implements Serializable {
 
     String randomItemName()
     {  //todo: expand and include in fetch/delivery quests
-        String[] options = {"collection of frequently asked questions","case of card sleeves", "well loved playmat", "copy of Richard Garfield's autobiography", "collection of random foreign language cards", "lucky coin", "giant card binder", "unsorted box of commons", "bucket full of pieces of shattered artifacts","depleted mana shard"};
+        Localizer localizer = Forge.getLocalizer();
+        String[] options = {
+                localizer.getMessage("advRewardItem1"),
+                localizer.getMessage("advRewardItem2"),
+                localizer.getMessage("advRewardItem3"),
+                localizer.getMessage("advRewardItem4"),
+                localizer.getMessage("advRewardItem5"),
+                localizer.getMessage("advRewardItem6"),
+                localizer.getMessage("advRewardItem7"),
+                localizer.getMessage("advRewardItem8"),
+                localizer.getMessage("advRewardItem9"),
+                localizer.getMessage("advRewardItem10")};
 
         return Aggregates.random(options);
     }
@@ -534,6 +571,7 @@ public class AdventureQuestController implements Serializable {
     }
 
     public AdventureQuestData getQuestNPCResponse(String pointID, PointOfInterestChanges changes, String questOrigin) {
+        Localizer localizer = Forge.getLocalizer();
         AdventureQuestData ret;
 
         for (AdventureQuestData q : Current.player().getQuests()) {
@@ -542,9 +580,9 @@ public class AdventureQuestController implements Serializable {
             if (q.sourceID.equals(pointID)) {
                 //remind player about current active side quest
                 DialogData response = new DialogData();
-                response.text = "\"You haven't finished the last thing we asked you to do!\" (" + q.name +") ";
+                response.text = localizer.getMessage("advQuestNotFinished", q.name);
                 DialogData dismiss = new DialogData();
-                dismiss.name = "\"Oh, right, let me go take care of that.\"";
+                dismiss.name = localizer.getMessage("advQuestGoTakeCareOfThat");
                 response.options = new DialogData[]{dismiss};
                 ret = new AdventureQuestData();
                 ret.offerDialog = response;
@@ -554,9 +592,9 @@ public class AdventureQuestController implements Serializable {
         if (nextQuestDate.containsKey(pointID) && nextQuestDate.get(pointID) >= LocalDate.now().toEpochDay()){
             //No more side quests available here today due to previous activity
             DialogData response = new DialogData();
-            response.text = "\"We don't have anything new for you to do right now. Come back tomorrow.\"";
+            response.text = localizer.getMessage("advQuestComeBackTomorrow");
             DialogData dismiss = new DialogData();
-            dismiss.name = "\"Okay.\" (Leave)";
+            dismiss.name = localizer.getMessage("advOkayLeave");
             response.options = new DialogData[]{dismiss};
             ret = new AdventureQuestData();
             ret.offerDialog = response;
@@ -566,9 +604,9 @@ public class AdventureQuestController implements Serializable {
         if (tooManyQuests(Current.player().getQuests())) {
             //No more side quests available here today, too many active
             DialogData response = new DialogData();
-            response.text = "\"Adventurer, we need your assistance!\"";
+            response.text = localizer.getMessage("advQuestNeedAssistance");
             DialogData dismiss = new DialogData();
-            dismiss.name = "\"I can't, I have far too many things to do right now\" (Your quest log is too full already) (Leave)";
+            dismiss.name = localizer.getMessage("advQuestLogFull");
             response.options = new DialogData[]{dismiss};
             ret = new AdventureQuestData();
             ret.offerDialog = response;

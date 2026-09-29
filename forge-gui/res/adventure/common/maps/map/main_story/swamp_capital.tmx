@@ -58,6 +58,8 @@
     &quot;enemyPool&quot;:[
 	&quot;Adept Black Wizard&quot;,
 	&quot;Apprentice Black Wizard&quot;,
+	&quot;Assassin&quot;,
+	&quot;Banshee&quot;,
 	&quot;Challenger 20&quot;,
 	&quot;Challenger 21&quot;,
 	&quot;Challenger 22&quot;,
@@ -74,36 +76,55 @@
 	&quot;Necromancer&quot;,
 	&quot;Rat Ninja&quot;,
 	&quot;Vampire&quot;,
-	&quot;Vampire Lord&quot;
-	&quot;Witch&quot;,
+	&quot;Vampire Lord&quot;,
+	&quot;Witch&quot;
 	],
     &quot;rounds&quot;:3,
     &quot;entryFee&quot;:100,
      &quot;rewards&quot;: [[
-		{
-			&quot;type&quot;: &quot;gold&quot;,
-			&quot;probability&quot;: 1,
-			&quot;count&quot;: 500 
-		}
-		],[{
-			&quot;type&quot;: &quot;item&quot;,
-			&quot;probability&quot;: 1,
-			&quot;count&quot;: 1,
-			&quot;itemNames&quot;: [&quot;Death Ring&quot;,&quot;Dark Armor&quot;,&quot;Dark Shield&quot;,&quot;Dark Boots&quot;]
-		}
-		],
-		[
-		{
-			&quot;type&quot;: &quot;card&quot;,
-			&quot;probability&quot;: 1, 
-      			&quot;count&quot;:2,
-			&quot;rarity&quot;: [
-				&quot;Rare&quot;,&quot;Mythic Rare&quot;
-			],
-      			&quot;colors&quot;: [&quot;black&quot;] 
-		}
-		]
-		] 
+        {
+            &quot;type&quot;: &quot;gold&quot;,
+            &quot;probability&quot;: 1,
+            &quot;count&quot;: 100
+        }
+    ],[
+        {
+            &quot;type&quot;: &quot;gold&quot;,
+            &quot;probability&quot;: 1,
+            &quot;count&quot;: 200
+        },
+        {
+            &quot;type&quot;: &quot;card&quot;,
+            &quot;probability&quot;: 1,
+            &quot;count&quot;: 1,
+            &quot;rarity&quot;: [
+                &quot;Rare&quot;
+            ],
+            &quot;colors&quot;: [&quot;black&quot;]
+        }
+    ],[
+        {
+            &quot;type&quot;: &quot;gold&quot;,
+            &quot;probability&quot;: 1,
+            &quot;count&quot;: 200
+        },
+        {
+            &quot;type&quot;: &quot;item&quot;,
+            &quot;probability&quot;: 1,
+            &quot;count&quot;: 1,
+            &quot;itemNames&quot;: [&quot;Death Ring&quot;,&quot;Dark Armor&quot;,&quot;Dark Shield&quot;,&quot;Dark Boots&quot;]
+        },
+        {
+            &quot;type&quot;: &quot;card&quot;,
+            &quot;probability&quot;: 1,
+            &quot;count&quot;: 2,
+            &quot;rarity&quot;: [
+                &quot;Mythic Rare&quot;
+            ],
+            &quot;colors&quot;: [&quot;black&quot;]
+        }
+    ]
+    ]
 }</property>
    </properties>
   </object>
@@ -125,7 +146,7 @@
   </object>
   <object id="65" template="../../obj/shop.tx" x="376" y="322">
    <properties>
-    <property name="commonShopList" value="Enchantment6Black,Creature6Black,Instant6Black,Vampire,Zombie,Skeleton,Demon,Spiders"/>
+    <property name="commonShopList" value="Enchantment6Black,Creature6Black,BlackBoosterPackShop,Instant6Black,Vampire,Zombie,Skeleton,Demon,Spiders"/>
     <property name="mythicShopList" value="Planeswalker4Black,WUBRG,RWB,RUB,RGB,UWB,UGB,UWB,Legend4Black,PhyrexianBlack"/>
     <property name="rareShopList" value="Artifact4Black,Land4Black,Dimir,Rakdos,Orzhov,Golgari,Vehicle2Black,Wand4Black"/>
     <property name="signYOffset" type="float" value="-8"/>
@@ -134,7 +155,7 @@
   </object>
   <object id="66" template="../../obj/shop.tx" x="424" y="274">
    <properties>
-    <property name="commonShopList" value="Enchantment6Black,Creature6Black,Instant6Black,Vampire,Zombie,Skeleton,Demon,Spiders"/>
+    <property name="commonShopList" value="Enchantment6Black,Creature6Black,BlackBoosterPackShop,Instant6Black,Vampire,Zombie,Skeleton,Demon,Spiders"/>
     <property name="mythicShopList" value="Planeswalker4Black,WUBRG,RWB,RUB,RGB,UWB,UGB,UWB,Legend4Black,PhyrexianBlack"/>
     <property name="rareShopList" value="Artifact4Black,Land4Black,Dimir,Rakdos,Orzhov,Golgari,Vehicle2Black,Wand4Black"/>
     <property name="signYOffset" type="float" value="-8"/>
@@ -143,7 +164,7 @@
   </object>
   <object id="67" template="../../obj/shop.tx" x="424" y="322">
    <properties>
-    <property name="commonShopList" value="Enchantment6Black,Creature6Black,Instant6Black,Vampire,Zombie,Skeleton,Demon,Spiders"/>
+    <property name="commonShopList" value="Enchantment6Black,Creature6Black,BlackBoosterPackShop,Instant6Black,Vampire,Zombie,Skeleton,Demon,Spiders"/>
     <property name="mythicShopList" value="Planeswalker4Black,WUBRG,RWB,RUB,RGB,UWB,UGB,UWB,Legend4Black,PhyrexianBlack"/>
     <property name="rareShopList" value="Artifact4Black,Land4Black,Dimir,Rakdos,Orzhov,Golgari,Vehicle2Black,Wand4Black"/>
     <property name="signXOffset" type="float" value="18"/>
@@ -153,7 +174,7 @@
   </object>
   <object id="68" template="../../obj/shop.tx" x="472" y="274">
    <properties>
-    <property name="commonShopList" value="Enchantment6Black,Creature6Black,Instant6Black,Vampire,Zombie,Skeleton,Demon,Spiders"/>
+    <property name="commonShopList" value="Enchantment6Black,Creature6Black,BlackBoosterPackShop,Instant6Black,Vampire,Zombie,Skeleton,Demon,Spiders"/>
     <property name="mythicShopList" value="Planeswalker4Black,WUBRG,RWB,RUB,RGB,UWB,UGB,UWB,Legend4Black,PhyrexianBlack"/>
     <property name="rareShopList" value="Artifact4Black,Land4Black,Dimir,Rakdos,Orzhov,Golgari,Vehicle2Black,Wand4Black"/>
     <property name="signYOffset" type="float" value="-8"/>
@@ -162,7 +183,7 @@
   </object>
   <object id="69" template="../../obj/shop.tx" x="472" y="322">
    <properties>
-    <property name="commonShopList" value="Enchantment6Black,Creature6Black,Instant6Black,Vampire,Zombie,Skeleton,Demon,Spiders"/>
+    <property name="commonShopList" value="Enchantment6Black,Creature6Black,BlackBoosterPackShop,Instant6Black,Vampire,Zombie,Skeleton,Demon,Spiders"/>
     <property name="mythicShopList" value="Planeswalker4Black,WUBRG,RWB,RUB,RGB,UWB,UGB,UWB,Legend4Black,PhyrexianBlack"/>
     <property name="rareShopList" value="Artifact4Black,Land4Black,Dimir,Rakdos,Orzhov,Golgari,Vehicle2Black,Wand4Black"/>
     <property name="signYOffset" type="float" value="-8"/>
@@ -171,7 +192,7 @@
   </object>
   <object id="70" template="../../obj/shop.tx" x="520" y="274">
    <properties>
-    <property name="commonShopList" value="Enchantment6Black,Creature6Black,Instant6Black,Vampire,Zombie,Skeleton,Demon,Spiders"/>
+    <property name="commonShopList" value="Enchantment6Black,Creature6Black,BlackBoosterPackShop,Instant6Black,Vampire,Zombie,Skeleton,Demon,Spiders"/>
     <property name="mythicShopList" value="Planeswalker4Black,WUBRG,RWB,RUB,RGB,UWB,UGB,UWB,Legend4Black,PhyrexianBlack"/>
     <property name="rareShopList" value="Artifact4Black,Land4Black,Dimir,Rakdos,Orzhov,Golgari,Vehicle2Black,Wand4Black"/>
     <property name="signYOffset" type="float" value="-8"/>
@@ -180,7 +201,7 @@
   </object>
   <object id="71" template="../../obj/shop.tx" x="520" y="322">
    <properties>
-    <property name="commonShopList" value="Enchantment6Black,Creature6Black,Instant6Black,Vampire,Zombie,Skeleton,Demon,Spiders"/>
+    <property name="commonShopList" value="Enchantment6Black,Creature6Black,BlackBoosterPackShop,Instant6Black,Vampire,Zombie,Skeleton,Demon,Spiders"/>
     <property name="mythicShopList" value="Planeswalker4Black,WUBRG,RWB,RUB,RGB,UWB,UGB,UWB,Legend4Black,PhyrexianBlack"/>
     <property name="rareShopList" value="Artifact4Black,Land4Black,Dimir,Rakdos,Orzhov,Golgari,Vehicle2Black,Wand4Black"/>
     <property name="signYOffset" type="float" value="-8"/>
@@ -189,7 +210,7 @@
   </object>
   <object id="77" template="../../obj/shop.tx" x="376" y="274">
    <properties>
-    <property name="commonShopList" value="Enchantment6Black,Creature6Black,Instant6Black,Vampire,Zombie,Skeleton,Demon,Spiders"/>
+    <property name="commonShopList" value="Enchantment6Black,Creature6Black,BlackBoosterPackShop,Instant6Black,Vampire,Zombie,Skeleton,Demon,Spiders"/>
     <property name="mythicShopList" value="Planeswalker4Black,WUBRG,RWB,RUB,RGB,UWB,UGB,UWB,Legend4Black,PhyrexianBlack"/>
     <property name="rareShopList" value="Artifact4Black,Land4Black,Dimir,Rakdos,Orzhov,Golgari,Vehicle2Black,Wand4Black"/>
     <property name="signYOffset" type="float" value="-8"/>
@@ -203,7 +224,7 @@
   </object>
   <object id="83" template="../../obj/shop.tx" x="519" y="194">
    <properties>
-    <property name="commonShopList" value="Enchantment6Black,Creature6Black,Instant6Black,Vampire,Zombie,Skeleton,Demon,Spiders"/>
+    <property name="commonShopList" value="Enchantment6Black,Creature6Black,BlackBoosterPackShop,Instant6Black,Vampire,Zombie,Skeleton,Demon,Spiders"/>
     <property name="mythicShopList" value="Planeswalker4Black,WUBRG,RWB,RUB,RGB,UWB,UGB,UWB,Legend4Black,PhyrexianBlack"/>
     <property name="rareShopList" value="Artifact4Black,Land4Black,Dimir,Rakdos,Orzhov,Golgari,Vehicle2Black,Wand4Black"/>
     <property name="signYOffset" type="float" value="-8"/>
@@ -212,7 +233,7 @@
   </object>
   <object id="84" template="../../obj/shop.tx" x="456" y="194">
    <properties>
-    <property name="commonShopList" value="Enchantment6Black,Creature6Black,Instant6Black,Vampire,Zombie,Skeleton,Demon,Spiders"/>
+    <property name="commonShopList" value="Enchantment6Black,Creature6Black,BlackBoosterPackShop,Instant6Black,Vampire,Zombie,Skeleton,Demon,Spiders"/>
     <property name="mythicShopList" value="Planeswalker4Black,WUBRG,RWB,RUB,RGB,UWB,UGB,UWB,Legend4Black,PhyrexianBlack"/>
     <property name="rareShopList" value="Artifact4Black,Land4Black,Dimir,Rakdos,Orzhov,Golgari,Vehicle2Black,Wand4Black"/>
     <property name="signYOffset" type="float" value="-8"/>

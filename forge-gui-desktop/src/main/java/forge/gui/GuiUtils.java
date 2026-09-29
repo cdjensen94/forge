@@ -20,8 +20,6 @@ package forge.gui;
 import java.awt.Dimension;
 import java.awt.Font;
 import java.awt.FontFormatException;
-import java.awt.event.ActionEvent;
-import java.awt.event.ActionListener;
 import java.io.File;
 import java.io.IOException;
 
@@ -34,6 +32,7 @@ import javax.swing.KeyStroke;
 
 import forge.localinstance.properties.ForgePreferences.FPref;
 import forge.model.FModel;
+import forge.util.Lang;
 
 /**
  * <p>
@@ -71,8 +70,8 @@ public final class GuiUtils {
             System.err.println("GuiUtils > newFont: can't find \"" + filename + "\"");
         }
 
-        if ("ja-JP".equals(FModel.getPreferences().getPref(FPref.UI_LANGUAGE)) && !ttf.canDisplay('鍮') ||
-            "zh-CN".equals(FModel.getPreferences().getPref(FPref.UI_LANGUAGE)) && !ttf.canDisplay('鹫')) {
+        Lang lang = Lang.initInstance(FModel.getPreferences().getPref(FPref.UI_LANGUAGE));
+        if (!ttf.canDisplay(lang.canDisplayCheck())) {
             // Use the system default font if can't display the above character
             ttf = new JLabel().getFont();
         }
@@ -101,12 +100,9 @@ public final class GuiUtils {
             label = "<html>" + "<div style='height: " + itemHeight + "px; margin-top: 6px;'>" + label.substring(6, label.length() - 7) + "</div></html>";
         }
         final JMenuItem item = new JMenuItem(label);
-        item.addActionListener(new ActionListener() {
-            @Override
-            public void actionPerformed(final ActionEvent arg0) {
-                if (null != onClick) {
-                    onClick.run();
-                }
+        item.addActionListener(arg0 -> {
+            if (null != onClick) {
+                onClick.run();
             }
         });
         item.setEnabled(enabled);

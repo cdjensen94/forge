@@ -1,10 +1,9 @@
 package forge.ai.ability;
 
 
-import java.util.Map;
-
 import com.google.common.collect.Iterables;
-
+import forge.ai.AiAbilityDecision;
+import forge.ai.AiPlayDecision;
 import forge.ai.ComputerUtilCard;
 import forge.ai.SpellAbilityAi;
 import forge.game.card.Card;
@@ -17,20 +16,23 @@ import forge.game.player.PlayerPredicates;
 import forge.game.spellability.SpellAbility;
 import forge.game.zone.ZoneType;
 
+import java.util.Map;
+
 public class ClashAi extends SpellAbilityAi {
 
     /* (non-Javadoc)
      * @see forge.card.abilityfactory.SpellAiLogic#doTriggerAINoCost(forge.game.player.Player, java.util.Map, forge.card.spellability.SpellAbility, boolean)
      */
     @Override
-    protected boolean doTriggerAINoCost(Player aiPlayer, SpellAbility sa, boolean mandatory) {
+    protected AiAbilityDecision doTriggerNoCost(Player aiPlayer, SpellAbility sa, boolean mandatory) {
         boolean legalAction = true;
 
         if (sa.usesTargeting()) {
             legalAction = selectTarget(aiPlayer, sa);
         }
 
-        return legalAction;
+        return legalAction ? new AiAbilityDecision(100, AiPlayDecision.WillPlay)
+                : new AiAbilityDecision(0, AiPlayDecision.TargetingFailed);
     }
 
     /*
@@ -40,14 +42,17 @@ public class ClashAi extends SpellAbilityAi {
      * forge.game.spellability.SpellAbility)
      */
     @Override
-    protected boolean checkApiLogic(Player ai, SpellAbility sa) {
+    protected AiAbilityDecision checkApiLogic(Player ai, SpellAbility sa) {
         boolean legalAction = true;
 
         if (sa.usesTargeting()) {
             legalAction = selectTarget(ai, sa);
+            if (!legalAction) {
+                return new AiAbilityDecision(0, AiPlayDecision.TargetingFailed);
+            }
         }
 
-        return legalAction;
+        return new AiAbilityDecision(100, AiPlayDecision.WillPlay);
     }
 
     /*
@@ -93,7 +98,7 @@ public class ClashAi extends SpellAbilityAi {
             // Springjack Knight
             // TODO: Whirlpool Whelm also uses creature targeting but it's trickier to support
             CardCollectionView aiCreats = ai.getCreaturesInPlay();
-            CardCollectionView oppCreats = CardLists.filter(ai.getOpponents().getCardsIn(ZoneType.Battlefield), CardPredicates.Presets.CREATURES);
+            CardCollectionView oppCreats = CardLists.filter(ai.getOpponents().getCardsIn(ZoneType.Battlefield), CardPredicates.CREATURES);
 
             Card tgt = aiCreats.isEmpty() ? ComputerUtilCard.getWorstCreatureAI(oppCreats) : ComputerUtilCard.getBestCreatureAI(aiCreats);
 
@@ -105,7 +110,6 @@ public class ClashAi extends SpellAbilityAi {
             }
         }
 
-        return sa.getTargets().size() > 0;
+        return !sa.getTargets().isEmpty();
     }
-
 }

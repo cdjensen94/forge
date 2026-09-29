@@ -1,18 +1,16 @@
 package forge.itemmanager.filters;
 
 import java.util.HashMap;
-import java.util.Iterator;
 import java.util.Map;
 
 import javax.swing.JPanel;
-
-import com.google.common.base.Predicates;
 
 import forge.gui.GuiBase;
 import forge.gui.UiCommand;
 import forge.item.InventoryItem;
 import forge.item.ItemPredicate;
 import forge.item.PaperCard;
+import forge.item.PaperCardPredicates;
 import forge.itemmanager.ItemManager;
 import forge.itemmanager.SFilterUtil;
 import forge.itemmanager.SItemManagerUtil.StatTypes;
@@ -49,14 +47,11 @@ public abstract class StatTypeFilter<T extends InventoryItem> extends ToggleButt
         buttonMap.put(st, button);
 
         //hook so right-clicking a button toggles itself on and toggles off all other buttons
-        button.setRightClickCommand(new UiCommand() {
-            @Override
-            public void run() {
-                lockFiltering = true;
-                SFilterUtil.showOnlyStat(st, button, buttonMap);
-                lockFiltering = false;
-                applyChange();
-            }
+        button.setRightClickCommand((UiCommand) () -> {
+            lockFiltering = true;
+            SFilterUtil.showOnlyStat(st, button, buttonMap);
+            lockFiltering = false;
+            applyChange();
         });
     }
 
@@ -64,7 +59,7 @@ public abstract class StatTypeFilter<T extends InventoryItem> extends ToggleButt
     protected <U extends InventoryItem> boolean showUnsupportedItem(U item) {
         FLabel btnPackOrDeck = buttonMap.get(StatTypes.PACK_OR_DECK); //support special pack/deck case
         if (btnPackOrDeck != null && btnPackOrDeck.isSelected()) {
-            return ItemPredicate.Presets.IS_PACK_OR_DECK.apply(item);
+            return ItemPredicate.IS_PACK_OR_DECK.test(item);
         }
         return false;
     }
@@ -75,15 +70,13 @@ public abstract class StatTypeFilter<T extends InventoryItem> extends ToggleButt
 
         FLabel btnPackOrDeck = buttonMap.get(StatTypes.PACK_OR_DECK);
         if (btnPackOrDeck != null) { //support special pack/deck case
-            int count = items.countAll(ItemPredicate.Presets.IS_PACK_OR_DECK, InventoryItem.class);
+            int count = items.countAll(ItemPredicate.IS_PACK_OR_DECK, InventoryItem.class);
             btnPackOrDeck.setText(String.valueOf(count));
         }
 
-        Iterator<StatTypes> buttonMapStatsIterator = buttonMap.keySet().iterator();
-        while (buttonMapStatsIterator.hasNext()){
-            StatTypes statTypes = buttonMapStatsIterator.next();
-            if (statTypes.predicate != null){
-                int count = items.countAll(Predicates.compose(statTypes.predicate, PaperCard.FN_GET_RULES), PaperCard.class);
+        for (StatTypes statTypes : buttonMap.keySet()) {
+            if (statTypes.predicate != null) {
+                int count = items.countAll(PaperCardPredicates.fromRules(statTypes.predicate), PaperCard.class);
                 buttonMap.get(statTypes).setText(String.valueOf(count));
             }
         }

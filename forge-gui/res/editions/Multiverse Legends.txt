@@ -58,7 +58,7 @@ ScryfallCode=MUL
 50 R Lathiel, the Bounteous Dawn @Shawn Wood
 51 R Lurrus of the Dream-Den @Steve Ellis
 52 R Lutri, the Spellchaser @Justine Mara Andersen
-53 M Niv-Mizzet Reborn @Illustranesia
+53 M Niv-Mizzet Reborn @Septian Fajrianto
 54 R Obosh, the Preypiercer @Denis Medri
 55 U Radha, Coalition Warlord @Justin Hernandez & Alexis Hernandez
 56 U Raff, Weatherlight Stalwart @Nino Vecia
@@ -118,7 +118,7 @@ ScryfallCode=MUL
 110 R Judith, the Scourge Diva @Wesley Burt
 111 U Juri, Master of the Revue @Dmitry Burmak
 112 R Kaheera, the Orphanguard @Ryan Pancoast
-113 R Keruga, the Macrosage @Dan Scott
+113 R Keruga, the Macrosage @Dan Murayama Scott
 114 M Kroxa, Titan of Death's Hunger @Vincent Proce
 115 R Lathiel, the Bounteous Dawn @Lucas Graciano
 116 R Lurrus of the Dream-Den @Slawomir Maniak
@@ -188,7 +188,7 @@ ScryfallCode=MUL
 180 R Lathiel, the Bounteous Dawn @Shawn Wood
 181 R Lurrus of the Dream-Den @Steve Ellis
 182 R Lutri, the Spellchaser @Justine Mara Andersen
-183 M Niv-Mizzet Reborn @Illustranesia
+183 M Niv-Mizzet Reborn @Septian Fajrianto
 184 R Obosh, the Preypiercer @Denis Medri
 185 U Radha, Coalition Warlord @Justin Hernandez & Alexis Hernandez
 186 U Raff, Weatherlight Stalwart @Nino Vecia
@@ -201,6 +201,9 @@ ScryfallCode=MUL
 193 M Yarok, the Desecrated @Jessica Rossier
 194 R Yorion, Sky Nomad @Justine Mara Andersen
 195 R Zirda, the Dawnwaker @Justine Mara Andersen
+
+[rebalanced]
+A-120 U A-Radha, Coalition Warlord @Randy Vargas
 
 [draft booster]
 2 Anafenza, Kin-Tree Spirit|MUL
@@ -270,5 +273,5 @@ ScryfallCode=MUL
 2 Zirda, the Dawnwaker|MUL
 
 [tokens]
-r_3_1_elemental_trample_haste
-u_2_1_a_phyrexian_myr
+1 u_2_1_a_phyrexian_myr @Samuel Perin
+2 r_3_1_elemental_trample_haste @Victor Adame Minguez

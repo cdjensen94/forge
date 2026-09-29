@@ -7,7 +7,8 @@ import java.util.Map;
 
 import com.google.common.collect.Sets;
 
-import forge.ai.GameState;
+import forge.game.GameState;
+import forge.card.GamePieceType;
 import forge.game.Game;
 import forge.game.GameType;
 import forge.game.ability.AbilityFactory;
@@ -18,10 +19,8 @@ import forge.game.spellability.SpellAbility;
 import forge.game.trigger.Trigger;
 import forge.game.trigger.TriggerHandler;
 import forge.game.zone.ZoneType;
-import forge.item.IPaperCard;
 import forge.item.InventoryItem;
 import forge.localinstance.properties.ForgeConstants;
-import forge.model.FModel;
 
 public class Puzzle extends GameState implements InventoryItem, Comparable<Puzzle> {
     String name;
@@ -107,10 +106,6 @@ public class Puzzle extends GameState implements InventoryItem, Comparable<Puzzl
         this.parse(stateLines);
     }
 
-    public IPaperCard getPaperCard(final String cardName, final String setCode, final int artID) {
-        return FModel.getMagicDb().getCommonCards().getCard(cardName, setCode, artID);
-    }
-
     public void setupMaxPlayerHandSize(Game game, int maxHandSize) {
         for (Player p : game.getPlayers()) {
             p.setStartingHandSize(maxHandSize);
@@ -131,7 +126,7 @@ public class Puzzle extends GameState implements InventoryItem, Comparable<Puzzl
         goalCard.setOwner(human);
         goalCard.setImageKey("t:puzzle");
         goalCard.setName("Puzzle Goal");
-        goalCard.setImmutable(true);
+        goalCard.setGamePieceType(GamePieceType.EFFECT);
         goalCard.setOracleText(getGoalDescription());
 
         int turnCorr = 0;
@@ -180,7 +175,7 @@ public class Puzzle extends GameState implements InventoryItem, Comparable<Puzzl
                     break;
                 }
                 String trigPlay = "Mode$ ChangesZone | Origin$ Any | Destination$ Battlefield | ValidCard$ " + targets + " | " +
-                        "Static$ True | TriggerDescription$ When the specified permanent enters the battlefield, you win the game.";
+                        "Static$ True | TriggerDescription$ When the specified permanent enters, you win the game.";
                 String effPlay = "DB$ WinsGame | Defined$ You | ConditionCheckSVar$ PermCount | ConditionSVarCompare$ GE" + targetCount;
                 final Trigger triggerPlay = TriggerHandler.parseTrigger(trigPlay, goalCard, true);
                 SpellAbility playSA = AbilityFactory.getAbility(effPlay, goalCard);
@@ -258,6 +253,9 @@ public class Puzzle extends GameState implements InventoryItem, Comparable<Puzzl
             sb.append("[COMPLETED] ");
         }
         sb.append(name);
+        if (this.difficulty != null) {
+            sb.append(" (" + this.difficulty + ")");
+        }
         return sb.toString();
     }
 

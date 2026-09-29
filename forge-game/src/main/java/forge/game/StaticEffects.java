@@ -20,11 +20,13 @@ package forge.game;
 import java.util.Map;
 import java.util.Set;
 
-import com.google.common.collect.Iterables;
+import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 
 import forge.game.card.Card;
+import forge.game.card.CardCollection;
 import forge.game.staticability.StaticAbility;
+import forge.game.staticability.StaticAbilityLayer;
 
 /**
  * <p>
@@ -39,12 +41,13 @@ public class StaticEffects {
     // **************** StaticAbility system **************************
     private final Map<StaticAbility, StaticEffect> staticEffects = Maps.newHashMap();
 
-    public final void clearStaticEffects(final Set<Card> affectedCards) {
+    public final void clearStaticEffects(final Set<Card> affectedCards, Map<StaticAbilityLayer, Set<Card>> affectedPerLayer) {
         // remove all static effects
         for (final StaticEffect se : staticEffects.values()) {
-            Iterables.addAll(affectedCards, se.remove());
+            se.remove(affectedPerLayer).forEach(affectedCards::add);
         }
         this.staticEffects.clear();
+        updateCaches(affectedPerLayer);
     }
 
     /**
@@ -68,12 +71,34 @@ public class StaticEffects {
         return staticEffects.values();
     }
 
-    public boolean removeStaticEffect(final StaticAbility staticAbility) {
-        final StaticEffect currentEffect = staticEffects.remove(staticAbility);
+    public boolean removeStaticEffect(final StaticAbility staticAbility, final StaticAbilityLayer layer, final boolean removeFull) {
+        final StaticEffect currentEffect;
+        if (removeFull) {
+            currentEffect = staticEffects.remove(staticAbility);
+        } else {
+            currentEffect = staticEffects.get(staticAbility);
+        }
         if (currentEffect == null) {
             return false;
         }
-        currentEffect.remove();
+        Map<StaticAbilityLayer, Set<Card>> affectedPerLayer = Maps.newHashMap();
+        currentEffect.remove(affectedPerLayer, Lists.newArrayList(layer));
+        updateCaches(affectedPerLayer);
         return true;
+    }
+
+    private void updateCaches(Map<StaticAbilityLayer, Set<Card>> affectedPerLayer) {
+        CardCollection affectedKeywordsBefore = new CardCollection();
+        if (affectedPerLayer.containsKey(StaticAbilityLayer.TEXT)) {
+            affectedKeywordsBefore.addAll(affectedPerLayer.get(StaticAbilityLayer.TEXT));
+        }
+        if (affectedPerLayer.containsKey(StaticAbilityLayer.TYPE)) {
+            // setting Basic Land Type case
+            affectedKeywordsBefore.addAll(affectedPerLayer.get(StaticAbilityLayer.TYPE));
+        }
+        if (affectedPerLayer.containsKey(StaticAbilityLayer.ABILITIES)) {
+            affectedKeywordsBefore.addAll(affectedPerLayer.get(StaticAbilityLayer.ABILITIES));
+        }
+        affectedKeywordsBefore.forEach(Card::updateKeywordsCache);
     }
 }

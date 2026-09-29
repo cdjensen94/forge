@@ -699,7 +699,7 @@ public class FSkin {
             return this.image.getHeight(null);
         }
 
-        protected ImageIcon getIcon() {
+        public ImageIcon getIcon() {
             if (this.imageIcon == null) {
                 /*float screenScale = GuiBase.getInterface().getScreenScale();
                 int iconWidth = Math.round(image.getWidth(null) / screenScale);
@@ -760,7 +760,13 @@ public class FSkin {
     public static SkinIcon getIcon(final FSkinProp s0) {
         final SkinIcon icon = SkinIcon.icons.get(s0);
         if (icon == null) {
-            throw new NullPointerException("Can't find an icon for FSkinProp " + s0);
+            final SkinIcon blank = SkinIcon.icons.get(FSkinProp.ICO_BLANK);
+            if (blank == null) // if blank is null at this point then the skin is bugged or GC?
+                throw new NullPointerException("Can't find an icon for FSkinProp " + s0);
+            else { // this should be 2 or less unless a new required image icon is needed.
+                System.err.println("Missing image icon for FSkinProp " + s0 + ". Blank image will be used instead.");
+                return blank;
+            }
         }
         return icon;
     }
@@ -866,7 +872,7 @@ public class FSkin {
         }
 
         @Override
-        protected ImageIcon getIcon() { //can skip null check since imageIcon will always be set
+        public ImageIcon getIcon() { //can skip null check since imageIcon will always be set
             return this.imageIcon;
         }
     }
@@ -940,11 +946,7 @@ public class FSkin {
 
     /** @return {@link java.awt.font} */
     private static Font getFixedFont(final int size) {
-        Font fixedFont = fixedFonts.get(size);
-        if (fixedFont == null) {
-            fixedFont = new Font("Monospaced", Font.PLAIN, size);
-            fixedFonts.put(size, fixedFont);
-        }
+        Font fixedFont = fixedFonts.computeIfAbsent(size, s -> new Font("Monospaced", Font.PLAIN, s));
         return fixedFont;
     }
 
@@ -1096,11 +1098,17 @@ public class FSkin {
             str = str.replaceAll(pattern, replacement);
         }
         // Just return the string unencoded if we're optimizing for screen readers.
-        if (FModel.getPreferences().getPrefBoolean(FPref.UI_SR_OPTIMIZE)) {
+        if (FModel.getPreferences().getPrefBoolean(FPref.UI_SCREENREADER_OPTIMIZE)) {
             return str;
         }
-        //format mana symbols to display as icons
-        pattern = "\\{([A-Z0-9]+)\\}|\\{([A-Z0-9]+)/([A-Z0-9]+)\\}|(A-)|\\{([A-Z0-9]+)/([A-Z0-9]+)/([A-Z0-9]+)\\}"; //fancy pattern needed so "/" can be omitted from replacement
+        // format mana symbols to display as icons
+        // fancy pattern needed so "/" can be omitted from replacement
+        pattern = 
+          "\\{([A-Z0-9]+)\\}" +                  // {SINGLE}
+          "|\\{([A-Z0-9]+)/([A-Z0-9]+)\\}" +    // {DOUBLE}
+          "|(?:(?<=\\s)|(?<=^))(A-)" +      // A- after ' ' or start of string
+          "|\\{([A-Z0-9]+)/([A-Z0-9]+)/([A-Z0-9]+)\\}"; // {TRIPLE}
+
         try {
             replacement = "<img src=\"" + new File(ForgeConstants.CACHE_SYMBOLS_DIR + "/$1$2$3$4$5$6$7.png").toURI().toURL().toString() + "\" width=" + SYMBOL_WIDTH + " height=" + SYMBOL_HEIGHT + ">";
             str = str.replaceAll(pattern, replacement);
@@ -1120,7 +1128,8 @@ public class FSkin {
     private static String preferredName;
     private static BufferedImage bimDefaultSprite, bimFavIcon, bimPreferredSprite, bimFoils, bimQuestDraftDeck, bimOldFoils,
     bimDefaultAvatars, bimPreferredAvatars, bimTrophies, bimAbilities, bimManaIcons, bimPhyrexian, bimColorlessHybrid, bimDefaultSleeve,
-            bimDefaultSleeve2, bimDefaultDeckbox, bimPrefferedSetLogo, bimDefaultWatermark, bimDefaultDraftRank;
+            bimDefaultSleeve2, bimDefaultDeckbox, bimPrefferedSetLogo, bimDefaultWatermark, bimDefaultDraftRank, bimAttractionLights,
+            bimZoneIcons;
     private static int x0, y0, w0, h0, newW, newH, preferredW, preferredH;
     private static int defaultFontSize = 12;
     private static boolean loaded = false;
@@ -1239,7 +1248,7 @@ public class FSkin {
         }
 
         final Localizer localizer = Localizer.getInstance();
-        FView.SINGLETON_INSTANCE.setSplashProgessBarMessage(localizer.getMessage("splash.loading.processingimagesprites") + ": ", 12);
+        FView.SINGLETON_INSTANCE.setSplashProgessBarMessage(localizer.getMessage("splash.loading.processingimagesprites") + ": ", 21);
 
         // Grab and test various sprite files.
         final String defaultDir = ForgeConstants.DEFAULT_SKINS_DIR;
@@ -1263,6 +1272,8 @@ public class FSkin {
         final File f18 = new File(defaultDir + ForgeConstants.SPRITE_PHYREXIAN_FILE);
         final File f19 = new File(defaultDir + ForgeConstants.SPRITE_COLORLESS_HYBRID_FILE);
         final File f20 = new File(defaultDir + ForgeConstants.SPRITE_DRAFTRANKS_FILE);
+        final File f21 = new File(defaultDir + ForgeConstants.SPRITE_ATTRACTION_LIGHTS_FILE);
+        final File f22 = new File(defaultDir + ForgeConstants.SPRITE_ZONE_FILE);
 
         try {
             int p = 0;
@@ -1275,6 +1286,8 @@ public class FSkin {
             bimPhyrexian = ImageIO.read(f18);
             FView.SINGLETON_INSTANCE.incrementSplashProgessBar(++p);
             bimColorlessHybrid = ImageIO.read(f19);
+            FView.SINGLETON_INSTANCE.incrementSplashProgessBar(++p);
+            bimAttractionLights = ImageIO.read(f21);
             FView.SINGLETON_INSTANCE.incrementSplashProgessBar(++p);
             bimPreferredSprite = ImageIO.read(f2);
             FView.SINGLETON_INSTANCE.incrementSplashProgessBar(++p);
@@ -1295,6 +1308,8 @@ public class FSkin {
             bimPrefferedSetLogo = f16.exists() ? ImageIO.read(f16) : ImageIO.read(f15);
             FView.SINGLETON_INSTANCE.incrementSplashProgessBar(++p);
             bimDefaultWatermark = ImageIO.read(f17);
+            FView.SINGLETON_INSTANCE.incrementSplashProgessBar(++p);
+            bimZoneIcons = ImageIO.read(f22);
             FView.SINGLETON_INSTANCE.incrementSplashProgessBar(++p);
             bimTrophies = ImageIO.read(f7);
             FView.SINGLETON_INSTANCE.incrementSplashProgessBar(++p);
@@ -1363,6 +1378,9 @@ public class FSkin {
                 case COLORLESS_HYBRID:
                     setImage(prop, bimColorlessHybrid);
                     break;
+                case ATTRACTION_LIGHTS:
+                    setImage(prop, bimAttractionLights);
+                    break;
                 case DECKBOX:
                     setImage(prop, bimDefaultDeckbox);
                     break;
@@ -1374,6 +1392,9 @@ public class FSkin {
                     break;
                 case WATERMARKS:
                     setImage(prop, bimDefaultWatermark);
+                    break;
+                case ZONES:
+                    setImage(prop, bimZoneIcons);
                     break;
                 default:
                     break;
@@ -1407,6 +1428,8 @@ public class FSkin {
         bimPhyrexian.flush();
         bimColorlessHybrid.flush();
         bimManaIcons.flush();
+        bimAttractionLights.flush();
+        bimZoneIcons.flush();
 
         if (bimPreferredAvatars != null) { bimPreferredAvatars.flush(); }
 
@@ -1428,6 +1451,8 @@ public class FSkin {
         bimPhyrexian = null;
         bimColorlessHybrid = null;
         bimManaIcons = null;
+        bimAttractionLights = null;
+        bimZoneIcons = null;
 
         //establish encoding symbols
         final File dir = new File(ForgeConstants.CACHE_SYMBOLS_DIR);
@@ -1481,7 +1506,7 @@ public class FSkin {
         return mySkins;
     }
 
-    public static Iterable<String> getAllSkins() {
+    public static List<String> getAllSkins() {
         return allSkins;
     }
 
@@ -1491,6 +1516,11 @@ public class FSkin {
 
     public static Map<Integer, SkinImage> getSleeves() {
         return sleeves;
+    }
+
+    public static BufferedImage getSleeveImage(int index) {
+        SkinImage s = sleeves.get(index);
+        return (s != null && s.image instanceof BufferedImage bi) ? bi : null;
     }
 
     public static boolean isLoaded() { return loaded; }
@@ -1534,32 +1564,24 @@ public class FSkin {
 
         // Test if various points of requested sub-image are transparent.
         // If any return true, image exists.
-        int x, y;
         Color c;
 
         if (bimPreferredSprite != null) {
-            // Center
-            x = (x0 + w0 / 2);
-            y = (y0 + h0 / 2);
-            c = getColorFromPixel(bimPreferredSprite.getRGB(x, y));
-            if (c.getAlpha() != 0) { return bimPreferredSprite; }
-
-            x += 2;
-            y += 2;
-            c = getColorFromPixel(bimPreferredSprite.getRGB(x, y));
-            if (c.getAlpha() != 0) { return bimPreferredSprite; }
-
-            x -= 4;
-            c = getColorFromPixel(bimPreferredSprite.getRGB(x, y));
-            if (c.getAlpha() != 0) { return bimPreferredSprite; }
-
-            y -= 4;
-            c = getColorFromPixel(bimPreferredSprite.getRGB(x, y));
-            if (c.getAlpha() != 0) { return bimPreferredSprite; }
-
-            x += 4;
-            c = getColorFromPixel(bimPreferredSprite.getRGB(x, y));
-            if (c.getAlpha() != 0) { return bimPreferredSprite; }
+            // Probe wider than the centre to catch icons with a transparent middle.
+            final int cx = x0 + w0 / 2;
+            final int cy = y0 + h0 / 2;
+            final int r  = Math.min(8, Math.min(w0, h0) / 2);
+            final int[][] probes = {
+                { cx,     cy     },
+                { cx + r, cy + r },
+                { cx - r, cy + r },
+                { cx - r, cy - r },
+                { cx + r, cy - r },
+            };
+            for (int[] p : probes) {
+                c = getColorFromPixel(bimPreferredSprite.getRGB(p[0], p[1]));
+                if (c.getAlpha() != 0) { return bimPreferredSprite; }
+            }
         }
 
         return bimDefaultSprite;

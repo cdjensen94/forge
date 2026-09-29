@@ -1,6 +1,5 @@
 package forge.screens.home.sanctioned;
 
-import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.util.ArrayList;
 import java.util.List;
@@ -11,7 +10,6 @@ import javax.swing.SwingUtilities;
 
 import forge.Singletons;
 import forge.deck.Deck;
-import forge.deck.DeckBase;
 import forge.deck.DeckGroup;
 import forge.deck.DeckProxy;
 import forge.game.GameType;
@@ -23,13 +21,11 @@ import forge.gui.SOverlayUtils;
 import forge.gui.UiCommand;
 import forge.gui.framework.FScreen;
 import forge.gui.framework.ICDoc;
-import forge.item.InventoryItem;
 import forge.itemmanager.ItemManagerConfig;
 import forge.localinstance.properties.ForgePreferences.FPref;
 import forge.model.FModel;
 import forge.player.GamePlayerUtil;
 import forge.screens.deckeditor.CDeckEditorUI;
-import forge.screens.deckeditor.controllers.ACEditorBase;
 import forge.screens.deckeditor.controllers.CEditorLimited;
 import forge.toolbox.FOptionPane;
 
@@ -44,20 +40,12 @@ public enum CSubmenuSealed implements ICDoc {
     /** */
     SINGLETON_INSTANCE;
 
-    private final UiCommand cmdDeckSelect = new UiCommand() {
-        @Override
-        public void run() {
-            VSubmenuSealed.SINGLETON_INSTANCE.getBtnStart().setEnabled(true);
-            fillOpponentComboBox();
-        }
+    private final UiCommand cmdDeckSelect = () -> {
+        VSubmenuSealed.SINGLETON_INSTANCE.getBtnStart().setEnabled(true);
+        fillOpponentComboBox();
     };
 
-    private final ActionListener radioAction = new ActionListener() {
-        @Override
-        public void actionPerformed(final ActionEvent e) {
-            fillOpponentComboBox();
-        }
-    };
+    private final ActionListener radioAction = e -> fillOpponentComboBox();
 
     @Override
     public void register() {
@@ -72,26 +60,11 @@ public enum CSubmenuSealed implements ICDoc {
 
         view.getLstDecks().setSelectCommand(cmdDeckSelect);
 
-        view.getBtnBuildDeck().setCommand(new UiCommand() {
-            @Override
-            public void run() {
-                setupSealed();
-            }
-        });
+        view.getBtnBuildDeck().setCommand((UiCommand) this::setupSealed);
 
-        view.getBtnStart().addActionListener(new ActionListener() {
-            @Override
-            public void actionPerformed(final ActionEvent e) {
-                startGame(GameType.Sealed);
-            }
-        });
+        view.getBtnStart().addActionListener(e -> startGame(GameType.Sealed));
 
-        view.getBtnDirections().setCommand(new UiCommand() {
-            @Override
-            public void run() {
-                view.showDirections();
-            }
-        });
+        view.getBtnDirections().setCommand((UiCommand) view::showDirections);
 
         view.getRadSingle().addActionListener(radioAction);
 
@@ -107,14 +80,12 @@ public enum CSubmenuSealed implements ICDoc {
         view.getLstDecks().setPool(DeckProxy.getAllSealedDecks());
         view.getLstDecks().setup(ItemManagerConfig.SEALED_DECKS);
 
-        SwingUtilities.invokeLater(new Runnable() {
-            @Override public void run() {
-                final JButton btnStart = view.getBtnStart();
-                if (btnStart.isEnabled()) {
-                    view.getBtnStart().requestFocusInWindow();
-                } else {
-                    view.getBtnBuildDeck().requestFocusInWindow();
-                }
+        SwingUtilities.invokeLater(() -> {
+            final JButton btnStart = view.getBtnStart();
+            if (btnStart.isEnabled()) {
+                view.getBtnStart().requestFocusInWindow();
+            } else {
+                view.getBtnBuildDeck().requestFocusInWindow();
             }
         });
     }
@@ -148,12 +119,9 @@ public enum CSubmenuSealed implements ICDoc {
             return;
         }
 
-        SwingUtilities.invokeLater(new Runnable() {
-            @Override
-            public void run() {
-                SOverlayUtils.startGameOverlay();
-                SOverlayUtils.showOverlay();
-            }
+        SwingUtilities.invokeLater(() -> {
+            SOverlayUtils.startGameOverlay();
+            SOverlayUtils.showOverlay();
         });
 
         // Restore Zero Indexing
@@ -171,25 +139,19 @@ public enum CSubmenuSealed implements ICDoc {
         final HostedMatch hostedMatch = GuiBase.getInterface().hostMatch();
         hostedMatch.startMatch(GameType.Sealed, null, starter, human, GuiBase.getInterface().getNewGuiGame());
 
-        SwingUtilities.invokeLater(new Runnable() {
-            @Override
-            public void run() {
-                SOverlayUtils.hideOverlay();
-            }
-        });
+        SwingUtilities.invokeLater(SOverlayUtils::hideOverlay);
     }
 
-    @SuppressWarnings("unchecked")
-    private <T extends DeckBase> void setupSealed() {
+    private void setupSealed() {
         final DeckGroup sealed = SealedCardPoolGenerator.generateSealedDeck(false);
         if (sealed == null) { return; }
 
-        final ACEditorBase<? extends InventoryItem, T> editor = (ACEditorBase<? extends InventoryItem, T>) new CEditorLimited(
-                FModel.getDecks().getSealed(), FScreen.DECK_EDITOR_SEALED, CDeckEditorUI.SINGLETON_INSTANCE.getCDetailPicture());
+        final CEditorLimited<DeckGroup> editor = new CEditorLimited<>(
+                FModel.getDecks().getSealed(), DeckGroup::new, FScreen.DECK_EDITOR_SEALED, CDeckEditorUI.SINGLETON_INSTANCE.getCDetailPicture());
 
         Singletons.getControl().setCurrentScreen(FScreen.DECK_EDITOR_SEALED);
         CDeckEditorUI.SINGLETON_INSTANCE.setEditorController(editor);
-        editor.getDeckController().setModel((T) sealed);
+        editor.getDeckController().setModel(sealed);
     }
 
     private void fillOpponentComboBox() {

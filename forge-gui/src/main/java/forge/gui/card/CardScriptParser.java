@@ -1,24 +1,21 @@
 package forge.gui.card;
 
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-
-import org.apache.commons.lang3.StringUtils;
-
-import com.google.common.base.Predicate;
 import com.google.common.collect.ImmutableSortedSet;
-import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
-
 import forge.card.CardType;
 import forge.game.ability.AbilityFactory;
 import forge.game.ability.AbilityFactory.AbilityRecordType;
 import forge.game.ability.ApiType;
 import forge.game.replacement.ReplacementType;
 import forge.game.trigger.TriggerType;
+import org.apache.commons.lang3.StringUtils;
+
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.function.Predicate;
 
 public final class CardScriptParser {
 
@@ -345,11 +342,8 @@ public final class CardScriptParser {
         }
     }
 
-    private static final Predicate<String> startsWith(final String s) {
-        return new Predicate<String>() {
-            @Override public boolean apply(final String input) {
-                return s.startsWith(input);
-            }};
+    private static Predicate<String> startsWith(final String s) {
+        return s::startsWith;
     }
 
     /**
@@ -367,7 +361,7 @@ public final class CardScriptParser {
      * Defined starting strings for cards and spellabilities.
      */
     private static final Set<String> DEFINED_CARDS_STARTSWITH = ImmutableSortedSet
-            .of("Triggered", "Replaced", "ThisTurnEntered");
+            .of("Triggered", "Replaced");
     /**
      * Literal defined strings for players.
      */
@@ -396,7 +390,7 @@ public final class CardScriptParser {
         if (DEFINED_CARDS.contains(defined)) {
             return true;
         }
-        return Iterables.any(DEFINED_CARDS_STARTSWITH, startsWith(defined));
+        return DEFINED_CARDS_STARTSWITH.stream().anyMatch(startsWith(defined));
     }
     private static boolean isDefinedPlayerLegal(final String defined) {
         final boolean non = defined.startsWith("Non"), flipped = defined.startsWith("Flipped");
@@ -412,7 +406,7 @@ public final class CardScriptParser {
         if (DEFINED_PLAYERS.contains(defined)) {
             return true;
         }
-        return Iterables.any(DEFINED_PLAYERS_STARTSWITH, startsWith(defined));
+        return DEFINED_PLAYERS_STARTSWITH.stream().anyMatch(startsWith(defined));
     }
 
     private static final Set<String> VALID_INCLUSIVE = ImmutableSortedSet.of(
@@ -443,72 +437,63 @@ public final class CardScriptParser {
             "sameName", "namedCard", "NamedByRememberedPlayer", "Permanent",
             "ChosenCard", "nonChosenCard", "White", "Blue", "Black", "Red",
             "Green", "nonWhite", "nonBlue", "nonBlack", "nonRed", "nonGreen",
-            "Colorless", "nonColorless", "Multicolor", "nonMulticolor",
-            "Monocolor", "nonMonocolor", "ChosenColor", "AllChosenColors",
+            "Colorless", "nonColorless", "Multicolor", "Monocolor", "ChosenColor", "AllChosenColors",
             "AnyChosenColor", "DoubleFaced", "Flip", "YouCtrl", "YourTeamCtrl",
             "YouDontCtrl", "OppCtrl", "ChosenCtrl", "DefenderCtrl",
             "DefenderCtrlForRemembered", "DefendingPlayerCtrl",
             "EnchantedPlayerCtrl", "EnchantedControllerCtrl",
-            "RememberedPlayer", "RememberedPlayerCtrl",
-            "nonRememberedPlayerCtrl", "TargetedPlayerCtrl",
+            "RememberedPlayer", "RememberedPlayerCtrl", "TargetedPlayerCtrl",
             "TargetedControllerCtrl", "ActivePlayerCtrl",
             "YouOwn", "YouDontOwn", "OppOwn",
             "TargetedPlayerOwn", "OwnerDoesntControl", "Other", "Self",
             "AttachedBy", "Attached", "NameNotEnchantingEnchantedPlayer",
-            "NotAttachedTo", "Enchanted", "CanEnchantRemembered",
+            "Enchanted", "CanEnchantRemembered",
             "CanEnchantSource", "CanBeEnchantedBy", "CanBeEnchantedByTargeted",
-            "CanBeEnchantedByAllRemembered", "EquippedBy",
-            "EquippedByTargeted", "EquippedByEnchanted", "FortifiedBy",
+            "EquippedBy", "EquippedByTargeted", "EquippedByEnchanted", "FortifiedBy",
             "CanBeEquippedBy", "Equipped", "Fortified", "HauntedBy",
             "notTributed", "madness", "Paired", "PairedWith",
             "Above", "DirectlyAbove", "TopGraveyardCreature",
             "BottomGraveyard", "TopLibrary", "BottomLibrary", "Cloned", "DamagedBy", "Damaged",
             "sharesPermanentTypeWith", "canProduceSameManaTypeWith", "SecondSpellCastThisTurn",
             "ThisTurnCast", "withFlashback", "tapped", "untapped", "faceDown",
-            "faceUp", "hasLevelUp", "DrawnThisTurn",
-            "firstTurnControlled", "notFirstTurnControlled",
-            "startedTheTurnUntapped", "attackedOrBlockedSinceYourLastUpkeep",
-            "blockedOrBeenBlockedSinceYourLastUpkeep",
-            "dealtDamageToYouThisTurn", "dealtDamageToOppThisTurn",
-            "controllerWasDealtCombatDamageByThisTurn",
-            "controllerWasDealtDamageByThisTurn", "wasDealtDamageThisTurn",
-            "wasDealtDamageByHostThisTurn", "wasDealtDamageByEquipeeThisTurn",
-            "wasDealtDamageByEnchantedThisTurn", "dealtDamageThisTurn",
+            "faceUp", "DrawnThisTurn",
+            "firstTurnControlled", "startedTheTurnUntapped",
+            "attackedOrBlockedSinceYourLastUpkeep", "blockedOrBeenBlockedSinceYourLastUpkeep",
+            "dealtDamageToYouThisTurn", "dealtDamageToOppThisTurn", "dealtDamageThisTurn",
+            "wasDealtDamageThisTurn",
             "attackedThisTurn", "attackedLastTurn", "blockedThisTurn",
-            "gotBlockedThisTurn", "notAttackedThisTurn", "notAttackedLastTurn",
-            "notBlockedThisTurn", "greatestPower", "yardGreatestPower",
+            "gotBlockedThisTurn", "greatestPower", "yardGreatestPower",
             "leastPower", "leastToughness", "greatestCMC",
             "greatestRememberedCMC", "lowestRememberedCMC", "lowestCMC",
-            "enchanted", "unenchanted", "enchanting", "equipped", "unequipped",
-            "equipping", "modified", "token", "nonToken", "hasXCost", "suspended",
-            "delved", "attacking", "attackingYou", "notattacking",
+            "enchanted", "enchanting", "equipped",
+            "equipping", "modified", "token", "hasXCost", "suspended",
+            "delved", "attacking", "attackingYou",
             "attackedBySourceThisCombat", "blocking", "blockingSource",
             "blockingCreatureYouCtrl", "blockingRemembered",
-            "sharesBlockingAssignmentWith", "notblocking", "blocked",
+            "sharesBlockingAssignmentWith", "blocked",
             "blockedBySource", "blockedThisTurn", "blockedByThisTurn",
             "blockedBySourceThisTurn", "isBlockedByRemembered", "blockedRemembered",
             "blockedByRemembered", "unblocked", "attackersBandedWith",
             "kicked", "kicked1", "kicked2", "evoked",
-            "HasDevoured", "HasNotDevoured", "IsMonstrous", "IsNotMonstrous",
-            "CostsPhyrexianMana", "IsRemembered", "IsNotRemembered",
-            "IsImprinted", "IsNotImprinted", "hasActivatedAbilityWithTapCost",
-            "hasActivatedAbility", "hasManaAbility",
+            "HasDevoured", "IsMonstrous",
+            "CostsPhyrexianMana", "IsRemembered",
+            "IsImprinted", "hasManaAbility",
             "hasNonManaActivatedAbility", "NoAbilities", "HasCounters",
-            "wasNotCast", "ChosenType", "IsNotChosenType", "IsCommander",
-            "IsNotCommander","IsRenowned", "IsNotRenowned");
-    private static final Set<String> VALID_EXCLUSIVE_STARTSWITH = ImmutableSortedSet
-            .of("named", "notnamed", "OwnedBy", "ControlledBy",
-                    "ControllerControls", "AttachedTo", "EnchantedBy",
-                    "NotEnchantedBy", "TopGraveyard", "SharesColorWith",
-                    "MostProminentColor", "notSharesColorWith",
-                    "sharesCreatureTypeWith", "sharesCardTypeWith", "sharesLandTypeWith",
-                    "sharesNameWith", "doesNotShareNameWith",
-                    "sharesControllerWith", "sharesOwnerWith",
-                    "ThisTurnEntered", "sharesTypeWith", "hasKeyword", "with",
-                    "greatestPowerControlledBy", "greatestCMCControlledBy",
-                    "power", "toughness", "cmc", "totalPT", "counters", "non",
-                    "RememberMap", "wasCastFrom", "wasNotCastFrom", "set",
-                    "inZone", "HasSVar");
+            "ChosenType", "IsNotChosenType", "IsCommander",
+            "IsRenowned");
+    private static final Set<String> VALID_EXCLUSIVE_STARTSWITH = ImmutableSortedSet.of(
+            "named", "OwnedBy", "ControlledBy",
+            "ControllerControls", "AttachedTo", "EnchantedBy",
+            "TopGraveyard", "SharesColorWith",
+            "MostProminentColor", "notSharesColorWith",
+            "sharesCreatureTypeWith", "sharesCardTypeWith", "sharesLandTypeWith",
+            "sharesNameWith", "doesNotShareNameWith",
+            "sharesControllerWith", "sharesOwnerWith",
+            "ThisTurnEntered", "sharesTypeWith", "hasKeyword", "with",
+            "greatestPowerControlledBy", "greatestCMCControlledBy",
+            "power", "toughness", "cmc", "totalPT", "counters", "non",
+            "RememberMap", "wasCastFrom", "set",
+            "inZone", "HasSVar", "hasAbility");
 
     private static boolean isValidExclusive(String valid) {
         if (valid.charAt(0) == '!') {
@@ -517,7 +502,7 @@ public final class CardScriptParser {
         if (VALID_EXCLUSIVE.contains(valid)) {
             return true;
         }
-        return Iterables.any(VALID_EXCLUSIVE_STARTSWITH, startsWith(valid));
+        return VALID_EXCLUSIVE_STARTSWITH.stream().anyMatch(startsWith(valid));
     }
 
     private static final class KeyValuePair {

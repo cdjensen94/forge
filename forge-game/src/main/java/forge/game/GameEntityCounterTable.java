@@ -1,13 +1,14 @@
 package forge.game;
 
 import java.util.Map;
+import java.util.Optional;
+import java.util.stream.Collectors;
 
-import org.apache.commons.lang3.ObjectUtils;
-
-import com.google.common.base.Optional;
 import com.google.common.collect.ForwardingTable;
 import com.google.common.collect.HashBasedTable;
-import com.google.common.collect.Maps;
+import com.google.common.collect.HashMultiset;
+import com.google.common.collect.Multiset;
+import com.google.common.collect.Multisets;
 import com.google.common.collect.Table;
 
 import forge.game.ability.AbilityKey;
@@ -15,17 +16,18 @@ import forge.game.card.Card;
 import forge.game.card.CounterType;
 import forge.game.player.Player;
 import forge.game.replacement.ReplacementType;
+import forge.game.spellability.AbilityStatic;
 import forge.game.spellability.SpellAbility;
 import forge.game.trigger.TriggerType;
 
-public class GameEntityCounterTable extends ForwardingTable<Optional<Player>, GameEntity, Map<CounterType, Integer>> {
+public class GameEntityCounterTable extends ForwardingTable<Optional<Player>, GameEntity, Multiset<CounterType>> {
 
-    private Table<Optional<Player>, GameEntity, Map<CounterType, Integer>> dataMap = HashBasedTable.create();
+    private Table<Optional<Player>, GameEntity, Multiset<CounterType>> dataMap = HashBasedTable.create();
 
     public GameEntityCounterTable() {
     }
 
-    public GameEntityCounterTable(Table<Optional<Player>, GameEntity, Map<CounterType, Integer>> counterTable) {
+    public GameEntityCounterTable(Table<Optional<Player>, GameEntity, Multiset<CounterType>> counterTable) {
         putAll(counterTable);
     }
 
@@ -34,72 +36,56 @@ public class GameEntityCounterTable extends ForwardingTable<Optional<Player>, Ga
      * @see com.google.common.collect.ForwardingTable#delegate()
      */
     @Override
-    protected Table<Optional<Player>, GameEntity, Map<CounterType, Integer>> delegate() {
+    protected Table<Optional<Player>, GameEntity, Multiset<CounterType>> delegate() {
         return dataMap;
     }
 
-    public Integer put(Player putter, GameEntity object, CounterType type, Integer value) {
-        Optional<Player> o = Optional.fromNullable(putter);
-        Map<CounterType, Integer> map = get(o, object);
+    public int put(Player putter, GameEntity object, CounterType type, int value) {
+        Optional<Player> o = Optional.ofNullable(putter);
+        Multiset<CounterType> map = get(o, object);
         if (map == null) {
-            map = Maps.newHashMap();
+            map = HashMultiset.create();
             put(o, object, map);
         }
-        return map.put(type, ObjectUtils.firstNonNull(map.get(type), 0) + value);
+        if (value > 0) {
+            return map.add(type, value);
+        } else {
+            return map.remove(type, -value);
+        }
     }
 
     public int get(Player putter, GameEntity object, CounterType type) {
-        Optional<Player> o = Optional.fromNullable(putter);
-        Map<CounterType, Integer> map = get(o, object);
-        if (map == null || !map.containsKey(type)) {
+        Optional<Player> o = Optional.ofNullable(putter);
+        Multiset<CounterType> map = get(o, object);
+        if (map == null) {
             return 0;
         }
-        return ObjectUtils.firstNonNull(map.get(type), 0);
+        return map.count(type);
     }
 
     public int totalValues() {
-        int result = 0;
-        for (Map<CounterType, Integer> m : values()) {
-            for (Integer i : m.values()) {
-                result += i;
-            }
-        }
-        return result;
+        return values().stream().collect(Collectors.summingInt(Multiset::size));
     }
 
     /*
      * returns the counters that can still be removed from game entity
      */
-    public Map<CounterType, Integer> filterToRemove(GameEntity ge) {
-        Map<CounterType, Integer> result = Maps.newHashMap();
+    public Multiset<CounterType> filterToRemove(GameEntity ge) {
         if (!containsColumn(ge)) {
-            result.putAll(ge.getCounters());
-            return result;
+            return HashMultiset.create(ge.getCounters());
         }
-        Map<CounterType, Integer> alreadyRemoved = column(ge).get(Optional.absent());
-        for (Map.Entry<CounterType, Integer> e : ge.getCounters().entrySet()) {
-            Integer rest = e.getValue() - (alreadyRemoved.containsKey(e.getKey()) ? alreadyRemoved.get(e.getKey()) : 0);
-            if (rest > 0) {
-                result.put(e.getKey(), rest);
-            }
-        }
-        return result;
+        Multiset<CounterType> alreadyRemoved = column(ge).get(Optional.<Player>empty());
+        return HashMultiset.create(Multisets.difference(ge.getCounters(), alreadyRemoved));
     }
 
-    public Map<GameEntity, Integer> filterTable(CounterType type, String valid, Card host, CardTraitBase sa) {
-        Map<GameEntity, Integer> result = Maps.newHashMap();
-
-        for (Map.Entry<GameEntity, Map<Optional<Player>, Map<CounterType, Integer>>> gm : columnMap().entrySet()) {
-            if (gm.getKey().isValid(valid, host.getController(), host, sa)) {
-                for (Map<CounterType, Integer> cm : gm.getValue().values()) {
-                    Integer old = ObjectUtils.firstNonNull(result.get(gm.getKey()), 0);
-                    Integer v = ObjectUtils.firstNonNull(cm.get(type), 0);
-                    if (old + v > 0) {
-                        result.put(gm.getKey(), old + v);
-                    }
-                }
-            }
-        }
+    public Map<GameEntity, Integer> filterTable(CounterType type, String valid, String validSource, Card host, CardTraitBase sa) {
+        Map<GameEntity, Integer> result = columnMap().entrySet().stream().filter(gm -> gm.getKey().isValid(valid, host.getController(), host, sa))
+            .collect(Collectors.groupingBy(gm -> gm.getKey(),
+                            Collectors.summingInt(gm -> gm.getValue().entrySet().stream().
+                                    filter(e -> validSource == null || (e.getKey().isPresent() && e.getKey().get().isValid(validSource, host.getController(), host, sa))).
+                                    mapToInt(e -> type == null ? e.getValue().size() : e.getValue().count(type)).sum())));
+        // entities that only received counters of other types must not count as matches
+        result.values().removeIf(v -> v == 0);
         return result;
     }
 
@@ -107,7 +93,7 @@ public class GameEntityCounterTable extends ForwardingTable<Optional<Player>, Ga
         if (isEmpty()) {
             return;
         }
-        for (Cell<Optional<Player>, GameEntity, Map<CounterType, Integer>> c : cellSet()) {
+        for (Cell<Optional<Player>, GameEntity, Multiset<CounterType>> c : cellSet()) {
             if (c.getValue().isEmpty()) {
                 continue;
             }
@@ -122,65 +108,81 @@ public class GameEntityCounterTable extends ForwardingTable<Optional<Player>, Ga
         game.getTriggerHandler().runTrigger(TriggerType.CounterAddedAll, runParams, false);
     }
 
-    public void replaceCounterEffect(final Game game, final SpellAbility cause, final boolean effect) {
-        replaceCounterEffect(game, cause, effect, false, null);
+    public void replaceCounterEffect(final Game game, final SpellAbility cause) {
+        replaceCounterEffect(game, cause, cause != null && !(cause instanceof AbilityStatic), false, null);
     }
-
     @SuppressWarnings("unchecked")
     public boolean replaceCounterEffect(final Game game, final SpellAbility cause, final boolean effect, final boolean etb, Map<AbilityKey, Object> params) {
         if (isEmpty()) {
             return false;
         }
         GameEntityCounterTable result = new GameEntityCounterTable();
-        for (Map.Entry<GameEntity, Map<Optional<Player>, Map<CounterType, Integer>>> gm : columnMap().entrySet()) {
-            Map<Optional<Player>, Map<CounterType, Integer>> values = gm.getValue();
+        for (Map.Entry<GameEntity, Map<Optional<Player>, Multiset<CounterType>>> gm : columnMap().entrySet()) {
+            Map<Optional<Player>, Multiset<CounterType>> values = gm.getValue();
 
-            final Map<AbilityKey, Object> repParams = AbilityKey.mapFromAffected(gm.getKey());
-            repParams.put(AbilityKey.Cause, cause);
-            repParams.put(AbilityKey.EffectOnly, effect);
-            repParams.put(AbilityKey.CounterMap, values);
-            repParams.put(AbilityKey.ETB, etb);
-            if (params != null) {
-                repParams.putAll(params);
-            }
+            // ETB Counters are already handled in the Move Event
+            if (!etb) {
+                final Map<AbilityKey, Object> repParams = AbilityKey.mapFromAffected(gm.getKey());
+                repParams.put(AbilityKey.Cause, cause);
+                repParams.put(AbilityKey.EffectOnly, effect);
+                repParams.put(AbilityKey.CounterMap, values);
+                repParams.put(AbilityKey.ETB, etb);
+                if (params != null) {
+                    repParams.putAll(params);
+                }
 
-            switch (game.getReplacementHandler().run(ReplacementType.AddCounter, repParams)) {
-            case NotReplaced:
-                break;
-            case Updated: {
-                values = (Map<Optional<Player>, Map<CounterType, Integer>>) repParams.get(AbilityKey.CounterMap);
-                break;
-            }
-            default:
-                continue;
+                switch (game.getReplacementHandler().run(ReplacementType.AddCounter, repParams)) {
+                case NotReplaced:
+                    break;
+                case Updated: {
+                    values = (Map<Optional<Player>, Multiset<CounterType>>) repParams.get(AbilityKey.CounterMap);
+                    break;
+                }
+                default:
+                    continue;
+                }
             }
 
             // Add ETB flag
-            final Map<AbilityKey, Object> runParams = AbilityKey.newMap();
-            runParams.put(AbilityKey.ETB, etb);
+            Map<AbilityKey, Object> runParams = AbilityKey.newMap();
             runParams.put(AbilityKey.Cause, cause);
             if (params != null) {
                 runParams.putAll(params);
             }
 
+            boolean firstTime = false;
+            if (gm.getKey() instanceof Card c) {
+                firstTime = game.getCounterAddedThisTurn(null, c) == 0;
+            }
+
             // Apply counter after replacement effect
-            for (Map.Entry<Optional<Player>, Map<CounterType, Integer>> e : values.entrySet()) {
+            for (Map.Entry<Optional<Player>, Multiset<CounterType>> e : values.entrySet()) {
                 boolean remember = cause != null && cause.hasParam("RememberPut");
-                for (Map.Entry<CounterType, Integer> ec : e.getValue().entrySet()) {
-                    Integer value = ec.getValue();
-                    if (value == null) {
-                        continue;
-                    }
+                for (Multiset.Entry<CounterType> ec : e.getValue().entrySet()) {
+                    int value = ec.getCount();
                     if (cause != null && cause.hasParam("MaxFromEffect")) {
-                        value = Math.min(value, Integer.parseInt(cause.getParam("MaxFromEffect")) - gm.getKey().getCounters(ec.getKey()));
+                        value = Math.min(value, Integer.parseInt(cause.getParam("MaxFromEffect")) - gm.getKey().getCounters(ec.getElement()));
                     }
-                    gm.getKey().addCounterInternal(ec.getKey(), value, e.getKey().orNull(), true, result, runParams);
-                    if (remember && ec.getValue() >= 1) {
+                    gm.getKey().addCounterInternal(ec.getElement(), value, e.getKey().orElse(null), true, result, runParams);
+                    if (remember && value > 0) {
                         cause.getHostCard().addRemembered(gm.getKey());
                     }
                 }
             }
+
+            if (result.containsColumn(gm.getKey())) {
+                runParams = AbilityKey.newMap();
+                runParams.put(AbilityKey.Object, gm.getKey());
+                runParams.put(AbilityKey.FirstTime, firstTime);
+                game.getTriggerHandler().runTrigger(TriggerType.CounterTypeAddedAll, runParams, false);
+            }
         }
+
+        int totalAdded = totalValues();
+        if (totalAdded > 0 && cause != null && cause.hasParam("RememberAmount")) {
+            cause.getHostCard().addRemembered(totalAdded);
+        }
+
         result.triggerCountersPutAll(game);
         return !result.isEmpty();
     }

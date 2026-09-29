@@ -55,24 +55,22 @@ public class TriggerBecomesTarget extends Trigger {
      * @param runParams*/
     @Override
     public final boolean performTest(final Map<AbilityKey, Object> runParams) {
-        if (hasParam("ValidSource")) {
-            SpellAbility source = (SpellAbility) runParams.get(AbilityKey.SourceSA);
-            if (source == null) {
-                return false;
-            }
-            String valid[] = getParam("ValidSource").split(",");
-            if (!matchesValid(source, valid)) {
-                if (!matchesValid(source.getHostCard(), valid)) {
-                    return false;
-                }
-            }
+        if (!matchesValidParam("ValidSource", runParams.get(AbilityKey.SourceSA))) {
+            return false;
         }
+
         if (!matchesValidParam("ValidTarget", runParams.get(AbilityKey.Target))) {
             return false;
         }
 
         if (hasParam("FirstTime")) {
             if (!runParams.containsKey(AbilityKey.FirstTime)) {
+                return false;
+            }
+        }
+
+        if (hasParam("Valiant")) {
+            if (!runParams.containsKey(AbilityKey.Valiant)) {
                 return false;
             }
         }
@@ -85,7 +83,6 @@ public class TriggerBecomesTarget extends Trigger {
     public final void setTriggeringObjects(final SpellAbility sa, Map<AbilityKey, Object> runParams) {
         sa.setTriggeringObject(AbilityKey.Source, ((SpellAbility) runParams.get(AbilityKey.SourceSA)).getHostCard());
         sa.setTriggeringObjectsFrom(runParams, AbilityKey.SourceSA, AbilityKey.Target);
-        sa.setTriggeringObject(AbilityKey.StackInstance, sa.getHostCard().getGame().getStack().getInstanceMatchingSpellAbilityID((SpellAbility) runParams.get(AbilityKey.SourceSA)));
     }
 
     @Override

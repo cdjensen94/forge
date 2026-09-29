@@ -2,14 +2,15 @@ package forge.util;
 
 import forge.localinstance.properties.ForgeConstants;
 
+import javax.imageio.ImageIO;
+import javax.swing.*;
 import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
-
-import javax.imageio.ImageIO;
-import javax.swing.SwingUtilities;
+import java.net.URLConnection;
 
 public class SwingImageFetcher extends ImageFetcher {
 
@@ -29,14 +30,46 @@ public class SwingImageFetcher extends ImageFetcher {
             this.notifyObservers = notifyObservers;
         }
 
-        private void doFetch(String urlToDownload) throws IOException {
-            String newdespath = urlToDownload.contains(".fullborder.jpg") || urlToDownload.startsWith(ForgeConstants.URL_PIC_SCRYFALL_DOWNLOAD) ?
+        private boolean doFetch(String urlToDownload) throws IOException {
+            if (disableHostedDownload && urlToDownload.startsWith(ForgeConstants.URL_CARDFORGE)) {
+                // Don't try to download card images from cardforge servers
+                return false;
+            }
+
+            if (ScryfallRateLimiter.shouldSkip(urlToDownload)) {
+                return false;
+            }
+
+            boolean isScryfallUrl = urlToDownload.startsWith(ForgeConstants.URL_PIC_SCRYFALL_DOWNLOAD)
+                    || urlToDownload.startsWith(ForgeConstants.URL_SCRYFALL_CDN);
+            String newdespath = urlToDownload.contains(".fullborder.jpg") || isScryfallUrl ?
                     TextUtil.fastReplace(destPath, ".full.jpg", ".fullborder.jpg") : destPath;
-            if (!newdespath.contains(".full") && urlToDownload.startsWith(ForgeConstants.URL_PIC_SCRYFALL_DOWNLOAD))
+            if (!newdespath.contains(".full") && !newdespath.contains(".artcrop") && isScryfallUrl && !destPath.startsWith(ForgeConstants.CACHE_TOKEN_PICS_DIR))
                 newdespath = newdespath.replace(".jpg", ".fullborder.jpg"); //fix planes/phenomenon for round border options
             URL url = new URL(urlToDownload);
             System.out.println("Attempting to fetch: " + url);
-            BufferedImage image = ImageIO.read(url);
+            ScryfallRateLimiter.acquire(urlToDownload);
+
+            // Read through a connection rather than ImageIO.read(URL), which discards the response
+            // code - without it a 429 is indistinguishable from any other failure and we keep asking.
+            final URLConnection connection = url.openConnection();
+            connection.setRequestProperty("Accept", "*/*");
+            connection.setRequestProperty("User-Agent", BuildInfo.getUserAgent());
+            if (connection instanceof HttpURLConnection httpConnection) {
+                final int responseCode = httpConnection.getResponseCode();
+                if (responseCode != HttpURLConnection.HTTP_OK) {
+                    System.err.println("Failed to fetch image. HTTP code: " + responseCode
+                            + " (" + httpConnection.getResponseMessage() + ") for URL: " + urlToDownload);
+                    ScryfallRateLimiter.noteIfRateLimited(responseCode, urlToDownload, httpConnection.getHeaderField("Retry-After"));
+                    httpConnection.disconnect();
+                    return false;
+                }
+            }
+
+            BufferedImage image;
+            try (InputStream is = connection.getInputStream()) {
+                image = ImageIO.read(is);
+            }
             // First, save to a temporary file so that nothing tries to read
             // a partial download.
             File destFile = new File(newdespath + ".tmp");
@@ -49,6 +82,7 @@ public class SwingImageFetcher extends ImageFetcher {
                     SwingUtilities.invokeLater(notifyObservers);
                 } else {
                     System.err.println("Failed to rename image to " + newdespath);
+                    return false;
                 }
             } else {
                 System.err.println("Failed to save image from " + url + " as jpeg");
@@ -64,7 +98,10 @@ public class SwingImageFetcher extends ImageFetcher {
                 } else {
                     System.err.println("Failed to save image from " + url + " as png");
                 }
+                return false;
             }
+
+            return true;
         }
 
         private String tofullBorder(String imageurl) {
@@ -75,7 +112,7 @@ public class SwingImageFetcher extends ImageFetcher {
                 HttpURLConnection conn = (HttpURLConnection) url.openConnection();
                 //connection.setConnectTimeout(1000 * 5); //wait 5 seconds the most
                 //connection.setReadTimeout(1000 * 5);
-                conn.setRequestProperty("User-Agent", "");
+                conn.setRequestProperty("User-Agent", BuildInfo.getUserAgent());
                 if(conn.getResponseCode() == HttpURLConnection.HTTP_NOT_FOUND)
                     imageurl = TextUtil.fastReplace(imageurl, ".full.jpg", ".fullborder.jpg");
                 conn.disconnect();
@@ -86,10 +123,13 @@ public class SwingImageFetcher extends ImageFetcher {
         }
 
         public void run() {
+            boolean success = false;
             for (String urlToDownload : downloadUrls) {
                 try {
-                    doFetch(tofullBorder(urlToDownload));
-                    break;
+                    if (doFetch(urlToDownload)) {
+                        success = true;
+                        break;
+                    }
                 } catch (IOException e) {
                     System.err.println("Failed to download card [" + destPath + "] image: " + e.getMessage());
                     if (urlToDownload.contains("tokens")) {
@@ -99,14 +139,17 @@ public class SwingImageFetcher extends ImageFetcher {
                         String extension = urlToDownload.substring(typeIndex);
                         urlToDownload = setlessFilename+extension;
                         try {
-                            doFetch(tofullBorder(urlToDownload));
-                            break;
+                            if (doFetch(urlToDownload)) {
+                                success = true;
+                                break;
+                            }
                         } catch (IOException t) {
                             System.err.println("Failed to download setless token [" + destPath + "]: " + e.getMessage());
                         }
                     }
                 }
             }
+            // If all downloads fail, mark this image as unfetchable so we don't try again.
         }
     }
 

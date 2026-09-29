@@ -19,7 +19,7 @@ ScryfallCode=ONE
 7 C Compleat Devotion @Filipe Pagliuso
 8 C Crawling Chorus @Michael Walsh
 9 C Duelist of Deep Faith @Marcela Bolívar
-10 M Elesh Norn, Mother of Machines @Martina Fackova
+10 M Elesh Norn, Mother of Machines @Martina Fačková
 11 R The Eternal Wanderer @Alix Branwyn
 12 C Flensing Raptor @Abz J Harding
 13 C Goldwarden's Helm @Vincent Christiaens
@@ -43,7 +43,7 @@ ScryfallCode=ONE
 31 U Resistance Reunited @Aurore Folny
 32 C Sinew Dancer @Campbell White
 33 R Skrelv, Defector Mite @Brian Valeza
-34 R Skrelv's Hive @Heonhwa Choe
+34 R Skrelv's Hive @Heonhwa
 35 U Swooping Lookout @Mike Franchina
 36 C Vanish into Eternity @Magali Villeneuve
 37 U Veil of Assimilation @Wayne Wu
@@ -53,7 +53,7 @@ ScryfallCode=ONE
 41 U Atmosphere Surgeon @Campbell White
 42 R Blade of Shared Souls @Volkan Baǵa
 43 R Blue Sun's Twilight @Piotr Dura
-44 C Bring the Ending @LA Draws
+44 C Bring the Ending @L.A. Draws
 45 C Chrome Prowler @Maxime Minard
 46 U Distorted Curiosity @Svetlin Velinov
 47 R Encroaching Mycosynth @Martin de Diego Sádaba
@@ -113,7 +113,7 @@ ScryfallCode=ONE
 101 U Nimraiser Paladin @José Parodi
 102 C Offer Immortality @A. M. Sartor
 103 C Pestilent Syphoner @Brian Valeza
-104 R Phyrexian Arena @Martina Fackova
+104 R Phyrexian Arena @Martina Fačková
 105 M Phyrexian Obliterator @Maxim Kostin
 106 U Ravenous Necrotitan @Johann Bodin
 107 U Scheming Aspirant @Lauren K. Cannon
@@ -145,7 +145,7 @@ ScryfallCode=ONE
 133 C Furnace Strider @Denis Zhbankov
 134 U Gleeful Demolition @Tuan Duong Chu
 135 C Hazardous Blast @Zoltan Boros
-136 U Hexgold Halberd @Heonhwa Choe
+136 U Hexgold Halberd @Heonhwa
 137 C Hexgold Slash @Eli Minaya
 138 R Koth, Fire of Resistance @Eric Wilkerson
 139 C Kuldotha Cackler @Maxime Minard
@@ -183,7 +183,7 @@ ScryfallCode=ONE
 171 U Incubation Sac @Tony Foti
 172 U Infectious Bite @Campbell White
 173 C Lattice-Blade Mantis @Durion
-174 C Maze's Mantle @LA Draws
+174 C Maze's Mantle @L.A. Draws
 175 M Nissa, Ascended Animist @Chase Stone
 176 U Noxious Assault @Billy Christian
 177 C Oil-Gorger Troll @Dave Kendall
@@ -238,7 +238,7 @@ ScryfallCode=ONE
 226 C Dune Mover @Kev Walker
 227 R The Filigree Sylex @Leanna Crossan
 228 C Furnace Skullbomb @Matt Forsyth
-229 R Graaz, Unstoppable Juggernaut @Nestor Ossandon Leal
+229 R Graaz, Unstoppable Juggernaut @Néstor Ossandón Leal
 230 U Ichorplate Golem @Sam Wolfe Connelly
 231 C Maze Skullbomb @Matt Forsyth
 232 R Mirran Safehouse @Piotr Dura
@@ -246,7 +246,7 @@ ScryfallCode=ONE
 234 U Myr Convert @José Parodi
 235 C Myr Custodian @Mark Behm
 236 C Myr Kinsmith @Cristi Balanescu
-237 C Phyrexian Atlas @Illustranesia
+237 C Phyrexian Atlas @Septian Fajrianto
 238 C Prophetic Prism @Leanna Crossan
 239 U Prosthetic Injector @Zezhou Chen
 240 U Ribskiff @José Parodi
@@ -281,6 +281,8 @@ ScryfallCode=ONE
 269 L Swamp @Mark Riddick
 270 L Mountain @Mark Riddick
 271 L Forest @Mark Riddick
+
+[precon product]
 272 L Plains @Sergey Glushakov
 273 L Island @David Álvarez
 274 L Swamp @Julian Kok Joon Wen
@@ -288,16 +290,11 @@ ScryfallCode=ONE
 276 L Forest @Nadia Hurianova
 
 [jumpstart]
-404 R Mite Overseer @Nestor Ossandon Leal
+404 R Mite Overseer @Néstor Ossandón Leal
 405 R Serum Sovereign @Chris Rallis
 406 R Kinzu of the Bleak Coven @Andreas Zafiratos
 407 R Rhuk, Hexgold Nabber @Andrea De Dominicis
 408 R Goliath Hatchery @Simon Dominic
-409 R Mite Overseer @Nestor Ossandon Leal
-410 R Serum Sovereign @Chris Rallis
-411 R Kinzu of the Bleak Coven @Andreas Zafiratos
-412 R Rhuk, Hexgold Nabber @Andrea De Dominicis
-413 R Goliath Hatchery @Simon Dominic
 
 [showcase]
 285 U Bladed Ambassador @Ravenna Tran
@@ -315,7 +312,7 @@ ScryfallCode=ONE
 297 U Myr Convert @JungShan
 298 M Elesh Norn, Mother of Machines @Dominik Mayer
 299 M Mondrak, Glory Dominus @Flavio Girón
-300 M Phyrexian Vindicator @shikee
+300 M Phyrexian Vindicator @Shikee
 301 R Skrelv, Defector Mite @Sidharth Chaturvedi
 302 M Tekuthal, Inquiry Dominus @Dominik Mayer
 303 R Unctus, Grand Metatect @Sidharth Chaturvedi
@@ -324,7 +321,7 @@ ScryfallCode=ONE
 306 R Geth, Thane of Contracts @Flavio Girón
 307 R Karumonix, the Rat King @Flavio Girón
 308 M Phyrexian Obliterator @Yu-ki Nishimoto
-309 R Vraan, Executioner Thane @shikee
+309 R Vraan, Executioner Thane @Shikee
 310 M Capricious Hellraiser @Kekai Kotaki
 311 R Slobad, Iron Goblin @Dominik Mayer
 312 M Solphim, Mayhem Dominus @Dominik Mayer
@@ -375,17 +372,19 @@ ScryfallCode=ONE
 367 L Swamp @Daria Khlebnikova
 368 L Mountain @Indra Nugroho
 369 L Forest @Alayna Danner
-414 M Elesh Norn, Mother of Machines @Martina Fackova
+414 M Elesh Norn, Mother of Machines @Martina Fačková
 415 M Elesh Norn, Mother of Machines @Junji Ito
+
+[etched]
 417 U Bladed Ambassador @Ravenna Tran
-418 M Elesh Norn, Mother of Machines @Martina Fackova
+418 M Elesh Norn, Mother of Machines @Martina Fačková
 419 M Elesh Norn, Mother of Machines @Junji Ito
 420 M Elesh Norn, Mother of Machines @Dominik Mayer
 421 M Elesh Norn, Mother of Machines @Richard Whitters
 422 R The Eternal Wanderer @Kento Matsuura
 423 R Kemba, Kha Enduring @Izumi Tomoki
 424 M Mondrak, Glory Dominus @Flavio Girón
-425 M Phyrexian Vindicator @shikee
+425 M Phyrexian Vindicator @Shikee
 426 C Sinew Dancer @Kekai Kotaki
 427 R Skrelv, Defector Mite @Sidharth Chaturvedi
 428 M Jace, the Perfected Mind @Showichi Furumi
@@ -401,7 +400,7 @@ ScryfallCode=ONE
 438 R Geth, Thane of Contracts @Flavio Girón
 439 R Karumonix, the Rat King @Flavio Girón
 440 M Phyrexian Obliterator @Yu-ki Nishimoto
-441 R Vraan, Executioner Thane @shikee
+441 R Vraan, Executioner Thane @Shikee
 442 M Vraska, Betrayal's Sting @Sansyu
 443 M Vraska, Betrayal's Sting @Chase Stone
 444 M Capricious Hellraiser @Kekai Kotaki
@@ -461,7 +460,7 @@ ScryfallCode=ONE
 
 [extended art]
 375 R Norn's Wellspring @Jonas De Ro
-376 R Skrelv's Hive @Heonhwa Choe
+376 R Skrelv's Hive @Heonhwa
 377 R White Sun's Twilight @Julian Kok Joon Wen
 378 R Blade of Shared Souls @Volkan Baǵa
 379 R Blue Sun's Twilight @Piotr Dura
@@ -469,7 +468,7 @@ ScryfallCode=ONE
 381 R Mercurial Spelldancer @Marcela Bolívar
 382 R Mindsplice Apparatus @Ovidio Cartagena
 383 R Black Sun's Twilight @Jonas De Ro
-384 R Phyrexian Arena @Martina Fackova
+384 R Phyrexian Arena @Martina Fačková
 385 R Dragonwing Glider @Andreas Zafiratos
 386 R Red Sun's Twilight @Julian Kok Joon Wen
 387 R Urabrask's Forge @Lie Setiawan
@@ -489,6 +488,11 @@ ScryfallCode=ONE
 401 R The Monumental Facade @Bruce Brenneise
 402 R The Mycosynth Gardens @Andrew Mar
 403 R The Seedcore @Kasia 'Kafis' Zielińska
+409 R Mite Overseer @Néstor Ossandón Leal
+410 R Serum Sovereign @Chris Rallis
+411 R Kinzu of the Bleak Coven @Andreas Zafiratos
+412 R Rhuk, Hexgold Nabber @Andrea De Dominicis
+413 R Goliath Hatchery @Simon Dominic
 
 [buy a box]
 284 R Green Sun's Twilight @Piotr Dura
@@ -500,18 +504,23 @@ ScryfallCode=ONE
 280 U Bladehold War-Whip @Tony Foti
 281 U Slaughter Singer @Adam Burn
 282 R Karumonix, the Rat King @Jason A. Engle
-283 R Phyrexian Arena @Martina Fackova
+283 R Phyrexian Arena @Martina Fačková
 
 [tokens]
-c_1_1_a_phyrexian_mite_toxic_noblock
-c_1_1_a_phyrexian_mite_toxic_noblock
-c_2_2_a_drone_deathtouch_leavedrain
-c_3_3_a_phyrexian_golem
-g_3_3_phyrexian_beast_toxic
-g_x_x_phyrexian_horror
-r_1_1_phyrexian_goblin
-r_2_2_rebel
-r_x_1_phyrexian_horror_trample_haste
-the_hollow_sentinel
-w_2_2_cat
-w_2_2_samurai_double_strike
+1 w_2_2_cat @April Prime
+2 w_2_2_samurai_double_strike @Gaboleps
+3 r_1_1_phyrexian_goblin @Jokubas Uogintas
+# Duplicated as there is no r_1_1_phyrexian_goblin_haste token yet
+3 r_1_1_phyrexian_goblin_haste @Jokubas Uogintas
+4 r_x_1_phyrexian_horror_trample_haste @Camille Alquier
+5 r_2_2_rebel @Bram Sels
+6 g_3_3_phyrexian_beast_toxic @Uriah Voth
+7 g_x_x_phyrexian_horror @Allen Williams
+8 c_2_2_a_drone_deathtouch_leavedrain @Steve Argyle
+9 the_hollow_sentinel @Igor Kieryluk
+10 c_3_3_a_phyrexian_golem @Samuel Araya
+11 c_1_1_a_phyrexian_mite_toxic_noblock @Oriana Menendez
+12 c_1_1_a_phyrexian_mite_toxic_noblock @Dave Kendall
+
+[other]
+13 emblem_koth_fire_of_resistance @Eric Wilkerson

@@ -4,7 +4,7 @@ Date=2018-06-08
 Name=Battlebond
 Type=Draft
 BoosterCovers=3
-Booster=10 Common, 3 Uncommon, 1 fromSheet("BBD RareMythic"), 1 BasicLand
+Booster=10 Common, 3 Uncommon, 1 fromSheet("BBD RareMythicDistribution"), 1 BasicLand
 ScryfallCode=BBD
 
 [cards]
@@ -38,7 +38,7 @@ ScryfallCode=BBD
 28 U Jubilant Mascot @Filip Burburan
 29 R Play of the Game @Jung Park
 30 R Regna's Sanction @Bayard Wu
-31 C Skystreamer @Dan Scott
+31 C Skystreamer @Dan Murayama Scott
 32 R Together Forever @Aaron Miller
 33 M Arcane Artisan @Tommy Arnold
 34 U Fumble @Gabor Szikszai
@@ -150,9 +150,9 @@ ScryfallCode=BBD
 140 C Daggerdrome Imp @Jack Wang
 141 R Diabolic Intent @Josu Hernaiz
 142 C Doomed Dissenter @Tony Foti
-143 C Eyeblight Assassin @Dan Scott
+143 C Eyeblight Assassin @Dan Murayama Scott
 144 C Fill with Fright @Luca Zontini
-145 C Grotesque Mutation @Dan Scott
+145 C Grotesque Mutation @Dan Murayama Scott
 146 C Hand of Silumgar @Lius Lasahido
 147 C Last Gasp @Jason A. Engle
 148 C Liturgy of Blood @Zack Stella
@@ -248,7 +248,7 @@ ScryfallCode=BBD
 238 U Juggernaut @Kev Walker
 239 C Millennial Gargoyle @Seb McKinnon
 240 R Mind's Eye @Karl Kopinski
-241 M Mycosynth Lattice @Anthony S. Waters
+241 M Mycosynth Lattice @Anthony S. Waters & Cara Mitten
 242 C Night Market Guard @Steve Argyle
 243 C Peace Strider @Igor Kieryluk
 244 C Pierce Strider @Igor Kieryluk
@@ -262,13 +262,89 @@ ScryfallCode=BBD
 252 L Swamp @Titus Lunter
 253 L Mountain @Titus Lunter
 254 L Forest @Titus Lunter
+
+[etched]
 255 M Will Kenrith @Anna Steinbauer
 256 M Rowan Kenrith @Anna Steinbauer
 
+[RareMythicDistribution]
+1 Will Kenrith|BBD|[1]
+1 Rowan Kenrith|BBD|[2]
+8 Regna, the Redeemer|BBD
+8 Krav, the Unredeemed|BBD
+8 Zndrsplt, Eye of Wisdom|BBD
+8 Okaun, Eye of Chaos|BBD
+8 Virtus the Veiled|BBD
+8 Gorm the Great|BBD
+8 Khorvath Brightflame|BBD
+8 Sylvia Brightspear|BBD
+8 Pir, Imaginative Rascal|BBD
+8 Toothy, Imaginary Friend|BBD
+1 Arena Rector|BBD
+1 Brightling|BBD
+8 Play of the Game|BBD
+8 Regna's Sanction|BBD
+8 Together Forever|BBD
+1 Arcane Artisan|BBD
+8 Game Plan|BBD
+8 Spellseeker|BBD
+8 Zndrsplt's Judgment|BBD
+1 Archfiend of Despair|BBD
+8 Mindblade Render|BBD
+1 Stunning Reversal|BBD
+8 Thrilling Encore|BBD
+8 Virtus's Maneuver|BBD
+8 Bonus Round|BBD
+8 Khorvath's Fury|BBD
+1 Najeela, the Blade-Blossom|BBD
+8 Stolen Strategy|BBD
+1 Bramble Sovereign|BBD
+8 Generous Patron|BBD
+1 Grothama, All-Devouring|BBD
+8 Pir's Whim|BBD
+8 Archon of Valor's Reach|BBD
+8 Last One Standing|BBD
+8 Sentinel Tower|BBD
+8 Victory Chimes|BBD
+8 Bountiful Promenade|BBD
+8 Luxury Suite|BBD
+8 Morphic Pool|BBD
+8 Sea of Clouds|BBD
+8 Spire Garden|BBD
+8 Angelic Chorus|BBD
+8 Kor Spiritdancer|BBD
+1 Land Tax|BBD
+8 Mangara of Corondor|BBD
+8 Mystic Confluence|BBD
+8 Sower of Temptation|BBD
+8 Tidespout Tyrant|BBD
+1 True-Name Nemesis|BBD
+8 Diabolic Intent|BBD
+1 Nirkana Revenant|BBD
+8 Noosegraf Mob|BBD
+8 Nyxathid|BBD
+8 Goblin Razerunners|BBD
+8 Magmatic Force|BBD
+8 War's Toll|BBD
+1 Doubling Season|BBD
+8 Greater Good|BBD
+8 Magus of the Candelabra|BBD
+8 Seedborn Muse|BBD
+8 Vigor|BBD
+8 Apocalypse Hydra|BBD
+8 Evil Twin|BBD
+8 Gwafa Hazid, Profiteer|BBD
+8 Mind's Eye|BBD
+1 Mycosynth Lattice|BBD
+
 [tokens]
-w_1_1_spirit_flying
-w_1_1_warrior
-b_2_2_zombie
-b_5_5_zombie_giant
-g_3_3_beast
-c_1_1_a_myr
+1 w_1_1_spirit_flying @Ryan Yee
+2 w_1_1_warrior @Ryan Barger
+3 b_2_2_zombie @Igor Kieryluk
+4 b_5_5_zombie_giant @Igor Kieryluk
+5 g_3_3_beast @Jesper Ejsing
+6 c_1_1_a_myr @Ryan Pancoast
+
+[other]
+7 emblem_will_kenrith @Anna Steinbauer
+8 emblem_rowan_kenrith @Anna Steinbauer

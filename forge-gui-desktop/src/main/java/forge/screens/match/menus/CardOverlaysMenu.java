@@ -1,15 +1,15 @@
 package forge.screens.match.menus;
 
 import java.awt.Component;
-import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
-import java.awt.event.KeyEvent;
 
 import javax.swing.JCheckBoxMenuItem;
 import javax.swing.JMenu;
 import javax.swing.JMenuItem;
+import javax.swing.KeyStroke;
 import javax.swing.SwingUtilities;
 
+import forge.control.KeyboardShortcuts;
 import forge.localinstance.properties.ForgePreferences;
 import forge.localinstance.properties.ForgePreferences.FPref;
 import forge.menus.MenuUtil;
@@ -32,6 +32,7 @@ public final class CardOverlaysMenu {
         menu.addSeparator();
         menu.add(getMenuItem_CardOverlay(Localizer.getInstance().getMessage("lblCardName"), FPref.UI_OVERLAY_CARD_NAME));
         menu.add(getMenuItem_CardOverlay(Localizer.getInstance().getMessage("lblManaCost"), FPref.UI_OVERLAY_CARD_MANA_COST));
+        menu.add(getMenuItem_CardOverlay(Localizer.getInstance().getMessage("lblPerpetualManaCost"), FPref.UI_OVERLAY_CARD_PERPETUAL_MANA_COST));
         menu.add(getMenuItem_CardOverlay(Localizer.getInstance().getMessage("lblPowerOrToughness"), FPref.UI_OVERLAY_CARD_POWER));
         menu.add(getMenuItem_CardOverlay(Localizer.getInstance().getMessage("lblCardID"), FPref.UI_OVERLAY_CARD_ID));
         menu.add(getMenuItem_CardOverlay(Localizer.getInstance().getMessage("lblAbilityIcon"), FPref.UI_OVERLAY_ABILITY_ICONS));
@@ -39,7 +40,7 @@ public final class CardOverlaysMenu {
     }
 
     private JMenuItem getMenuItem_CardOverlay(String menuCaption, FPref pref) {
-        JCheckBoxMenuItem menu = new JCheckBoxMenuItem(menuCaption);
+        JCheckBoxMenuItem menu = MenuUtil.createStayOpenCheckBox(menuCaption);
         menu.setState(prefs.getPrefBoolean(pref));
         menu.setEnabled(showOverlays);
         menu.addActionListener(getCardOverlaysAction(pref));
@@ -47,50 +48,35 @@ public final class CardOverlaysMenu {
     }
 
     private JMenuItem getMenuItem_ShowOverlays() {
-        JCheckBoxMenuItem menu = new JCheckBoxMenuItem(Localizer.getInstance().getMessage("lblShow"));
-        menu.setAccelerator(MenuUtil.getAcceleratorKey(KeyEvent.VK_O));
+        JCheckBoxMenuItem menu = MenuUtil.createStayOpenCheckBox(Localizer.getInstance().getMessage("lblShow"));
+        final KeyStroke ks = KeyboardShortcuts.getKeyStrokeForPref(FPref.SHORTCUT_CARDOVERLAYS);
+        if (ks != null) { menu.setAccelerator(ks); }
         menu.setState(prefs.getPrefBoolean(FPref.UI_SHOW_CARD_OVERLAYS));
         menu.addActionListener(getShowOverlaysAction());
         return menu;
     }
 
     private ActionListener getShowOverlaysAction() {
-        return new ActionListener() {
-            @Override
-            public void actionPerformed(ActionEvent e) {
-                toggleCardOverlayDisplay((JMenuItem)e.getSource());
-            }
-        };
+        return e -> toggleCardOverlayDisplay((JMenuItem)e.getSource());
     }
 
     private void toggleCardOverlayDisplay(JMenuItem showMenu) {
-        toggleShowOverlaySetting();
+        toggleOverlaySetting(FPref.UI_SHOW_CARD_OVERLAYS);
         repaintCardOverlays();
         // Enable/disable overlay menu items based on state of "Show" menu.
         for (Component c : showMenu.getParent().getComponents()) {
-            if (c instanceof JMenuItem) {
-                JMenuItem m = (JMenuItem)c;
-                if (m != showMenu) {
-                    m.setEnabled(prefs.getPrefBoolean(FPref.UI_SHOW_CARD_OVERLAYS));
+            if (c instanceof JMenuItem jmu) {
+                if (jmu != showMenu) {
+                    jmu.setEnabled(prefs.getPrefBoolean(FPref.UI_SHOW_CARD_OVERLAYS));
                 }
             }
         }
     }
 
-    private static void toggleShowOverlaySetting() {
-        boolean isOverlayEnabled = !prefs.getPrefBoolean(FPref.UI_SHOW_CARD_OVERLAYS);
-        prefs.setPref(FPref.UI_SHOW_CARD_OVERLAYS, isOverlayEnabled);
-        prefs.save();
-    }
-
     private ActionListener getCardOverlaysAction(final FPref overlaySetting) {
-        return new ActionListener() {
-            @Override
-            public void actionPerformed(ActionEvent e) {
-                toggleOverlaySetting(overlaySetting);
-                repaintCardOverlays();
-            }
-
+        return e -> {
+            toggleOverlaySetting(overlaySetting);
+            repaintCardOverlays();
         };
     }
 
@@ -101,11 +87,6 @@ public final class CardOverlaysMenu {
     }
 
     private void repaintCardOverlays() {
-        SwingUtilities.invokeLater(new Runnable() {
-            @Override
-            public void run() {
-                matchUI.repaintCardOverlays();
-            }
-        });
+        SwingUtilities.invokeLater(matchUI::repaintCardOverlays);
     }
 }

@@ -1,13 +1,16 @@
 package forge.util;
 
-import java.io.FileInputStream;
-import java.io.IOException;
-import java.util.*;
-
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 
-import com.google.common.base.Charsets;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Paths;
+import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public class CardTranslation {
 
@@ -15,19 +18,30 @@ public class CardTranslation {
     private static Map <String, String> translatedtypes;
     private static Map <String, String> translatedoracles;
     private static Map <String, List <Pair <String, String> > > oracleMappings;
-    private static Map <String, String> translatedCaches;
+    private static Map <String, Map <String, String> > translatedCaches;
+    private static Map <String, String> sharedCache;
     private static Map <String, String> translatedEffectNames;
     private static Map <String, String> translatedTokenNames;
     private static final List <String> knownEffectNames = Arrays.asList("The Ring", "The Monarch", "The Initiative", "City's Blessing", "Keyword Effects");
+    private static final Pattern TRANSLATION_INVARIANT = Pattern.compile("\\{[^}]{1,6}\\}|[+-]\\d+/[+-]\\d+");
     private static String languageSelected = "en-US";
 
     private static void readTranslationFile(String language, String languagesDirectory) {
         String filename = "cardnames-" + language + ".txt";
 
-        try (LineReader translationFile = new LineReader(new FileInputStream(languagesDirectory + filename), Charsets.UTF_8)) {
+        try (LineReader translationFile = new LineReader(Files.newInputStream(Paths.get(languagesDirectory + filename)), StandardCharsets.UTF_8)) {
             for (String line : translationFile.readLines()) {
                 String[] matches = line.split("\\|");
                 if (matches.length >= 2) {
+                    if (matches[0].indexOf('$') > 0) {
+                        //Functional variant, e.g. "Garbage Elemental $C"
+                        String[] variantSplit = matches[0].split("\\s*\\$", 2);
+                        if(variantSplit.length > 1) {
+                            //Add the base name to the translated names.
+                            translatednames.put(variantSplit[0], matches[1]);
+                            matches[0] = variantSplit[0] + " $" + variantSplit[1]; //Standardize storage.
+                        }
+                    }
                     translatednames.put(matches[0], matches[1]);
                 }
                 if (matches.length >= 3) {
@@ -53,7 +67,7 @@ public class CardTranslation {
             if (name.contains(" // ")) {
                 int splitIndex = name.indexOf(" // ");
                 String leftname = name.substring(0, splitIndex);
-                String rightname = name.substring(splitIndex + 4, name.length());
+                String rightname = name.substring(splitIndex + 4);
                 return translatednames.getOrDefault(leftname, leftname) + " // " + translatednames.getOrDefault(rightname, rightname);
             }
             try {
@@ -72,6 +86,10 @@ public class CardTranslation {
             }
         }
         return name;
+    }
+
+    public static String getTranslatedName(ITranslatable card) {
+        return getTranslatedName(card.getUntranslatedName());
     }
 
     private static String translateTokenName(String name) {
@@ -203,6 +221,12 @@ public class CardTranslation {
         return originaltype;
     }
 
+    public static String getTranslatedType(ITranslatable item) {
+        if (!needsTranslation())
+            return item.getUntranslatedType();
+        return translatedtypes.getOrDefault(item.getTranslationKey(), item.getUntranslatedType());
+    }
+
     public static String getTranslatedOracle(String name) {
         if (needsTranslation()) {
             String toracle = translatedoracles.get(name);
@@ -212,14 +236,35 @@ public class CardTranslation {
         return "";
     }
 
-    public static HashMap<String, String> getTranslationTexts(String cardname, String altcardname) {
-        if (!needsTranslation()) return null;
+    public static String getTranslatedOracle(ITranslatable card) {
+        if(!needsTranslation())
+            return ""; //card.getUntranslatedOracle();
+        //Fallbacks and english versions of oracle texts are handled elsewhere.
+        return translatedoracles.getOrDefault(card.getTranslationKey(), "");
+    }
+
+    public static HashMap<String, String> getTranslationTexts(ITranslatable card) {
+        return getTranslationTexts(card, null);
+    }
+
+    public static HashMap<String, String> getTranslationTexts(ITranslatable cardMain, ITranslatable cardOther) {
+        if(!needsTranslation()) return null;
         HashMap<String, String> translations = new HashMap<>();
-        translations.put("name", getTranslatedName(cardname));
-        translations.put("oracle", getTranslatedOracle(cardname));
-        translations.put("altname", getTranslatedName(altcardname));
-        translations.put("altoracle", getTranslatedOracle(altcardname));
+        translations.put("name", getTranslatedName(cardMain));
+        translations.put("oracle", getTranslatedOracle(cardMain));
+        if(cardOther == null) {
+            translations.put("altname", "");
+            translations.put("altoracle", "");
+        }
+        else {
+            translations.put("altname", getTranslatedName(cardOther));
+            translations.put("altoracle", getTranslatedOracle(cardOther));
+        }
         return translations;
+    }
+
+    public static String getLanguageSelected() {
+        return languageSelected;
     }
 
     private static boolean needsTranslation() {
@@ -234,7 +279,10 @@ public class CardTranslation {
             translatedtypes = new HashMap<>();
             translatedoracles = new HashMap<>();
             oracleMappings = new HashMap<>();
-            translatedCaches = new HashMap<>();
+            // read from the game thread and the EDT both, and computeIfAbsent on a plain
+            // HashMap is not safe under that
+            translatedCaches = new ConcurrentHashMap<>();
+            sharedCache = new ConcurrentHashMap<>();
             readTranslationFile(languageSelected, languagesDirectory);
         }
     }
@@ -248,38 +296,104 @@ public class CardTranslation {
         return result;
     }
 
-    public static void buildOracleMapping(String faceName, String oracleText) {
-        if (!needsTranslation() || oracleMappings.containsKey(faceName)) return;
-        String translatedText = getTranslatedOracle(faceName);
-        if (translatedText.equals("")) {
+    public static void buildOracleMapping(String faceName, String oracleText, String variantName) {
+        String translationKey = faceName;
+        if(variantName != null)
+            translationKey = faceName + " $" + variantName;
+        if (!needsTranslation() || oracleMappings.containsKey(translationKey)) return;
+        String translatedText = getTranslatedOracle(translationKey);
+        if (translatedText.isEmpty()) {
             // english card only, fall back
             return;
         }
-        String translatedName = getTranslatedName(faceName);
+        String translatedName = getTranslatedName(translationKey);
         List <Pair <String, String> > mapping = new ArrayList<>();
         String [] splitOracleText = oracleText.split("\\\\n");
         String [] splitTranslatedText = translatedText.split("\r\n\r\n");
 
-        for (int i = 0; i < splitOracleText.length && i < splitTranslatedText.length; i++) {
+        int offset = leadingLineOffset(splitOracleText, splitTranslatedText);
+
+        for (int i = 0; i < splitOracleText.length; i++) {
             String toracle = replaceCardName("en-US", faceName, splitOracleText[i]);
-            String ttranslated = replaceCardName(languageSelected, translatedName, splitTranslatedText[i]);
             // Remove reminder text in English oracle text unless entire line is reminder text
             if (!toracle.startsWith("(")) {
                 toracle = toracle.replaceAll("\\(.*\\)", "");
             }
+            // A translated oracle can have fewer lines than the English one. Give the uncovered
+            // lines an entry of their own anyway, with no translation - otherwise they match some
+            // other line's entry and two abilities display the same text.
+            int t = i - offset;
+            String ttranslated = t >= 0 && t < splitTranslatedText.length
+                    ? replaceCardName(languageSelected, translatedName, splitTranslatedText[t])
+                    : null;
             mapping.add(Pair.of(toracle, ttranslated));
         }
-        oracleMappings.put(faceName, mapping);
+        oracleMappings.put(translationKey, mapping);
     }
 
-    public static String translateMultipleDescriptionText(String descText, String cardName) {
+    /**
+     * Translated oracles routinely reach us a line short, having folded a leading keyword line
+     * - "Enchant creature", "Flying", "Devoid (...)" - into the line below it, which leaves
+     * every remaining line paired with its neighbour's translation. Mana symbols and stat
+     * changes survive translation unaltered, so where a line carries one they say which pairing
+     * is right; where none does, the leading line is the one usually folded away.
+     *
+     * @return how far the translated lines have slipped against the English ones, 0 or 1
+     */
+    private static int leadingLineOffset(String [] oracle, String [] translated) {
+        if (oracle.length - translated.length != 1
+                || !(oracle[0].startsWith("Enchant ") || isKeywordLine(oracle[0]))) {
+            return 0;
+        }
+        int asIs = 0, shifted = 0;
+        for (int t = 0; t < translated.length; t++) {
+            List <String> theirs = translationInvariants(translated[t]);
+            // a translated line carrying no marks of its own says nothing either way: plenty
+            // of translations write a cost out in words where the English uses a symbol
+            if (theirs.isEmpty()) {
+                continue;
+            }
+            asIs += agreement(oracle[t], theirs);
+            shifted += agreement(oracle[t + 1], theirs);
+        }
+        return asIs > shifted ? 0 : 1;
+    }
+
+    /** 1 where the English line's marks are the translated line's, -1 where they differ. */
+    private static int agreement(String oracleLine, List <String> theirs) {
+        List <String> marks = translationInvariants(oracleLine);
+        return marks.isEmpty() ? 0 : marks.equals(theirs) ? 1 : -1;
+    }
+
+    /**
+     * Whether a line is a keyword line - "Flying", "Devoid (...)", "Enchant creature",
+     * "Renown 1 (...)" - rather than a sentence. This is the line translations fold into the
+     * one below it. They fold sentences too, but keep those at the front, so for a sentence
+     * the lines still pair from the top and there is nothing to realign.
+     */
+    private static boolean isKeywordLine(String line) {
+        String bare = line.replaceAll("\\([^()]*\\)", "").trim();
+        return bare.isEmpty() || (!bare.endsWith(".") && bare.split("\\s+").length <= 5);
+    }
+
+    /** The parts of an oracle line that read the same in every language. */
+    private static List <String> translationInvariants(String line) {
+        List <String> found = new ArrayList<>();
+        Matcher m = TRANSLATION_INVARIANT.matcher(line);
+        while (m.find()) {
+            found.add(m.group());
+        }
+        return found;
+    }
+
+    public static String translateMultipleDescriptionText(String descText, ITranslatable card) {
         if (!needsTranslation()) return descText;
         String [] splitDescText = descText.split("\n");
         String result = descText;
         for (String text : splitDescText) {
             text = text.trim();
             if (text.isEmpty()) continue;
-            String translated = translateSingleDescriptionText(text, cardName);
+            String translated = translateSingleDescriptionText(text, card);
             if (!text.equals(translated)) {
                 result = TextUtil.fastReplace(result, text, translated);
             } else {
@@ -288,7 +402,7 @@ public class CardTranslation {
                 if (splitKeywords.length <= 1) continue;
                 for (String keyword : splitKeywords) {
                     if (keyword.contains(" ")) continue;
-                    translated = translateSingleDescriptionText(keyword, cardName);
+                    translated = translateSingleDescriptionText(keyword, card);
                     if (!keyword.equals(translated)) {
                         result = TextUtil.fastReplace(result, keyword, translated);
                     }
@@ -298,19 +412,30 @@ public class CardTranslation {
         return result;
     }
 
-    public static String translateSingleDescriptionText(String descText, String cardName) {
+    public static String translateSingleDescriptionText(String descText, ITranslatable card) {
         if (descText == null)
             return "";
         if (!needsTranslation()) return descText;
-        if (translatedCaches.containsKey(descText)) return translatedCaches.get(descText);
+        // the answer comes out of one card's oracle mapping, so it can only be reused for that
+        // card - two cards sharing an ability need not word its translation the same way
+        String key = card.getTranslationKey();
+        Map <String, String> cardCache = translatedCaches.computeIfAbsent(key, k -> new ConcurrentHashMap<>());
+        if (cardCache.containsKey(descText)) return cardCache.get(descText);
 
-        List <Pair <String, String> > mapping = oracleMappings.get(cardName);
-        if (mapping == null) return descText;
+        List <Pair <String, String> > mapping = oracleMappings.get(key);
+        if (mapping == null) {
+            // no mapping of its own - a clone that took a different name, say - so fall back to
+            // whatever another card already worked out for this exact text
+            return sharedCache.getOrDefault(descText, descText);
+        }
         String result = descText;
         if (!mapping.isEmpty()) {
             result = translateSingleIngameText(descText, mapping);
         }
-        translatedCaches.put(descText, result);
+        cardCache.put(descText, result);
+        if (!result.equals(descText)) {
+            sharedCache.putIfAbsent(descText, result);
+        }
         return result;
     }
 
@@ -331,7 +456,9 @@ public class CardTranslation {
         }
 
         if (candidateIndex < mapping.size()) {
-            return mapping.get(candidateIndex).getRight();
+            String translated = mapping.get(candidateIndex).getRight();
+            // an oracle line the translation does not cover carries no text of its own
+            return translated == null ? descText : translated;
         }
 
         return descText;

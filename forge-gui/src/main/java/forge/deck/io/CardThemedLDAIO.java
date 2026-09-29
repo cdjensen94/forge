@@ -1,18 +1,12 @@
 package forge.deck.io;
 
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.io.ObjectInputStream;
-import java.io.ObjectOutputStream;
-import java.util.List;
-import java.util.Map;
-
-import org.apache.commons.lang3.tuple.Pair;
-
 import forge.game.GameFormat;
 import forge.localinstance.properties.ForgeConstants;
+import org.apache.commons.lang3.tuple.Pair;
+
+import java.io.*;
+import java.util.List;
+import java.util.Map;
 
 /**
  * Created by maustin on 11/05/2017.
@@ -28,7 +22,6 @@ public class CardThemedLDAIO {
         try (FileOutputStream f = new FileOutputStream(file);
              ObjectOutputStream s = new ObjectOutputStream(f)){
             s.writeObject(lda);
-            s.close();
         } catch (IOException e) {
             System.out.println("Error writing matrix data: " + e);
         }
@@ -43,7 +36,6 @@ public class CardThemedLDAIO {
             System.out.println("Error reading LDA data: " + e);
             return null;
         }
-
     }
 
     public static void saveLDA(String format, Map<String,List<List<Pair<String, Double>>>> map){
@@ -69,11 +61,10 @@ public class CardThemedLDAIO {
     }
 
     public static File getLDAFile(final String name) {
-        return new File(ForgeConstants.DECK_GEN_DIR, name + SUFFIX_DATA);
+        return getMatrixFolder(name + SUFFIX_DATA);
     }
-
     public static File getRAWLDAFile(final String name) {
-        return new File(ForgeConstants.DECK_GEN_DIR, name + RAW_SUFFIX_DATA);
+        return getMatrixFolder(name + RAW_SUFFIX_DATA);
     }
 
     public static File getMatrixFolder(final String name) {
